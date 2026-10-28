@@ -15,10 +15,12 @@ from pydebuprep.checks.boot_time import BootTimeCheck
 from pydebuprep.checks.bootloader import BootloaderCheck
 from pydebuprep.checks.config_conflicts import ConfigConflictsCheck
 from pydebuprep.checks.debsums import DebsumsCheck
+from pydebuprep.checks.disk_space import DiskSpaceCheck
 from pydebuprep.checks.dkms import DkmsCheck
 from pydebuprep.checks.dmesg_errors import DmesgErrorsCheck
 from pydebuprep.checks.dpkg_audit import DpkgAuditCheck
 from pydebuprep.checks.dpkg_rc import DpkgRcCheck
+from pydebuprep.checks.fstab import FstabCheck
 from pydebuprep.checks.journal_errors import JournalErrorsCheck
 from pydebuprep.checks.kernel_running import KernelRunningCheck
 from pydebuprep.checks.needrestart import NeedrestartCheck
@@ -49,6 +51,8 @@ ALL_CHECKS: list[type[Check]] = [
     JournalErrorsCheck,
     DmesgErrorsCheck,
     BootTimeCheck,
+    FstabCheck,
+    DiskSpaceCheck,
 ]
 
 
