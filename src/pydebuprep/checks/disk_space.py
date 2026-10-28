@@ -35,9 +35,15 @@ class DiskSpaceCheck(Check):
 
     def run(self, ctx: Context) -> list[Finding]:
         usage: dict[str, DiskUsage] = {}
+        skip: set[str] = set()
         for mount, f in _rows(ctx.system.run(list(DF_SPACE)).stdout, 6):
+            if f[1].startswith("fuse."):
+                skip.add(mount)  # rclone, sshfs, gvfs, ...: sizes are not meaningful
+                continue
             usage[mount] = DiskUsage(_int(f[2]) * 1024, _int(f[4]) * 1024, 0, 0)
         for mount, f in _rows(ctx.system.run(list(DF_INODES)).stdout, 5):
+            if mount in skip:
+                continue
             entry = usage.setdefault(mount, DiskUsage(0, 0, 0, 0))
             entry.inodes_total, entry.inodes_free = _int(f[1]), _int(f[3])
         findings = []

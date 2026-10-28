@@ -17,6 +17,15 @@ TIMERS = (
 )
 
 
+def _should_be_active(ctx: Context, unit: str) -> bool:
+    """Enabled, and its start conditions hold (timers with unmet conditions idle by design)."""
+    res = ctx.system.run(
+        ["systemctl", "show", "-p", "UnitFileState", "-p", "ConditionResult", unit]
+    )
+    props = dict(line.partition("=")[::2] for line in res.stdout.splitlines())
+    return props.get("UnitFileState") == "enabled" and props.get("ConditionResult") != "no"
+
+
 def _timers(ctx: Context) -> list[list[str]]:
     return [row for row in unit_rows(run_systemctl(ctx, TIMERS).stdout) if len(row) >= 3]
 
@@ -36,7 +45,7 @@ class SystemdTimersCheck(Check):
                 remediation=[f"systemctl status {row[0]}", f"sudo systemctl enable --now {row[0]}"],
             )
             for row in _timers(ctx)
-            if row[1] == "loaded" and row[2] != "active"
+            if row[1] == "loaded" and row[2] != "active" and _should_be_active(ctx, row[0])
         ]
 
     def collect_baseline(self, ctx: Context) -> Any:

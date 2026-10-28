@@ -43,6 +43,7 @@ ALLOWED_PREFIXES: tuple[tuple[str, ...], ...] = (
     ("efibootmgr", "-v"),
     ("systemctl", "list-units"),
     ("systemctl", "list-timers"),
+    ("systemctl", "show", "-p"),
     ("systemd-analyze",),
     ("journalctl", "-p"),
     ("dmesg", "--level=err"),

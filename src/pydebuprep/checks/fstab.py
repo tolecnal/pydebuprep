@@ -14,6 +14,8 @@ VIRTUAL_FS = {
     "binfmt_misc", "efivarfs", "squashfs", "nsfs", "overlay", "ramfs", "rpc_pipefs",
 }  # fmt: skip
 MARKER = re.compile(r"^\s+\[([EW])\]\s*(.*)$")
+PERMISSION_NOISE = "(Permission denied)"
+SWAPFILE_NOTE = "is a directory or regular file"
 ESCAPE = re.compile(r"\\x([0-9a-fA-F]{2})")
 
 
@@ -40,10 +42,17 @@ class FstabCheck(Check):
         res = ctx.system.run(list(FINDMNT_VERIFY))
         problems: dict[str, list[str]] = {"E": [], "W": []}
         target = ""
+        unverified = False
         for line in res.stdout.splitlines():
             match = MARKER.match(line)
             if match:
-                problems[match.group(1)].append(f"{target}: {match.group(2)}")
+                message = match.group(2)
+                if PERMISSION_NOISE in message and not ctx.is_root:
+                    unverified = True
+                elif target == "none" and SWAPFILE_NOTE in message:
+                    continue  # swap files are listed with source=file; findmnt notes it
+                else:
+                    problems[match.group(1)].append(f"{target}: {message}")
             elif line.strip() and not line[0].isspace():
                 target = line.strip()
         remediation = [
@@ -71,7 +80,15 @@ class FstabCheck(Check):
                     remediation=remediation,
                 )
             )
-        if not res.ok and not findings:
+        if unverified:
+            findings.append(
+                Finding(
+                    Severity.INFO,
+                    "Some fstab entries could not be fully verified without root",
+                    remediation=["Run as root for complete results"],
+                )
+            )
+        if not res.ok and not problems["E"] and not problems["W"]:
             findings.append(
                 Finding(
                     Severity.CRITICAL,

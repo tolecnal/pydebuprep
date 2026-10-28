@@ -84,3 +84,26 @@ def test_root_full_critical_inodes_low_and_boot_excluded() -> None:
 def test_disk_space_ok() -> None:
     out = f"Filesystem Type 1024-blocks Used Available Capacity Mounted on\n/dev/sda1 ext4 {GB_BLOCKS} 0 {GB_BLOCKS} 0% /\n"
     assert DiskSpaceCheck().run(make_ctx(commands={DF_SPACE: out, DF_INODES: ""})) == []
+
+
+def test_fstab_non_root_permission_noise_filtered() -> None:
+    out = (
+        "/\n   [W] cannot detect on-disk filesystem type (Permission denied)\n"
+        "none\n   [W] non-bind mount source /swap.img is a directory or regular file\n"
+        "/data\n   [W] target specified more than once\n"
+    )
+    res = CommandResult(FINDMNT_VERIFY, 0, out, "")
+    fs = FstabCheck().run(make_ctx(commands={FINDMNT_VERIFY: res}, root=False))
+    assert [(f.severity, f.title) for f in fs] == [
+        (Severity.WARNING, "/etc/fstab has 1 warning"),
+        (Severity.INFO, "Some fstab entries could not be fully verified without root"),
+    ]
+
+
+def test_fuse_mounts_excluded() -> None:
+    space = (
+        "Filesystem Type 1024-blocks Used Available Capacity Mounted on\n"
+        f"gdrive: fuse.rclone {GB_BLOCKS} {GB_BLOCKS} 0 100% /home/u/mnt/gdrive\n"
+    )
+    inodes = "Filesystem Inodes IUsed IFree IUse% Mounted on\ngdrive: 1000 1000 0 100% /home/u/mnt/gdrive\n"
+    assert DiskSpaceCheck().run(make_ctx(commands={DF_SPACE: space, DF_INODES: inodes})) == []

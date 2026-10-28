@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 
 from pydebuprep.checks.base import Check, Context, count
@@ -9,6 +10,9 @@ from pydebuprep.model import Finding, Severity, truncate_evidence
 JOURNAL = ("journalctl", "-p", "err", "-b", "--no-pager", "-o", "json")
 PERMISSION_HINTS = ("insufficient permissions", "not seeing messages from other users")
 MAX_MESSAGE = 200
+# Hex/decimal runs containing a digit (PIDs, interface suffixes, addresses) vary between
+# otherwise identical messages; collapse them for grouping.
+VARIABLE = re.compile(r"[0-9a-fA-F]*[0-9][0-9a-fA-F]*")
 
 
 def _message(value: object) -> str:
@@ -29,6 +33,8 @@ class JournalErrorsCheck(Check):
     def run(self, ctx: Context) -> list[Finding]:
         res = ctx.system.run(list(JOURNAL), timeout=60)
         counts: Counter[tuple[str, str]] = Counter()
+        examples: dict[tuple[str, str], str] = {}
+        variants: dict[tuple[str, str], set[str]] = {}
         for line in res.stdout.splitlines():
             try:
                 entry = json.loads(line)
@@ -38,7 +44,10 @@ class JournalErrorsCheck(Check):
                 continue
             ident = entry.get("SYSLOG_IDENTIFIER") or entry.get("_COMM") or "kernel"
             msg = " ".join(_message(entry.get("MESSAGE", "")).split())[:MAX_MESSAGE]
-            counts[(str(ident), msg)] += 1
+            key = (str(ident), VARIABLE.sub("#", msg))
+            counts[key] += 1
+            examples.setdefault(key, msg)
+            variants.setdefault(key, set()).add(msg)
         findings = []
         if counts:
             total = sum(counts.values())
@@ -49,7 +58,11 @@ class JournalErrorsCheck(Check):
                     detail="Most common first. Some noise is normal; look for services you rely "
                     "on and anything new since the upgrade.",
                     evidence=truncate_evidence(
-                        [f"{n}x {ident}: {msg}" for (ident, msg), n in counts.most_common()]
+                        [
+                            f"{n}x {key[0]}: {examples[key]}"
+                            + (" (and similar)" if n > 1 and len(variants[key]) > 1 else "")
+                            for key, n in counts.most_common()
+                        ]
                     ),
                     remediation=["journalctl -p err -b", "journalctl -u UNIT -b for a service"],
                 )

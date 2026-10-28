@@ -68,7 +68,8 @@ TIMER_OUT = (
 
 
 def test_inactive_timer_warns() -> None:
-    (f,) = SystemdTimersCheck().run(make_ctx(commands={TIMERS: TIMER_OUT}))
+    commands = dict([(TIMERS, TIMER_OUT), show("certbot.timer", "enabled", "yes")])
+    (f,) = SystemdTimersCheck().run(make_ctx(commands=commands))
     assert (f.severity, f.title) == (Severity.WARNING, "Timer certbot.timer is not active")
 
 
@@ -169,3 +170,40 @@ def test_boot_not_finished() -> None:
     (f,) = BootTimeCheck().run(make_ctx(commands={ANALYZE: res, BLAME: ""}))
     assert (f.severity, f.title) == (Severity.INFO, "Boot has not finished yet")
     assert f.remediation == ["systemctl list-jobs"]
+
+
+def test_journal_groups_messages_differing_only_by_ids() -> None:
+    out = "\n".join(
+        [
+            jline("networkctl", 'Interface "veth44bbc08" not found.'),
+            jline("networkctl", 'Interface "veth789bd3a" not found.'),
+            jline("networkctl", 'Interface "veth2f6e785" not found.'),
+        ]
+    )
+    (f,) = JournalErrorsCheck().run(make_ctx(commands={JOURNAL: out}))
+    assert f.title == "3 error messages in the current boot (1 distinct)"
+    assert f.evidence == ['3x networkctl: Interface "veth44bbc08" not found. (and similar)']
+
+
+def show(unit: str, state: str, condition: str) -> tuple[tuple[str, ...], str]:
+    argv = ("systemctl", "show", "-p", "UnitFileState", "-p", "ConditionResult", unit)
+    return argv, f"UnitFileState={state}\nConditionResult={condition}\n"
+
+
+def test_inactive_timer_with_unmet_condition_or_disabled_ignored() -> None:
+    out = (
+        "ua-timer.timer loaded inactive dead Ubuntu Pro Timer\n"
+        "old.timer loaded inactive dead Disabled timer\n"
+        "certbot.timer loaded inactive dead Run certbot twice daily\n"
+    )
+    commands = dict(
+        [
+            (TIMERS, out),
+            show("ua-timer.timer", "enabled", "no"),
+            show("old.timer", "disabled", "yes"),
+            show("certbot.timer", "enabled", "yes"),
+        ]
+    )
+    assert titles(SystemdTimersCheck().run(make_ctx(commands=commands))) == [
+        "Timer certbot.timer is not active"
+    ]
