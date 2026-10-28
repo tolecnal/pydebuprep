@@ -96,5 +96,7 @@ def test_config_conflicts_critical_paths_configurable() -> None:
 
 
 def test_debsums_timeout_option() -> None:
-    assert DebsumsCheck().opt("timeout_seconds") == 600
-    assert DebsumsCheck({"timeout_seconds": "1200"}).opt("timeout_seconds") == 1200
+    for settings, expected in (({}, 600), ({"timeout_seconds": "1200"}, 1200)):
+        ctx = make_ctx(commands={DEBSUMS: ""})
+        DebsumsCheck(settings).run(ctx)
+        assert ctx.system.timeouts == [expected]  # type: ignore[attr-defined]

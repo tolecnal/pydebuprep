@@ -37,11 +37,13 @@ class FakeSystem(System):
         self.walk_errors = walk_errors or []
         self.strict = strict
         self.calls: list[tuple[str, ...]] = []
+        self.timeouts: list[float] = []
 
     def run(self, argv: Sequence[str], timeout: float = 30.0) -> CommandResult:
         check_allowed(argv)
         args = tuple(argv)
         self.calls.append(args)
+        self.timeouts.append(timeout)
         key = _strip_apt_opts(args)
         if key not in self.commands:
             if self.strict:

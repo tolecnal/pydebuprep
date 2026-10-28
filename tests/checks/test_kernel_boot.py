@@ -244,3 +244,9 @@ def test_boot_space_esp_checked() -> None:
 def test_boot_space_thresholds_configurable() -> None:
     ctx = make_ctx(disks={"/": usage(80), "/boot": usage(20)})
     assert BootSpaceCheck({"warning_pct": 15}).run(ctx) == []
+
+
+def test_boot_space_critical_threshold_configurable() -> None:
+    ctx = make_ctx(disks={"/": usage(80), "/boot": usage(5)})
+    (f,) = BootSpaceCheck({"critical_pct": 3}).run(ctx)
+    assert f.severity is Severity.WARNING
