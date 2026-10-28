@@ -10,6 +10,8 @@ from pydebuprep.checks.apt_lists_age import AptListsAgeCheck
 from pydebuprep.checks.apt_sources import AptSourcesCheck
 from pydebuprep.checks.apt_upgradable import AptUpgradableCheck
 from pydebuprep.checks.base import Check
+from pydebuprep.checks.config_conflicts import ConfigConflictsCheck
+from pydebuprep.checks.debsums import DebsumsCheck
 from pydebuprep.checks.dpkg_audit import DpkgAuditCheck
 from pydebuprep.checks.dpkg_rc import DpkgRcCheck
 from pydebuprep.checks.obsolete_packages import ObsoletePackagesCheck
@@ -25,6 +27,8 @@ ALL_CHECKS: list[type[Check]] = [
     AptAutoremoveCheck,
     DpkgRcCheck,
     ObsoletePackagesCheck,
+    ConfigConflictsCheck,
+    DebsumsCheck,
 ]
 
 

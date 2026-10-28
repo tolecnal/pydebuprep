@@ -1,0 +1,39 @@
+from __future__ import annotations
+
+from pydebuprep.checks.base import Check, Context, count, output_lines
+from pydebuprep.model import Finding, Severity, truncate_evidence
+
+DEBSUMS_TIMEOUT = 600.0
+
+
+class DebsumsCheck(Check):
+    id = "debsums"
+    title = "Package file checksums"
+    category = "packages"
+    requires_root = True
+    requires_commands = ("debsums",)
+    install_hint = "sudo apt install debsums"
+
+    def run(self, ctx: Context) -> list[Finding]:
+        res = ctx.system.run(["debsums", "-c"], timeout=DEBSUMS_TIMEOUT)
+        changed = output_lines(res.stdout)
+        missing = [line for line in output_lines(res.stderr) if "missing file" in line]
+        problems = changed + missing
+        if not problems:
+            return []
+        return [
+            Finding(
+                Severity.WARNING,
+                f"{count(len(problems), 'package file differs', 'package files differ')} "
+                "from or are missing compared to their packages"
+                if len(problems) != 1
+                else "1 package file differs from or is missing compared to its package",
+                detail="Files outside /etc that don't match their package can mean an "
+                "interrupted upgrade, a manual overwrite or disk corruption.",
+                evidence=truncate_evidence(problems),
+                remediation=[
+                    "Find the owner: dpkg -S PATH",
+                    "Restore it: sudo apt install --reinstall PACKAGE",
+                ],
+            )
+        ]
