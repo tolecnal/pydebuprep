@@ -4,15 +4,27 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from pydebuprep.checks.apt_autoremove import AptAutoremoveCheck
+from pydebuprep.checks.apt_held import AptHeldCheck
 from pydebuprep.checks.apt_lists_age import AptListsAgeCheck
 from pydebuprep.checks.apt_sources import AptSourcesCheck
+from pydebuprep.checks.apt_upgradable import AptUpgradableCheck
 from pydebuprep.checks.base import Check
+from pydebuprep.checks.dpkg_audit import DpkgAuditCheck
+from pydebuprep.checks.dpkg_rc import DpkgRcCheck
+from pydebuprep.checks.obsolete_packages import ObsoletePackagesCheck
 from pydebuprep.checks.os_release import OsReleaseCheck
 
 ALL_CHECKS: list[type[Check]] = [
     OsReleaseCheck,
     AptSourcesCheck,
     AptListsAgeCheck,
+    DpkgAuditCheck,
+    AptUpgradableCheck,
+    AptHeldCheck,
+    AptAutoremoveCheck,
+    DpkgRcCheck,
+    ObsoletePackagesCheck,
 ]
 
 

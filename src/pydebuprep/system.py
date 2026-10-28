@@ -191,3 +191,8 @@ class System:
 
     def now(self) -> datetime:
         return datetime.now(timezone.utc)
+
+
+def apt_command(program: str, *args: str) -> list[str]:
+    """Build an apt/apt-get/apt-cache argv that cannot lock or write caches."""
+    return [program, *APT_RO_OPTS, *args]

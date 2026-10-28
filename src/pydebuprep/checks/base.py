@@ -58,3 +58,11 @@ class Check:
                     reason += f"; {self.install_hint}"
                 return reason
         return None
+
+
+def count(n: int, singular: str, plural: str | None = None) -> str:
+    return f"{n} {singular if n == 1 else (plural or singular + 's')}"
+
+
+def output_lines(text: str) -> list[str]:
+    return [line.rstrip() for line in text.splitlines() if line.strip()]
