@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e '.[dev]'
+      - run: make lint test PYTHON=python
+
+  deb:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["debian:bookworm", "debian:trixie", "ubuntu:22.04", "ubuntu:24.04", "ubuntu:26.04"]
+    container: ${{ matrix.image }}
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential devscripts lintian \
+            debhelper dh-python python3-all python3-setuptools python3-yaml python3-pytest
+      - uses: actions/checkout@v4
+      - name: Build
+        run: dpkg-buildpackage -us -uc -b
+      - name: Lintian
+        run: lintian --fail-on error,warning ../*.deb
+      - name: Install and smoke test
+        run: |
+          apt-get install -y ../pydebuprep_*_all.deb
+          pydebuprep --version
+          pydebuprep list-checks
+          rc=0; pydebuprep report --no-baseline > /dev/null || rc=$?
+          test "$rc" -le 2
+          pydebuprep snapshot
+          test "$(stat -c %a /var/lib/pydebuprep/snapshots)" = 750

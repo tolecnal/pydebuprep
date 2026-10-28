@@ -190,3 +190,12 @@ def test_color_only_on_tty(monkeypatch: pytest.MonkeyPatch) -> None:
     assert not cli.use_color(no_color_flag=True)
     monkeypatch.setenv("NO_COLOR", "1")
     assert not cli.use_color(no_color_flag=False)
+
+
+def test_list_checks_uses_report_category_order(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(checks, "ALL_CHECKS", [RootCrit, Warn])
+    run(["list-checks"])
+    out = capsys.readouterr().out
+    assert out.index("warn-check") < out.index("root-crit")

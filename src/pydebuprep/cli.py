@@ -12,7 +12,7 @@ from typing import Any
 
 from pydebuprep import __version__, checks
 from pydebuprep.checks.base import Context, running_kernel
-from pydebuprep.model import CheckResult, Host, Report, Severity, compute_summary
+from pydebuprep.model import CATEGORY_ORDER, CheckResult, Host, Report, Severity, compute_summary
 from pydebuprep.osinfo import detect_os
 from pydebuprep.render import EXTENSIONS, FORMATS, render
 from pydebuprep.runner import run_checks
@@ -196,7 +196,8 @@ def cmd_snapshot(args: argparse.Namespace, system: System) -> int:
 
 
 def cmd_list_checks() -> int:
-    for check in sorted(checks.get_checks(), key=lambda c: (c.category, c.id)):
+    order = {cat: i for i, cat in enumerate(CATEGORY_ORDER)}
+    for check in sorted(checks.get_checks(), key=lambda c: (order.get(c.category, 99), c.id)):
         notes = []
         if check.requires_root:
             notes.append("root")
