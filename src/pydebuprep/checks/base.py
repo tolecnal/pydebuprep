@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Container, Sequence
+import copy
+from collections.abc import Container, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -35,6 +36,55 @@ class Context:
         return self.baseline.get("checks", {}).get(check_id)
 
 
+TRUE_WORDS = ("true", "yes", "on", "1")
+FALSE_WORDS = ("false", "no", "off", "0")
+
+
+@dataclass(frozen=True)
+class Option:
+    """A setting a check accepts; its type is the type of its default."""
+
+    name: str
+    default: Any
+    help: str
+
+    def coerce(self, value: Any) -> Any:
+        """Convert a config-file or command-line value; raises ValueError with a reason."""
+        default = self.default
+        if isinstance(default, bool):
+            if isinstance(value, bool):
+                return value
+            word = str(value).strip().lower()
+            if word in TRUE_WORDS:
+                return True
+            if word in FALSE_WORDS:
+                return False
+            raise ValueError("expected true or false")
+        if isinstance(default, int):
+            if isinstance(value, bool):
+                raise ValueError("expected an integer")
+            try:
+                return int(str(value).strip())
+            except ValueError:
+                raise ValueError("expected an integer") from None
+        if isinstance(default, float):
+            if isinstance(value, bool):
+                raise ValueError("expected a number")
+            try:
+                return float(str(value).strip())
+            except ValueError:
+                raise ValueError("expected a number") from None
+        if isinstance(default, list):
+            if isinstance(value, str):
+                return [item.strip() for item in value.split(",") if item.strip()]
+            if isinstance(value, (list, tuple)):
+                return [str(item) for item in value]
+            raise ValueError("expected a list")
+        if isinstance(value, (dict, list)):
+            raise ValueError("expected a string")
+        return str(value)
+
+
 class Check:
     id: str = ""
     title: str = ""
@@ -42,6 +92,28 @@ class Check:
     requires_root: bool = False
     requires_commands: tuple[str, ...] = ()
     install_hint: str | None = None
+    options: tuple[Option, ...] = ()
+
+    def __init__(self, settings: Mapping[str, Any] | None = None) -> None:
+        known = {o.name: o for o in self.options}
+        self.settings: dict[str, Any] = {o.name: copy.deepcopy(o.default) for o in self.options}
+        for name, value in (settings or {}).items():
+            if name not in known:
+                raise ValueError(f"{self.id}: unknown option {name!r}")
+            try:
+                self.settings[name] = known[name].coerce(value)
+            except ValueError as exc:
+                raise ValueError(f"{self.id}.{name}: {exc}") from None
+        try:
+            self.validate()
+        except ValueError as exc:
+            raise ValueError(f"{self.id}: {exc}") from None
+
+    def opt(self, name: str) -> Any:
+        return self.settings[name]
+
+    def validate(self) -> None:
+        """Check option values against each other; raise ValueError if they don't fit."""
 
     def run(self, ctx: Context) -> list[Finding]:
         raise NotImplementedError

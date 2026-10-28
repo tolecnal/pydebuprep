@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 from pydebuprep.checks.apt_autoremove import AptAutoremoveCheck
 from pydebuprep.checks.apt_held import AptHeldCheck
@@ -56,10 +57,25 @@ ALL_CHECKS: list[type[Check]] = [
 ]
 
 
-def get_checks(only: Sequence[str] | None = None, skip: Sequence[str] = ()) -> list[Check]:
+def get_checks(
+    only: Sequence[str] | None = None,
+    skip: Sequence[str] = (),
+    settings: Mapping[str, Mapping[str, Any]] | None = None,
+) -> list[Check]:
+    """Instantiate checks with their settings; raises ValueError for unknown ids or bad values."""
+    settings = settings or {}
     known = {cls.id: cls for cls in ALL_CHECKS}
-    for check_id in [*(only or []), *skip]:
+    for check_id in [*(only or []), *skip, *settings]:
         if check_id not in known:
             raise ValueError(f"unknown check: {check_id}")
     selected = [known[i] for i in only] if only else list(ALL_CHECKS)
-    return [cls() for cls in selected if cls.id not in skip]
+    return [cls(settings.get(cls.id)) for cls in selected if cls.id not in skip]
+
+
+def parse_check_option(text: str) -> tuple[str, str, str]:
+    """Split a --check-option argument CHECK.OPTION=VALUE."""
+    key, sep, value = text.partition("=")
+    check_id, dot, name = key.partition(".")
+    if not (sep and dot and check_id.strip() and name.strip()):
+        raise ValueError(f"invalid --check-option {text!r}: expected CHECK.OPTION=VALUE")
+    return check_id.strip(), name.strip(), value
