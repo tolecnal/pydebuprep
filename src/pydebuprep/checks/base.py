@@ -66,3 +66,8 @@ def count(n: int, singular: str, plural: str | None = None) -> str:
 
 def output_lines(text: str) -> list[str]:
     return [line.rstrip() for line in text.splitlines() if line.strip()]
+
+
+def running_kernel(ctx: Context) -> str:
+    res = ctx.system.run(["uname", "-r"])
+    return res.stdout.strip() if res.ok else "unknown"

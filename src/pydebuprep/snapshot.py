@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from pydebuprep.checks.base import Check, Context
+from pydebuprep.checks.base import Check, Context, running_kernel
 from pydebuprep.model import BaselineInfo
 
 DEFAULT_SNAPSHOT_DIR = "/var/lib/pydebuprep/snapshots"
@@ -23,11 +23,6 @@ class SnapshotError(Exception):
 
 def format_timestamp(when: datetime) -> str:
     return when.strftime("%Y%m%dT%H%M%SZ")
-
-
-def running_kernel(ctx: Context) -> str:
-    res = ctx.system.run(["uname", "-r"])
-    return res.stdout.strip() if res.ok else "unknown"
 
 
 def build_snapshot(checks: Sequence[Check], ctx: Context) -> dict[str, Any]:

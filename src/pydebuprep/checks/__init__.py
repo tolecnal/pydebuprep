@@ -10,10 +10,15 @@ from pydebuprep.checks.apt_lists_age import AptListsAgeCheck
 from pydebuprep.checks.apt_sources import AptSourcesCheck
 from pydebuprep.checks.apt_upgradable import AptUpgradableCheck
 from pydebuprep.checks.base import Check
+from pydebuprep.checks.boot_space import BootSpaceCheck
+from pydebuprep.checks.bootloader import BootloaderCheck
 from pydebuprep.checks.config_conflicts import ConfigConflictsCheck
 from pydebuprep.checks.debsums import DebsumsCheck
+from pydebuprep.checks.dkms import DkmsCheck
 from pydebuprep.checks.dpkg_audit import DpkgAuditCheck
 from pydebuprep.checks.dpkg_rc import DpkgRcCheck
+from pydebuprep.checks.kernel_running import KernelRunningCheck
+from pydebuprep.checks.needrestart import NeedrestartCheck
 from pydebuprep.checks.obsolete_packages import ObsoletePackagesCheck
 from pydebuprep.checks.os_release import OsReleaseCheck
 
@@ -29,6 +34,11 @@ ALL_CHECKS: list[type[Check]] = [
     ObsoletePackagesCheck,
     ConfigConflictsCheck,
     DebsumsCheck,
+    KernelRunningCheck,
+    NeedrestartCheck,
+    DkmsCheck,
+    BootloaderCheck,
+    BootSpaceCheck,
 ]
 
 

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from pydebuprep import __version__, checks
-from pydebuprep.checks.base import Context
+from pydebuprep.checks.base import Context, running_kernel
 from pydebuprep.model import CheckResult, Host, Report, Severity, compute_summary
 from pydebuprep.osinfo import detect_os
 from pydebuprep.render import EXTENSIONS, FORMATS, render
@@ -24,7 +24,6 @@ from pydebuprep.snapshot import (
     find_latest,
     format_timestamp,
     load_snapshot,
-    running_kernel,
 )
 from pydebuprep.system import System
 
