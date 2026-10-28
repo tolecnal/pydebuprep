@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import dataclasses
 import os
 import sys
@@ -11,7 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from pydebuprep import __version__, checks
-from pydebuprep.checks.base import CommandFailed, Context, running_kernel
+from pydebuprep.checks.base import Check, CommandFailed, Context, running_kernel
+from pydebuprep.config import DEFAULT_CONFIG_PATH, Config, ConfigError, example_config, load_config
 from pydebuprep.model import CATEGORY_ORDER, CheckResult, Host, Report, Severity, compute_summary
 from pydebuprep.osinfo import detect_os
 from pydebuprep.render import EXTENSIONS, FORMATS, render
@@ -20,6 +22,7 @@ from pydebuprep.snapshot import (
     DEFAULT_SNAPSHOT_DIR,
     SnapshotError,
     baseline_info,
+    baseline_warnings,
     create_snapshot,
     find_latest,
     format_timestamp,
@@ -28,7 +31,8 @@ from pydebuprep.snapshot import (
 from pydebuprep.system import System
 
 EXIT_TOOL_ERROR = 3
-COMMANDS = ("report", "snapshot", "list-checks")
+COMMANDS = ("report", "snapshot", "list-checks", "configtest", "example-config")
+CONFIG_ENV = "PYDEBUPREP_CONFIG"
 
 
 class ToolError(Exception):
@@ -37,6 +41,27 @@ class ToolError(Exception):
 
 def _csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _add_config_args(parser: argparse.ArgumentParser) -> None:
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--config",
+        "-c",
+        metavar="FILE",
+        help=f"read settings from FILE (default: {DEFAULT_CONFIG_PATH} if it exists)",
+    )
+    group.add_argument("--no-config", action="store_true", help="ignore any config file")
+
+
+def _add_check_option_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--check-option",
+        action="append",
+        default=[],
+        metavar="CHECK.OPTION=VALUE",
+        help="set a check option, overriding the config file (repeatable)",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -49,7 +74,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="COMMAND")
 
     report = sub.add_parser("report", help="run all checks and print a report (default)")
-    report.add_argument("--format", "-f", choices=FORMATS, default="text", help="output format")
+    report.add_argument("--format", "-f", choices=FORMATS, help="output format (default: text)")
     out = report.add_mutually_exclusive_group()
     out.add_argument(
         "--output-dir",
@@ -70,7 +95,6 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument(
         "--snapshot-dir",
         metavar="DIR",
-        default=DEFAULT_SNAPSHOT_DIR,
         help=f"where to look for the newest snapshot (default: {DEFAULT_SNAPSHOT_DIR})",
     )
     report.add_argument("--checks", type=_csv, metavar="ID,...", help="run only these checks")
@@ -80,20 +104,30 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument(
         "--min-severity",
         choices=[s.value for s in Severity][::-1],
-        default="info",
-        help="hide findings below this severity (exit code still counts them)",
+        help="hide findings below this severity (default: info; exit code still counts them)",
     )
     report.add_argument("--no-color", action="store_true", help="never colorize text output")
+    _add_check_option_arg(report)
+    _add_config_args(report)
 
     snap = sub.add_parser("snapshot", help="record a pre-upgrade baseline")
     snap.add_argument(
         "--snapshot-dir",
         metavar="DIR",
-        default=DEFAULT_SNAPSHOT_DIR,
         help=f"where to store the snapshot (default: {DEFAULT_SNAPSHOT_DIR})",
     )
+    _add_check_option_arg(snap)
+    _add_config_args(snap)
 
-    sub.add_parser("list-checks", help="list available checks")
+    listing = sub.add_parser("list-checks", help="list available checks")
+    listing.add_argument(
+        "--verbose", "-v", action="store_true", help="also show each check's options"
+    )
+
+    test = sub.add_parser("configtest", help="validate the config file and exit")
+    _add_config_args(test)
+
+    sub.add_parser("example-config", help="print an example config file with all defaults")
     return parser
 
 
@@ -107,8 +141,42 @@ def _stdout_is_tty() -> bool:
     return sys.stdout.isatty()
 
 
-def use_color(no_color_flag: bool) -> bool:
-    return not no_color_flag and "NO_COLOR" not in os.environ and _stdout_is_tty()
+def use_color(no_color_flag: bool, configured: bool = True) -> bool:
+    return configured and not no_color_flag and "NO_COLOR" not in os.environ and _stdout_is_tty()
+
+
+def default_config_path() -> str:
+    return os.environ.get(CONFIG_ENV) or DEFAULT_CONFIG_PATH
+
+
+def _load_config(args: argparse.Namespace) -> Config:
+    if args.no_config:
+        return Config.defaults()
+    return load_config(args.config, default_path=default_config_path())
+
+
+def _check_settings(args: argparse.Namespace, config: Config) -> dict[str, dict[str, Any]]:
+    settings = copy.deepcopy(config.check_settings)
+    for text in args.check_option:
+        check_id, name, value = checks.parse_check_option(text)
+        settings.setdefault(check_id, {})[name] = value
+    checks.get_checks(settings=settings)  # validate every setting, used or not
+    return settings
+
+
+def _select_checks(args: argparse.Namespace, config: Config) -> list[Check]:
+    settings = _check_settings(args, config)
+    skip = list(args.skip)
+    if not args.checks:
+        skip += sorted(config.disabled - set(skip))
+    return checks.get_checks(args.checks, skip, settings)
+
+
+def _ensure_writable_dir(directory: Path, what: str) -> None:
+    if not directory.is_dir():
+        raise ToolError(f"{what} {directory} does not exist")
+    if not os.access(directory, os.W_OK):
+        raise ToolError(f"{what} {directory} is not writable")
 
 
 def resolve_output_path(
@@ -139,12 +207,17 @@ def _filter_for_display(results: list[CheckResult], minimum: Severity) -> list[C
     ]
 
 
-def _load_baseline(args: argparse.Namespace) -> tuple[str, dict[str, Any]] | None:
+def _load_baseline(
+    args: argparse.Namespace, config: Config, snapshot_dir: str
+) -> tuple[str, dict[str, Any]] | None:
     if args.no_baseline:
         return None
-    if args.baseline:
-        return args.baseline, load_snapshot(args.baseline)
-    return find_latest(args.snapshot_dir)
+    choice = args.baseline or config.report.baseline
+    if choice == "none":
+        return None
+    if choice == "auto":
+        return find_latest(snapshot_dir)
+    return choice, load_snapshot(choice)
 
 
 def _write(text: str, path: Path) -> None:
@@ -170,9 +243,21 @@ def _print(text: str) -> None:
 
 
 def cmd_report(args: argparse.Namespace, system: System) -> int:
-    selected = checks.get_checks(args.checks, args.skip)
+    config = _load_config(args)
+    fmt = args.format or config.report.format
+    min_severity = args.min_severity or config.report.min_severity
+    snapshot_dir = args.snapshot_dir or config.report.snapshot_dir
+    output_dir = None if args.output else (args.output_dir or config.report.output_dir)
+    selected = _select_checks(args, config)
+    if output_dir is not None:
+        _ensure_writable_dir(Path(output_dir), "output directory")
+    elif args.output:
+        _ensure_writable_dir(Path(args.output).parent, "output directory")
     osinfo = detect_os(system)
-    loaded = _load_baseline(args)
+    loaded = _load_baseline(args, config, snapshot_dir)
+    if loaded:
+        for warning in baseline_warnings(loaded[1], system.hostname(), osinfo.codename):
+            print(f"pydebuprep: warning: {warning}", file=sys.stderr)
     ctx = Context(system, osinfo, loaded[1] if loaded else None)
     results = run_checks(selected, ctx)
     summary = compute_summary(results)
@@ -195,25 +280,29 @@ def cmd_report(args: argparse.Namespace, system: System) -> int:
         host=host,
         baseline=baseline_info(*loaded) if loaded else None,
         summary=summary,
-        results=_filter_for_display(results, Severity(args.min_severity)),
+        results=_filter_for_display(results, Severity(min_severity)),
     )
-    path = resolve_output_path(args.output, args.output_dir, host.hostname, args.format, now)
+    path = resolve_output_path(args.output, output_dir, host.hostname, fmt, now)
     if path is None:
-        _print(render(report, args.format, color=use_color(args.no_color)))
+        _print(render(report, fmt, color=use_color(args.no_color, config.report.color)))
     else:
-        _write(render(report, args.format), path)
+        _write(render(report, fmt), path)
         print(f"Report written to {path}", file=sys.stderr)
     return summary.exit_code
 
 
 def cmd_snapshot(args: argparse.Namespace, system: System) -> int:
+    config = _load_config(args)
+    selected = checks.get_checks(
+        skip=sorted(config.disabled), settings=_check_settings(args, config)
+    )
     ctx = Context(system, detect_os(system))
-    path = create_snapshot(checks.get_checks(), ctx, args.snapshot_dir)
+    path = create_snapshot(selected, ctx, args.snapshot_dir or config.report.snapshot_dir)
     print(path)
     return 0
 
 
-def cmd_list_checks() -> int:
+def cmd_list_checks(verbose: bool) -> int:
     order = {cat: i for i, cat in enumerate(CATEGORY_ORDER)}
     for check in sorted(checks.get_checks(), key=lambda c: (order.get(c.category, 99), c.id)):
         notes = []
@@ -223,6 +312,30 @@ def cmd_list_checks() -> int:
             notes.append("baseline")
         suffix = f" [{', '.join(notes)}]" if notes else ""
         print(f"{check.id:<20} {check.category:<9} {check.title}{suffix}")
+        if verbose:
+            for option in check.options:
+                print(f"    {option.name} = {_show(option.default)}  ({option.help})")
+    return 0
+
+
+def _show(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, list):
+        return ",".join(str(v) for v in value) or "(empty)"
+    return str(value)
+
+
+def cmd_configtest(args: argparse.Namespace) -> int:
+    if args.no_config:
+        print("Config file ignored (--no-config); built-in defaults apply")
+    else:
+        config = _load_config(args)
+        if config.path is None:
+            print(f"Config file {default_config_path()} not found; built-in defaults apply")
+        else:
+            print(f"Using {config.path}")
+    print("Syntax OK")
     return 0
 
 
@@ -237,8 +350,17 @@ def main(argv: list[str] | None = None, *, system: System | None = None) -> int:
         if args.command == "snapshot":
             return cmd_snapshot(args, system)
         if args.command == "list-checks":
-            return cmd_list_checks()
+            return cmd_list_checks(args.verbose)
+        if args.command == "configtest":
+            return cmd_configtest(args)
+        if args.command == "example-config":
+            _print(example_config())
+            return 0
         return cmd_report(args, system)
+    except ConfigError as exc:
+        for error in exc.errors:
+            print(f"pydebuprep: config error: {error}", file=sys.stderr)
+        return EXIT_TOOL_ERROR
     except (ToolError, SnapshotError, ValueError) as exc:
         print(f"pydebuprep: error: {exc}", file=sys.stderr)
         return EXIT_TOOL_ERROR

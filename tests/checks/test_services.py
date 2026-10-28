@@ -5,7 +5,12 @@ import json
 from pydebuprep.checks.boot_time import ANALYZE, BLAME, BootTimeCheck
 from pydebuprep.checks.dmesg_errors import DMESG_ERR, DMESG_WARN, DmesgErrorsCheck
 from pydebuprep.checks.journal_errors import JOURNAL, JournalErrorsCheck
-from pydebuprep.checks.systemd_failed import ACTIVE_SERVICES, FAILED, SystemdFailedCheck
+from pydebuprep.checks.systemd_failed import (
+    ACTIVE_SERVICES,
+    ENABLED_SERVICES,
+    FAILED,
+    SystemdFailedCheck,
+)
 from pydebuprep.checks.systemd_timers import TIMERS, SystemdTimersCheck
 from pydebuprep.model import Severity, Status
 from pydebuprep.runner import run_check
@@ -43,8 +48,7 @@ def test_no_systemd_skips() -> None:
 
 def test_compare_service_no_longer_active() -> None:
     out = "cron.service loaded active running Regular background program processing daemon\n"
-    ctx = make_ctx(commands={ACTIVE_SERVICES: out})
-    assert SystemdFailedCheck().collect_baseline(ctx) == ["cron.service"]
+    ctx = make_ctx(commands={ACTIVE_SERVICES: out, ENABLED_SERVICES: ""})
     fs = SystemdFailedCheck().compare(ctx, ["cron.service", "postgresql@15-main.service"])
     assert [(f.severity, f.title) for f in fs] == [
         (
@@ -55,7 +59,7 @@ def test_compare_service_no_longer_active() -> None:
 
 
 def test_compare_many_services_grouped() -> None:
-    ctx = make_ctx(commands={ACTIVE_SERVICES: ""})
+    ctx = make_ctx(commands={ACTIVE_SERVICES: "", ENABLED_SERVICES: ""})
     fs = SystemdFailedCheck().compare(ctx, [f"s{i}.service" for i in range(7)])
     assert titles(fs) == ["7 services were active before the upgrade but are not now"]
 
@@ -270,3 +274,27 @@ def test_systemd_timers_ignore_units() -> None:
         SystemdTimersCheck({"ignore_units": ["certbot.timer"]}).run(make_ctx(commands=commands))
         == []
     )
+
+
+ENABLED_OUT = "cron.service enabled enabled\nbackup.service enabled enabled\n"
+
+
+def test_systemd_baseline_records_active_and_enabled() -> None:
+    out = "cron.service loaded active running Regular background program processing daemon\n"
+    ctx = make_ctx(commands={ACTIVE_SERVICES: out, ENABLED_SERVICES: ENABLED_OUT})
+    assert SystemdFailedCheck().collect_baseline(ctx) == {
+        "active": ["cron.service"],
+        "enabled": ["backup.service", "cron.service"],
+    }
+
+
+def test_compare_service_no_longer_enabled() -> None:
+    ctx = make_ctx(
+        commands={ACTIVE_SERVICES: "", ENABLED_SERVICES: "cron.service enabled enabled\n"}
+    )
+    fs = SystemdFailedCheck().compare(
+        ctx, {"active": [], "enabled": ["backup.service", "cron.service"]}
+    )
+    assert [(f.severity, f.title) for f in fs] == [
+        (Severity.WARNING, "backup.service was enabled before the upgrade but is not now")
+    ]

@@ -127,3 +127,18 @@ def baseline_info(path: str, snap: dict[str, Any]) -> BaselineInfo:
         os_version=str(os_info.get("version_id", "")),
         hostname=str(snap.get("hostname", "")),
     )
+
+
+def baseline_warnings(snap: dict[str, Any], hostname: str, codename: str) -> list[str]:
+    """Reasons the baseline may not be a pre-upgrade snapshot of this host."""
+    warnings = []
+    other = snap.get("hostname")
+    if other and other != hostname:
+        warnings.append(f"baseline was taken on host {other}, not {hostname}")
+    before = (snap.get("os") or {}).get("codename")
+    if before and before == codename:
+        warnings.append(
+            f"baseline was taken on the current release ({codename}); "
+            "it may be a post-upgrade snapshot"
+        )
+    return warnings

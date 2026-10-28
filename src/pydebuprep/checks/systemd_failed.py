@@ -10,6 +10,14 @@ from pydebuprep.model import Finding, Severity, truncate_evidence
 LIST = ("systemctl", "list-units", "--no-legend", "--plain", "--no-pager")
 FAILED = (*LIST[:2], "--state=failed", *LIST[2:])
 ACTIVE_SERVICES = (*LIST[:2], "--type=service", "--state=active", *LIST[2:])
+ENABLED_SERVICES = (
+    "systemctl",
+    "list-unit-files",
+    "--type=service",
+    "--state=enabled",
+    "--no-legend",
+    "--no-pager",
+)
 GROUP_ABOVE = 5
 
 
@@ -36,17 +44,31 @@ class SystemdFailedCheck(Check):
             if not self._ignored(row[0])
         ]
 
+    def _units(self, ctx: Context, argv: tuple[str, ...]) -> list[str]:
+        return sorted(row[0] for row in unit_rows(run_systemctl(ctx, argv).stdout))
+
     def collect_baseline(self, ctx: Context) -> Any:
-        return sorted(row[0] for row in unit_rows(run_systemctl(ctx, ACTIVE_SERVICES).stdout))
+        return {
+            "active": self._units(ctx, ACTIVE_SERVICES),
+            "enabled": self._units(ctx, ENABLED_SERVICES),
+        }
 
     def compare(self, ctx: Context, before: Any) -> list[Finding]:
-        now = {row[0] for row in unit_rows(run_systemctl(ctx, ACTIVE_SERVICES).stdout)}
-        gone = sorted(u for u in set(before) - now if not self._ignored(u))
+        if isinstance(before, list):  # snapshots from 0.1.0 stored active units only
+            before = {"active": before, "enabled": []}
+        findings = self._lost(before.get("active", []), self._units(ctx, ACTIVE_SERVICES), "active")
+        if before.get("enabled"):
+            enabled_now = self._units(ctx, ENABLED_SERVICES)
+            findings += self._lost(before["enabled"], enabled_now, "enabled")
+        return findings
+
+    def _lost(self, before: list[str], now: list[str], state: str) -> list[Finding]:
+        gone = sorted(u for u in set(before) - set(now) if not self._ignored(u))
         if len(gone) > GROUP_ABOVE:
             return [
                 Finding(
                     Severity.WARNING,
-                    f"{len(gone)} services were active before the upgrade but are not now",
+                    f"{len(gone)} services were {state} before the upgrade but are not now",
                     evidence=truncate_evidence(gone),
                     remediation=[
                         "Check each: systemctl status UNIT",
@@ -57,7 +79,7 @@ class SystemdFailedCheck(Check):
         return [
             Finding(
                 Severity.WARNING,
-                f"{unit} was active before the upgrade but is not now",
+                f"{unit} was {state} before the upgrade but is not now",
                 remediation=[f"systemctl status {unit}", f"sudo systemctl enable --now {unit}"],
             )
             for unit in gone

@@ -3,6 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 # pytest < 7 (Ubuntu 22.04) has no `pythonpath` ini option; make src importable directly.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -66,3 +68,12 @@ def make_sample_report() -> Report:
         summary=compute_summary(results),
         results=results,
     )
+
+
+@pytest.fixture(autouse=True)
+def _no_host_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> None:
+    """Never let a real /etc/pydebuprep.conf on the test machine leak into tests."""
+    missing = tmp_path_factory.mktemp("noconf") / "pydebuprep.conf"
+    monkeypatch.setenv("PYDEBUPREP_CONFIG", str(missing))
