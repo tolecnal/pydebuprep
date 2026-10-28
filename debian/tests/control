@@ -1,0 +1,3 @@
+Test-Command: pydebuprep --version && pydebuprep list-checks && (pydebuprep report --format json --no-baseline > /dev/null; test $? -le 2)
+Depends: @
+Restrictions: allow-stderr

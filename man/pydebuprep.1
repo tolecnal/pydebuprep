@@ -1,0 +1,159 @@
+.TH PYDEBUPREP 1 "October 2026" "pydebuprep 0.1.0" "User Commands"
+.SH NAME
+pydebuprep \- read\-only health report for Debian and Ubuntu after a release upgrade
+.SH SYNOPSIS
+.B pydebuprep
+.RB [ report ]
+.RB [ \-\-format\ \fIFORMAT\fR ]
+.RB [ \-\-output\-dir\ \fIDIR\fR \ |\  \-\-output\ \fIFILE\fR ]
+.RB [ \-\-baseline\ \fIFILE\fR \ |\  \-\-no\-baseline ]
+.RB [ \-\-snapshot\-dir\ \fIDIR\fR ]
+.RB [ \-\-checks\ \fIID,...\fR ]
+.RB [ \-\-skip\ \fIID,...\fR ]
+.RB [ \-\-min\-severity\ \fILEVEL\fR ]
+.RB [ \-\-no\-color ]
+.br
+.B pydebuprep snapshot
+.RB [ \-\-snapshot\-dir\ \fIDIR\fR ]
+.br
+.B pydebuprep list\-checks
+.br
+.B pydebuprep
+.BR \-\-version \ |\  \-\-help
+.SH DESCRIPTION
+.B pydebuprep
+inspects a Debian (12, 13) or Ubuntu (22.04, 24.04, 26.04) system after a
+release upgrade and reports on APT sources, package state, configuration file
+conflicts, the running kernel, DKMS modules, the bootloader, systemd units and
+timers, the journal and kernel log, fstab and disk space.
+.PP
+It is strictly read\-only. It never installs, removes or reconfigures anything,
+never runs
+.BR "apt update" ,
+and never restarts services. Each finding includes the commands to fix it, for
+you to review and run yourself. Every external command it runs is checked
+against a built\-in allowlist of read\-only commands.
+.PP
+Run it as root for complete results. Checks that need root are reported as
+skipped otherwise.
+.SH COMMANDS
+.TP
+.B report
+Run all checks and print a report. This is the default when no command is
+given. If a snapshot exists, the newest one is used as a baseline and each
+check reports what changed since it was taken.
+.TP
+.B snapshot
+Record a baseline before upgrading: OS release, kernel, active services and
+timers, APT sources, held packages, installed packages, mounts and DKMS modules.
+Prints the path of the snapshot file.
+.TP
+.B list\-checks
+List the available checks with their IDs and categories.
+.SH OPTIONS
+.TP
+.BR \-f ", " \-\-format " " \fIFORMAT\fR
+Output format:
+.BR text " (default), " json ", " yaml ", " html " or " markdown .
+All formats contain the same information in the same order.
+.TP
+.BI \-\-output\-dir " DIR"
+Write the report to
+.I DIR/pydebuprep\-HOSTNAME\-YYYYmmddTHHMMSSZ.EXT
+instead of standard output. The directory must exist.
+.TP
+.BR \-o ", " \-\-output " " \fIFILE\fR
+Write the report to
+.IR FILE .
+If it already exists, a UTC timestamp is inserted before the extension; an
+existing file is never overwritten.
+.TP
+.BI \-\-baseline " FILE"
+Compare against this snapshot instead of the newest one.
+.TP
+.B \-\-no\-baseline
+Do not compare against any snapshot.
+.TP
+.BI \-\-snapshot\-dir " DIR"
+Where snapshots are stored and looked up (default
+.IR /var/lib/pydebuprep/snapshots ).
+.TP
+.BI \-\-checks " ID,..."
+Run only the listed checks.
+.TP
+.BI \-\-skip " ID,..."
+Do not run the listed checks.
+.TP
+.BI \-\-min\-severity " LEVEL"
+Hide findings below
+.IR LEVEL :
+.BR info " (default), " warning " or " critical .
+The exit status still counts hidden findings.
+.TP
+.B \-\-no\-color
+Never colorize text output. Color is also disabled when standard output is not
+a terminal or the
+.B NO_COLOR
+environment variable is set.
+.TP
+.B \-\-version
+Print the version and exit.
+.TP
+.BR \-h ", " \-\-help
+Print usage and exit.
+.SH EXIT STATUS
+.TP
+.B 0
+No findings at warning level or above.
+.TP
+.B 1
+The most severe finding is a warning.
+.TP
+.B 2
+At least one critical finding.
+.TP
+.B 3
+pydebuprep itself failed: invalid arguments, an unreadable baseline, or an
+output file that could not be written.
+.PP
+Skipped checks do not affect the exit status.
+.SH FILES
+.TP
+.I /var/lib/pydebuprep/snapshots/
+Default snapshot directory (mode 0750). Snapshots are JSON files named after
+the UTC time they were taken.
+.SH EXAMPLES
+Take a snapshot, upgrade, reboot, then report:
+.PP
+.nf
+.RS
+sudo pydebuprep snapshot
+sudo apt full\-upgrade   # or do\-release\-upgrade
+sudo reboot
+sudo pydebuprep
+.RE
+.fi
+.PP
+Write an HTML report to /var/tmp:
+.PP
+.nf
+.RS
+sudo pydebuprep report \-\-format html \-\-output\-dir /var/tmp
+.RE
+.fi
+.PP
+Machine\-readable output for automation:
+.PP
+.nf
+.RS
+sudo pydebuprep report \-\-format json \-\-no\-color > report.json; echo $?
+.RE
+.fi
+.SH SEE ALSO
+.BR apt (8),
+.BR dpkg (1),
+.BR needrestart (1),
+.BR debsums (1),
+.BR systemctl (1),
+.BR journalctl (1),
+.BR findmnt (8)

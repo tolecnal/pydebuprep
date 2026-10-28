@@ -2,4 +2,6 @@
 max-line-length = 100
 extend-ignore = E203,W503
 exclude = .git,.venv,build,debian,.superpowers
-per-file-ignores = tests/*:E501
+per-file-ignores =
+    tests/*:E501
+    tests/conftest.py:E501,E402

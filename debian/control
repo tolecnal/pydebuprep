@@ -1,0 +1,30 @@
+Source: pydebuprep
+Section: admin
+Priority: optional
+Maintainer: Jostein Elvaker Haande <jehaande@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               dh-python,
+               python3-all,
+               python3-setuptools,
+               python3-yaml,
+               python3-pytest
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+X-Python3-Version: >= 3.10
+
+Package: pydebuprep
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends}, python3-yaml
+Recommends: debsums, needrestart
+Suggests: efibootmgr, dkms
+Description: post-upgrade health report for Debian and Ubuntu
+ pydebuprep inspects a Debian or Ubuntu system after a release upgrade
+ (for example Debian 12 to 13, or Ubuntu 22.04 to 24.04) and reports on
+ package state, APT sources, configuration file conflicts, the running
+ kernel, bootloader, systemd units and timers, logs, mounts and disk space.
+ .
+ It is strictly read-only: it never changes the system, and every finding
+ comes with the commands to fix it. An optional snapshot taken before the
+ upgrade lets the report show what changed. Reports are available as text,
+ JSON, YAML, HTML and Markdown, with exit codes suited to automation such
+ as Ansible.

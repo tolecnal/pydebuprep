@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "configure" ]; then
+    # Snapshots list installed packages and services; keep them private to root.
+    install -d -m 0750 /var/lib/pydebuprep /var/lib/pydebuprep/snapshots
+fi
+
+#DEBHELPER#
+
+exit 0

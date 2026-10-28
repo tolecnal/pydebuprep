@@ -2,34 +2,6 @@
 requires = ["setuptools>=59"]
 build-backend = "setuptools.build_meta"
 
-[project]
-name = "pydebuprep"
-description = "Read-only post-upgrade health report for Debian and Ubuntu"
-readme = "README.md"
-requires-python = ">=3.10"
-license = {text = "MIT"}
-authors = [{name = "Jostein Elvaker Haande", email = "jehaande@gmail.com"}]
-dependencies = ["PyYAML"]
-dynamic = ["version"]
-classifiers = [
-    "Environment :: Console",
-    "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3",
-    "Topic :: System :: Systems Administration",
-]
-
-[project.optional-dependencies]
-dev = ["pytest", "ruff", "flake8", "mypy", "types-PyYAML"]
-
-[project.scripts]
-pydebuprep = "pydebuprep.cli:main"
-
-[tool.setuptools.dynamic]
-version = {attr = "pydebuprep.__version__"}
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
 [tool.ruff]
 target-version = "py310"
 line-length = 100
@@ -49,4 +21,3 @@ files = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src", "."]

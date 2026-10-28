@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# pytest < 7 (Ubuntu 22.04) has no `pythonpath` ini option; make src importable directly.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
 from pydebuprep.model import (
     BaselineInfo,
     CheckResult,
