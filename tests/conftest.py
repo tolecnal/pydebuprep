@@ -56,7 +56,7 @@ def make_sample_report() -> Report:
         CheckResult("fstab", "fstab", "storage", Status.OK, baseline_diff=None),
     ]
     return Report(
-        tool={"name": "pydebuprep", "version": "0.1.0"},
+        tool={"name": "pydebuprep", "version": "0.2.0"},
         generated_at="2026-10-28T12:00:00+00:00",
         host=Host("testhost", "debian", "13", "trixie", "6.12.0-1-amd64", True),
         baseline=BaselineInfo(

@@ -1,3 +1,15 @@
+pydebuprep (0.2.0) unstable; urgency=medium
+
+  * Configuration file /etc/pydebuprep.conf (YAML) with per-check options,
+    plus configtest and example-config commands and --check-option.
+  * New output formats: jira and confluence (wiki markup).
+  * disk-space checks local filesystems only unless include_remote is set.
+  * Snapshots record enabled as well as active services.
+  * Output directory is validated before checks run; baseline host and
+    release mismatches are warned about even when os-release is skipped.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Wed, 28 Oct 2026 20:00:00 +0000
+
 pydebuprep (0.1.0) unstable; urgency=medium
 
   * Initial release.

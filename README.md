@@ -24,7 +24,7 @@ Debian 12 (bookworm), Debian 13 (trixie), Ubuntu 22.04 (jammy), 24.04 (noble) an
 Build the package (see [Development](#development)) and install it:
 
 ```sh
-sudo apt install ./pydebuprep_0.1.0_all.deb
+sudo apt install ./pydebuprep_0.2.0_all.deb
 ```
 
 `debsums` and `needrestart` are recommended; the checks that need them are skipped
@@ -57,12 +57,70 @@ sudo pydebuprep report --format html --output-dir /var/tmp
 
 | Option | Effect |
 |---|---|
-| `--format text\|json\|yaml\|html\|markdown` | Output format (default `text`). Every format has the same structure. |
+| `--format text\|json\|yaml\|html\|markdown\|jira\|confluence` | Output format (default `text`). Every format has the same structure. |
 | `--output-dir DIR` | Write to a timestamped file in `DIR` instead of stdout. |
 | `--output FILE` | Write to `FILE`; if it exists, a timestamp is added instead of overwriting. |
 | `--checks ID,...` / `--skip ID,...` | Run only, or leave out, specific checks. |
 | `--min-severity warning\|critical` | Hide lower-severity findings (the exit code still counts them). |
 | `--no-color` | Plain text output (also when not a TTY or `NO_COLOR` is set). |
+| `--check-option CHECK.OPTION=VALUE` | Set a check option (repeatable); see `pydebuprep list-checks --verbose`. |
+| `--config FILE` / `--no-config` | Use another config file, or none. |
+
+### Pasting into Jira or Confluence
+
+`--format jira` produces Jira wiki markup: paste it into an issue or comment
+(in the text editor, or the visual editor, which converts wiki markup on paste).
+`--format confluence` produces Confluence wiki markup with status lozenges and
+info/note/warning panels; insert it with **Insert → Markup → Confluence wiki**.
+The two dialects differ, so use the one that matches where you paste. Both were
+written against the documented markup; check them in your own Jira/Confluence
+version before relying on the layout.
+
+```sh
+sudo pydebuprep --format jira --no-color | xclip -selection clipboard
+```
+
+## Configuration
+
+pydebuprep reads `/etc/pydebuprep.conf` if it exists (or the file in
+`$PYDEBUPREP_CONFIG`, or `--config FILE`). It's YAML: a `report` section with
+defaults for the command-line options, and a `checks` section where each check
+can be disabled or given options. Command-line options win over the file.
+
+```yaml
+report:
+  format: html
+  output_dir: /var/tmp/pydebuprep
+  baseline: auto            # auto | none | /path/to/snapshot.json
+checks:
+  debsums:
+    enabled: false
+  disk-space:
+    include_remote: true    # also NFS, CIFS, sshfs, rclone, ...
+    warning_pct: 20.0
+    exclude_mounts: ["/mnt/scratch*"]
+  journal-errors:
+    ignore: ["^networkctl: Interface .* not found"]
+```
+
+```sh
+pydebuprep example-config > pydebuprep.conf   # every setting at its default, commented
+sudo pydebuprep configtest                     # "Syntax OK", or every problem and exit 3
+pydebuprep list-checks --verbose               # all checks and their options
+```
+
+The package also installs the example as
+`/usr/share/doc/pydebuprep/examples/pydebuprep.conf`.
+
+| Check | Options (defaults) |
+|---|---|
+| `apt-lists-age` | `max_age_days` (7) |
+| `config-conflicts` | `critical_paths` (sshd_config, sshd_config.d/, sudoers, sudoers.d/) |
+| `debsums` | `timeout_seconds` (600) |
+| `boot-space` | `warning_pct` (25.0), `critical_pct` (10.0) |
+| `disk-space` | `include_remote` (false), `warning_pct` (25.0), `critical_pct` (10.0), `exclude_mounts` ([]) |
+| `dmesg-errors`, `journal-errors` | `ignore` ([]): regular expressions for messages to leave out |
+| `systemd-failed`, `systemd-timers` | `ignore_units` ([]): unit name patterns to leave out |
 
 ### Exit codes
 
@@ -100,9 +158,9 @@ host never looks healthy just because a check couldn't look.
 | `dmesg-errors` | services | Kernel errors and warnings (root) |
 | `journal-errors` | services | Errors in the journal since boot, grouped |
 | `needrestart` | services | Services still using old libraries (root, needs `needrestart`) |
-| `systemd-failed` | services | Failed units |
+| `systemd-failed` | services | Failed units; services active or enabled before the upgrade that aren't now |
 | `systemd-timers` | services | Enabled timers that aren't active |
-| `disk-space` | storage | Free space and inodes on all real filesystems |
+| `disk-space` | storage | Free space and inodes on local filesystems (network mounts optional) |
 | `fstab` | storage | `findmnt --verify`; mounts that went missing since the baseline |
 
 ## Running across a fleet with Ansible
@@ -156,7 +214,11 @@ host never looks healthy just because a check couldn't look.
    implement `run(ctx) -> list[Finding]`. Give every finding at least one
    remediation step.
 2. To take part in snapshots, also implement `collect_baseline(ctx)` and
-   `compare(ctx, before)`.
+   `compare(ctx, before)`. For settings, declare
+   `options = (Option("name", default, "help"),)` and read them with
+   `self.opt("name")`; the type comes from the default, and the option shows up
+   in `example-config`, `list-checks --verbose` and config validation
+   automatically. Override `validate()` to check values against each other.
 3. Add the class to `ALL_CHECKS` in `src/pydebuprep/checks/__init__.py`.
 4. Run commands only through `run_checked(ctx, argv)`, which turns a timeout or an
    unexpected exit status into a check error instead of empty output. If you need a

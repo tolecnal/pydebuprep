@@ -171,3 +171,13 @@ def test_wiki_escaping(fmt: str) -> None:
     out = render(r, fmt)
     assert r"a\|b \{c\} \[d\] \*e\* \_f\_ \!g\! \^h\^ \~i\~ \+j\+ \#k \\l" in out
     assert "{noformat} escape attempt" not in out
+
+
+@pytest.mark.parametrize("fmt", ["jira", "confluence"])
+def test_wiki_double_hyphen_not_turned_into_dash(fmt: str) -> None:
+    r = make_sample_report()
+    r.results[0].findings[1] = Finding(
+        Severity.INFO, "x", remediation=["sudo apt autoremove --purge"]
+    )
+    out = render(r, fmt)
+    assert r"# sudo apt autoremove \-\-purge" in out

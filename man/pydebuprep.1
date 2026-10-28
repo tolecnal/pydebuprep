@@ -1,4 +1,4 @@
-.TH PYDEBUPREP 1 "October 2026" "pydebuprep 0.1.0" "User Commands"
+.TH PYDEBUPREP 1 "October 2026" "pydebuprep 0.2.0" "User Commands"
 .SH NAME
 pydebuprep \- read\-only health report for Debian and Ubuntu after a release upgrade
 .SH SYNOPSIS
@@ -12,11 +12,21 @@ pydebuprep \- read\-only health report for Debian and Ubuntu after a release upg
 .RB [ \-\-skip\ \fIID,...\fR ]
 .RB [ \-\-min\-severity\ \fILEVEL\fR ]
 .RB [ \-\-no\-color ]
+.RB [ \-\-check\-option\ \fICHECK.OPTION=VALUE\fR ]
+.RB [ \-\-config\ \fIFILE\fR \ |\  \-\-no\-config ]
 .br
 .B pydebuprep snapshot
 .RB [ \-\-snapshot\-dir\ \fIDIR\fR ]
+.RB [ \-\-check\-option\ \fICHECK.OPTION=VALUE\fR ]
+.RB [ \-\-config\ \fIFILE\fR \ |\  \-\-no\-config ]
 .br
 .B pydebuprep list\-checks
+.RB [ \-\-verbose ]
+.br
+.B pydebuprep configtest
+.RB [ \-\-config\ \fIFILE\fR \ |\  \-\-no\-config ]
+.br
+.B pydebuprep example\-config
 .br
 .B pydebuprep
 .BR \-\-version \ |\  \-\-help
@@ -49,12 +59,27 @@ timers, APT sources, held packages, installed packages, mounts and DKMS modules.
 Prints the path of the snapshot file.
 .TP
 .B list\-checks
-List the available checks with their IDs and categories.
+List the available checks with their IDs and categories. With
+.BR \-\-verbose ,
+also list each check's options and their defaults.
+.TP
+.B configtest
+Read and validate the configuration file, report every problem found, and exit
+0 if it is valid or 3 if not. Prints
+.B Syntax OK
+on success.
+.TP
+.B example\-config
+Print a commented configuration file containing every setting at its default.
 .SH OPTIONS
 .TP
 .BR \-f ", " \-\-format " " \fIFORMAT\fR
 Output format:
-.BR text " (default), " json ", " yaml ", " html " or " markdown .
+.BR text " (default), " json ", " yaml ", " html ", " markdown ,
+.B jira
+(Jira wiki markup) or
+.B confluence
+(Confluence wiki markup, for Insert > Markup > Confluence wiki).
 All formats contain the same information in the same order.
 .TP
 .BI \-\-output\-dir " DIR"
@@ -96,6 +121,27 @@ a terminal or the
 .B NO_COLOR
 environment variable is set.
 .TP
+.BI \-\-check\-option " CHECK.OPTION=VALUE"
+Set an option of one check, overriding the configuration file. May be given
+more than once. Use
+.B list\-checks \-\-verbose
+to see the options.
+.TP
+.BR \-c ", " \-\-config " " \fIFILE\fR
+Read settings from
+.I FILE
+instead of
+.IR /etc/pydebuprep.conf .
+The file must exist.
+.TP
+.B \-\-no\-config
+Ignore any configuration file and use built\-in defaults.
+.TP
+.BR \-v ", " \-\-verbose
+With
+.BR list\-checks ,
+show each check's options.
+.TP
 .B \-\-version
 Print the version and exit.
 .TP
@@ -118,11 +164,57 @@ output file that could not be written.
 .PP
 Skipped checks do not affect the exit status. A check that fails to run (for
 example because a command timed out) raises it to at least 1.
+.SH CONFIGURATION
+The configuration file is YAML with two sections.
+.B report
+holds defaults for
+.BR format ", " output_dir ", " min_severity ", " color ", " baseline
+.RB ( auto ,
+.BR none ,
+or a snapshot path) and
+.BR snapshot_dir .
+.B checks
+has one entry per check ID:
+.B "enabled: false"
+leaves the check out, and the other keys set that check's options. For example:
+.PP
+.nf
+.RS
+report:
+  format: html
+  output_dir: /var/tmp/pydebuprep
+checks:
+  debsums:
+    enabled: false
+  disk\-space:
+    include_remote: true
+    exclude_mounts: [/mnt/scratch*]
+.RE
+.fi
+.PP
+Command\-line options override the file, which overrides built\-in defaults.
+Unknown keys, unknown checks and invalid values are errors.
 .SH FILES
+.TP
+.I /etc/pydebuprep.conf
+Configuration file, read if it exists. See
+.BR CONFIGURATION .
+.TP
+.I /usr/share/doc/pydebuprep/examples/pydebuprep.conf
+Example configuration with every default, also printed by
+.BR "pydebuprep example\-config" .
 .TP
 .I /var/lib/pydebuprep/snapshots/
 Default snapshot directory (mode 0750). Snapshots are JSON files named after
 the UTC time they were taken.
+.SH ENVIRONMENT
+.TP
+.B PYDEBUPREP_CONFIG
+Path of the configuration file to read instead of
+.IR /etc/pydebuprep.conf .
+.TP
+.B NO_COLOR
+Disables colored text output.
 .SH EXAMPLES
 Take a snapshot, upgrade, reboot, then report:
 .PP
@@ -140,6 +232,15 @@ Write an HTML report to /var/tmp:
 .nf
 .RS
 sudo pydebuprep report \-\-format html \-\-output\-dir /var/tmp
+.RE
+.fi
+.PP
+Check a configuration file, then report on network mounts too:
+.PP
+.nf
+.RS
+sudo pydebuprep configtest
+sudo pydebuprep \-\-check\-option disk\-space.include_remote=true
 .RE
 .fi
 .PP

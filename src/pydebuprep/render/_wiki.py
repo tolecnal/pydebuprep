@@ -21,7 +21,8 @@ _SPECIAL = re.compile(r"([\\{}\[\]|*_!^~+#])")
 
 
 def esc(text: str) -> str:
-    return _SPECIAL.sub(r"\\\1", text)
+    # Both products turn "--" into a dash, which would break command-line options.
+    return _SPECIAL.sub(r"\\\1", text).replace("--", r"\-\-")
 
 
 def noformat(lines: list[str]) -> list[str]:
