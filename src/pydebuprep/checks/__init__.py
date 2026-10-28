@@ -4,9 +4,16 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from pydebuprep.checks.apt_lists_age import AptListsAgeCheck
+from pydebuprep.checks.apt_sources import AptSourcesCheck
 from pydebuprep.checks.base import Check
+from pydebuprep.checks.os_release import OsReleaseCheck
 
-ALL_CHECKS: list[type[Check]] = []
+ALL_CHECKS: list[type[Check]] = [
+    OsReleaseCheck,
+    AptSourcesCheck,
+    AptListsAgeCheck,
+]
 
 
 def get_checks(only: Sequence[str] | None = None, skip: Sequence[str] = ()) -> list[Check]:
