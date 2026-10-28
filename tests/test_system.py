@@ -43,6 +43,7 @@ def test_check_allowed_accepts_exact_commands() -> None:
         ("apt-get", *APT_RO_OPTS, "-s", "autoremove", "-o", "APT::Get::Simulate=0"),
         ("apt-cache", *APT_RO_OPTS, "policy", "-o", "Dir::Cache::pkgcache=/etc/x"),
         ("apt-get", "check"),  # missing the read-only apt options
+        ("apt-mark", "showhold"),  # apt-mark rebuilds pkgcache.bin as root without them
         ("apt", "list", "--upgradable"),
         ("debsums", "-c", "--generate=all"),
         ("dkms", "status", "install", "-m", "x", "-v", "1"),

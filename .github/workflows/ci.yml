@@ -50,3 +50,12 @@ jobs:
           test "$rc" -le 2
           pydebuprep snapshot
           test "$(stat -c %a /var/lib/pydebuprep/snapshots)" = 750
+      - name: Prove a root run changes nothing (strace + filesystem timestamps)
+        run: |
+          # Worst case: real apt cache settings and no cache yet, so any apt call
+          # that may write one would do it now. Optional tools installed so their
+          # checks run too.
+          rm -f /etc/apt/apt.conf.d/docker-clean /var/cache/apt/*.bin
+          apt-get install -y --no-install-recommends strace debsums dkms needrestart efibootmgr
+          rm -f /var/cache/apt/*.bin
+          scripts/readonly-audit.sh /tmp/audit

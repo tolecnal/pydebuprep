@@ -1,6 +1,6 @@
 PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
-.PHONY: lint test coverage deb clean generated
+.PHONY: lint test coverage deb clean generated audit
 
 lint:
 	$(PYTHON) -m ruff check src tests
@@ -21,6 +21,10 @@ generated:
 	PYTHONPATH=src $(PYTHON) -m pydebuprep completion bash > completions/bash/pydebuprep
 	PYTHONPATH=src $(PYTHON) -m pydebuprep completion zsh > completions/zsh/_pydebuprep
 	PYTHONPATH=src $(PYTHON) -m pydebuprep example-config > examples/pydebuprep.conf
+
+# Run as root with pydebuprep installed: proves report/snapshot change nothing else.
+audit:
+	scripts/readonly-audit.sh
 
 deb:
 	dpkg-buildpackage -us -uc -b

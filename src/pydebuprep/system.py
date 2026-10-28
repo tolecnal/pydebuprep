@@ -26,7 +26,7 @@ APT_RO_OPTS: tuple[str, ...] = (
     "Dir::Cache::srcpkgcache=",
 )
 
-APT_PROGRAMS = ("apt", "apt-get", "apt-cache")
+APT_PROGRAMS = ("apt", "apt-get", "apt-cache", "apt-mark")
 
 _DF_EXCLUDE = ("-x", "tmpfs", "-x", "devtmpfs", "-x", "squashfs", "-x", "overlay", "-x", "efivarfs")
 _UNITS = ("--no-legend", "--plain", "--no-pager")
