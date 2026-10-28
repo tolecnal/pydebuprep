@@ -31,13 +31,15 @@ def expected_sequence() -> list[str]:
 
 
 def test_formats_and_extensions() -> None:
-    assert FORMATS == ("text", "json", "yaml", "html", "markdown")
+    assert FORMATS == ("text", "json", "yaml", "html", "markdown", "jira", "confluence")
     assert EXTENSIONS == {
         "text": "txt",
         "json": "json",
         "yaml": "yaml",
         "html": "html",
         "markdown": "md",
+        "jira": "jira.txt",
+        "confluence": "confluence.txt",
     }
 
 
@@ -51,7 +53,10 @@ def test_yaml_roundtrip_equals_to_dict() -> None:
     assert yaml.safe_load(render(r, "yaml")) == r.to_dict()
 
 
-@pytest.mark.parametrize("fmt", ["text", "html", "markdown"])
+HUMAN_FORMATS = ["text", "html", "markdown", "jira", "confluence"]
+
+
+@pytest.mark.parametrize("fmt", HUMAN_FORMATS)
 def test_all_formats_contain_same_items_in_same_order(fmt: str) -> None:
     out = render(make_sample_report(), fmt)
     pos = 0
@@ -61,7 +66,7 @@ def test_all_formats_contain_same_items_in_same_order(fmt: str) -> None:
         pos = found + len(item)
 
 
-@pytest.mark.parametrize("fmt", ["text", "html", "markdown"])
+@pytest.mark.parametrize("fmt", HUMAN_FORMATS)
 def test_no_baseline_wording(fmt: str) -> None:
     r = make_sample_report()
     r.baseline = None
@@ -112,7 +117,7 @@ def test_surrogate_escaped_paths_render_as_valid_utf8(fmt: str) -> None:
     assert "foo" in out
 
 
-@pytest.mark.parametrize("fmt", ["text", "markdown"])
+@pytest.mark.parametrize("fmt", ["text", "markdown", "jira", "confluence"])
 def test_terminal_control_sequences_stripped(fmt: str) -> None:
     r = make_sample_report()
     r.results[0].findings[0].evidence = ["\x1b]2;pwned\x07 evil \x9b31m"]
@@ -122,3 +127,47 @@ def test_terminal_control_sequences_stripped(fmt: str) -> None:
     assert "\x07" not in out
     assert "\x9b" not in out
     assert "evil" in out
+
+
+def test_jira_markup() -> None:
+    out = render(make_sample_report(), "jira")
+    assert out.startswith("h1. pydebuprep report\n")
+    assert "||Critical||Warning||Info||OK||Skipped||Error||Exit code||" in out
+    assert "|1|1|1|1|1|0|2|" in out
+    assert "h2. Release" in out
+    assert "h3. {{apt-sources}} - APT sources" in out
+    assert "{color:#de350b}*CRITICAL*{color}: Repository still targets bookworm" in out
+    assert (
+        "{noformat}\n/etc/apt/sources.list: deb http://deb.debian.org/debian bookworm\n{noformat}"
+        in out
+    )
+    assert "# Edit /etc/apt/sources.list: change bookworm to trixie" in out
+    assert "* [https://www.debian.org/releases/trixie/releasenotes]" in out
+    assert "{status" not in out
+
+
+def test_confluence_markup() -> None:
+    out = render(make_sample_report(), "confluence")
+    assert out.startswith("h1. pydebuprep report\n")
+    assert "{status:colour=Red|title=CRITICAL}" in out
+    assert "{warning}" in out  # critical findings sit in a warning panel
+    assert "{info}" in out
+    assert (
+        "{noformat}\n/etc/apt/sources.list: deb http://deb.debian.org/debian bookworm\n{noformat}"
+        in out
+    )
+    assert "{status:colour=Grey|title=SKIPPED}" in out
+    assert "{color:" not in out
+
+
+@pytest.mark.parametrize("fmt", ["jira", "confluence"])
+def test_wiki_escaping(fmt: str) -> None:
+    r = make_sample_report()
+    r.results[0].findings[1] = Finding(
+        Severity.INFO,
+        "a|b {c} [d] *e* _f_ !g! ^h^ ~i~ +j+ #k \\l",
+        evidence=["{noformat} escape attempt"],
+    )
+    out = render(r, fmt)
+    assert r"a\|b \{c\} \[d\] \*e\* \_f\_ \!g\! \^h\^ \~i\~ \+j\+ \#k \\l" in out
+    assert "{noformat} escape attempt" not in out

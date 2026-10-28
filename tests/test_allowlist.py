@@ -68,10 +68,16 @@ def test_no_subprocess_outside_system() -> None:
 
 
 def test_open_only_where_writes_are_expected() -> None:
-    allowed = {"system.py", "snapshot.py", "cli.py"}
+    allowed = {"system.py", "snapshot.py", "cli.py", "config.py"}
     for path in _sources():
         if path.name not in allowed:
             assert not re.search(r"\bopen\(", path.read_text()), path
+
+
+def test_config_only_reads() -> None:
+    text = (SRC / "config.py").read_text()
+    for call in re.findall(r"\bopen\([^)]*\)", text):
+        assert not re.search(r"""["'][wxa+]""", call), call
 
 
 def test_registry_ids_unique_and_kebab() -> None:
