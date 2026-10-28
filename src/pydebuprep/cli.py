@@ -31,7 +31,7 @@ from pydebuprep.snapshot import (
 from pydebuprep.system import System
 
 EXIT_TOOL_ERROR = 3
-COMMANDS = ("report", "snapshot", "list-checks", "configtest", "example-config")
+COMMANDS = ("report", "snapshot", "list-checks", "configtest", "example-config", "completion")
 CONFIG_ENV = "PYDEBUPREP_CONFIG"
 
 
@@ -129,6 +129,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_config_args(test)
 
     sub.add_parser("example-config", help="print an example config file with all defaults")
+
+    comp = sub.add_parser("completion", help="print a shell completion script")
+    comp.add_argument("shell", choices=("bash", "zsh"), help="shell to generate for")
     return parser
 
 
@@ -374,6 +377,11 @@ def main(argv: list[str] | None = None, *, system: System | None = None) -> int:
             return cmd_configtest(args)
         if args.command == "example-config":
             _print(example_config())
+            return 0
+        if args.command == "completion":
+            from pydebuprep.completion import bash_completion, zsh_completion
+
+            _print(bash_completion() if args.shell == "bash" else zsh_completion())
             return 0
         return cmd_report(args, system)
     except ConfigError as exc:

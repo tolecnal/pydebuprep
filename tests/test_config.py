@@ -144,6 +144,4 @@ def test_example_config_documents_every_option() -> None:
 
 def test_shipped_example_matches_generator() -> None:
     shipped = Path(__file__).resolve().parent.parent / "examples" / "pydebuprep.conf"
-    assert shipped.read_text() == example_config(), (
-        "regenerate with: python3 -m pydebuprep example-config > examples/pydebuprep.conf"
-    )
+    assert shipped.read_text() == example_config(), "regenerate with: make generated"

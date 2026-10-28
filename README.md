@@ -30,6 +30,13 @@ sudo apt install ./pydebuprep_0.2.0_all.deb
 `debsums` and `needrestart` are recommended; the checks that need them are skipped
 when they're missing.
 
+The package installs tab completion for bash
+(`/usr/share/bash-completion/completions/pydebuprep`, active when the
+`bash-completion` package is installed) and zsh
+(`/usr/share/zsh/vendor-completions/_pydebuprep`, picked up automatically,
+including if zsh is installed later). Elsewhere, generate them with
+`pydebuprep completion bash` or `pydebuprep completion zsh`.
+
 ## Usage
 
 ```sh
@@ -233,6 +240,7 @@ host never looks healthy just because a check couldn't look.
 python3 -m venv .venv --system-site-packages
 .venv/bin/pip install -e '.[dev]'
 make lint test
+make generated  # after changing commands, flags, checks or options
 make deb        # needs: debhelper dh-python python3-all python3-setuptools python3-yaml python3-pytest
 ```
 

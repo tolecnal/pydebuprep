@@ -28,6 +28,9 @@ pydebuprep \- read\-only health report for Debian and Ubuntu after a release upg
 .br
 .B pydebuprep example\-config
 .br
+.B pydebuprep completion
+.BR bash \ |\  zsh
+.br
 .B pydebuprep
 .BR \-\-version \ |\  \-\-help
 .SH DESCRIPTION
@@ -71,6 +74,10 @@ on success.
 .TP
 .B example\-config
 Print a commented configuration file containing every setting at its default.
+.TP
+.BR completion " " bash | zsh
+Print a shell completion script. The package already installs both; this is
+for other installations.
 .SH OPTIONS
 .TP
 .BR \-f ", " \-\-format " " \fIFORMAT\fR
@@ -210,6 +217,12 @@ Configuration file, read if it exists. See
 .I /usr/share/doc/pydebuprep/examples/pydebuprep.conf
 Example configuration with every default, also printed by
 .BR "pydebuprep example\-config" .
+.TP
+.I /usr/share/bash\-completion/completions/pydebuprep
+.TQ
+.I /usr/share/zsh/vendor\-completions/_pydebuprep
+Shell completion for bash (active when the bash\-completion package is
+installed) and zsh.
 .TP
 .I /var/lib/pydebuprep/snapshots/
 Default snapshot directory (mode 0750). Snapshots are JSON files named after

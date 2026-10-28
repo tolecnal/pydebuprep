@@ -1,0 +1,2 @@
+completions/bash/pydebuprep usr/share/bash-completion/completions/
+completions/zsh/_pydebuprep usr/share/zsh/vendor-completions/
