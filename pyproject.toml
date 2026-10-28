@@ -19,5 +19,15 @@ python_version = "3.10"
 strict = true
 files = ["src"]
 
+[tool.coverage.run]
+branch = true
+source = ["pydebuprep"]
+
+[tool.coverage.report]
+# A ratchet: raise it when coverage goes up, never lower it.
+fail_under = 95
+show_missing = true
+skip_covered = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -110,6 +110,10 @@ needs_bash_completion = pytest.mark.skipif(
         ("pydebuprep configtest --", ["--config", "--no-config"], ["--format"]),
         ("pydebuprep list-checks --", ["--verbose"], []),
         ("pydebuprep completion ", ["bash", "zsh"], []),
+        # Subcommands are only valid as the first word.
+        ("pydebuprep --no-color ", [], ["snapshot", "report"]),
+        ("pydebuprep -o report --", ["--format"], []),
+        ("pydebuprep --no-color --", ["--format"], ["--version"]),
     ],
 )
 def test_bash_completes(line: str, expected: list[str], absent: list[str]) -> None:
@@ -120,40 +124,84 @@ def test_bash_completes(line: str, expected: list[str], absent: list[str]) -> No
         assert word not in got, (line, got)
 
 
-ZSH_HARNESS = r"""
+PTY_HARNESS = r"""
+# Type a line and press TAB in a real interactive shell, then press Ctrl-X Ctrl-P, which
+# SETUP binds to print the line editor's buffer as BUF<...>. Waits on markers, not sleeps.
 zmodload zsh/zpty
-zpty z 'env -i HOME=/tmp TERM=dumb PATH=/usr/bin:/bin zsh -f -i'
-zpty -w z "unsetopt zle_bracketed_paste 2>/dev/null; PS1='> '; fpath=($COMPDIR \$fpath); autoload -Uz compinit; compinit -u -D; pydebuprep() { :; }"
-sleep 0.5
-local junk; while zpty -r -t z junk; do :; done
+zpty z "env -i HOME=/tmp TERM=dumb PATH=/usr/bin:/bin $SHELLCMD"
+wait_for() {
+    local chunk i
+    for i in {1..150}; do
+        zpty -r -t z chunk && out+=$chunk
+        [[ $out == $~1 ]] && return 0
+        sleep 0.1
+    done
+    return 1
+}
+local out=""
+zpty -w z "$SETUP"
+zpty -w z 'echo RE''ADY'
+wait_for '*READY*'
+sleep 0.3
+out=""
 zpty -w -n z "pydebuprep $LINE"$'\t'
-sleep 1
-local out="" chunk
-while zpty -r -t z chunk; do out+=$chunk; done
+sleep 0.5
+zpty -w -n z $'\x18\x10'
+wait_for '*BUF<*>*'
 print -r -- "$out"
 zpty -d z
 """
 
+BASH_SETUP = (
+    "PS1='> '; bind 'set enable-bracketed-paste off' 2>/dev/null; "
+    'bind -x \'"\\C-x\\C-p": echo "BUF<$READLINE_LINE>"\'; '
+    "{bc}source {script}; pydebuprep() {{ :; }}"
+)
+ZSH_SETUP = (
+    "unsetopt zle_bracketed_paste 2>/dev/null; PS1='> '; {fpath}"
+    "autoload -Uz compinit; compinit -u -D; {source}pydebuprep() {{ :; }}; "
+    '_show_buf() {{ zle -I; print -r -- "BUF<$BUFFER>"; }}; zle -N _show_buf; '
+    "bindkey '^X^P' _show_buf"
+)
 
-def zsh_complete(tmp_path: Path, line: str) -> str:
-    """Type LINE<TAB> into a real interactive zsh and return the resulting command line."""
-    compdir = tmp_path / "zfunc"
-    compdir.mkdir(exist_ok=True)
-    (compdir / "_pydebuprep").write_text(zsh_completion())
+
+def pty_complete(shell: str, setup: str, line: str) -> str:
+    """Type LINE<TAB> into a real interactive shell and return the resulting command line."""
     res = subprocess.run(
-        ["zsh", "-f", "-c", ZSH_HARNESS],
+        ["zsh", "-f", "-c", PTY_HARNESS],
         capture_output=True,
         text=True,
         check=False,
-        env={"COMPDIR": str(compdir), "LINE": line, "PATH": "/usr/bin:/bin"},
-        timeout=30,
+        env={"SHELLCMD": shell, "SETUP": setup, "LINE": line, "PATH": "/usr/bin:/bin"},
+        timeout=60,
     )
-    screen = re.sub(r"\x1b\[[0-9;?]*[a-zA-Z]", "", res.stdout.replace("\r", ""))
-    lines = [s for s in screen.splitlines() if "pydebuprep " in s]
-    return lines[-1].split("> ", 1)[-1].strip() if lines else ""
+    found = re.findall(r"BUF<(.*?)>", res.stdout.replace("\r", ""))
+    return found[-1].rstrip() if found else ""
 
 
-@pytest.mark.skipif(not shutil.which("zsh"), reason="zsh not installed")
+def zsh_complete(tmp_path: Path, line: str, *, sourced: bool = False) -> str:
+    compdir = tmp_path / "zfunc"
+    compdir.mkdir(exist_ok=True)
+    script = compdir / "_pydebuprep"
+    script.write_text(zsh_completion())
+    setup = ZSH_SETUP.format(
+        fpath="" if sourced else f"fpath=({compdir} $fpath); ",
+        source=f"source {script}; " if sourced else "",
+    )
+    return pty_complete("zsh -f -i", setup, line)
+
+
+def bash_pty_complete(tmp_path: Path, line: str, *, with_bash_completion: bool = True) -> str:
+    script = tmp_path / "pydebuprep.bash"
+    script.write_text(bash_completion())
+    bc = f"source {BASH_COMPLETION}; " if with_bash_completion else ""
+    return pty_complete("bash --norc --noprofile -i", BASH_SETUP.format(bc=bc, script=script), line)
+
+
+needs_zsh = pytest.mark.skipif(not shutil.which("zsh"), reason="zsh not installed")
+
+
+@needs_zsh
 @pytest.mark.parametrize(
     ("line", "expected"),
     [
@@ -164,7 +212,47 @@ def zsh_complete(tmp_path: Path, line: str) -> str:
         ("report --checks disk-sp", "pydebuprep report --checks disk-space,"),
         ("completion z", "pydebuprep completion zsh"),
         ("snapshot --snap", "pydebuprep snapshot --snapshot-dir"),
+        ("--vers", "pydebuprep --version"),
+        # --version is only valid as the first word
+        ("report --vers", "pydebuprep report --vers"),
+        ("--no-color --vers", "pydebuprep --no-color --vers"),
     ],
 )
 def test_zsh_completes(tmp_path: Path, line: str, expected: str) -> None:
     assert zsh_complete(tmp_path, line) == expected
+
+
+@needs_zsh
+def test_zsh_script_works_when_sourced(tmp_path: Path) -> None:
+    assert zsh_complete(tmp_path, "--format ji", sourced=True) == "pydebuprep --format jira"
+
+
+@needs_zsh
+@needs_bash_completion
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ("--format ji", "pydebuprep --format jira"),
+        ("--check-option disk-space.inc", "pydebuprep --check-option disk-space.include_remote="),
+        # TAB after the '=' must not repeat the option name
+        (
+            "--check-option disk-space.warning_pct=",
+            "pydebuprep --check-option disk-space.warning_pct=",
+        ),
+        (
+            "--check-option disk-space.include_remote=t",
+            "pydebuprep --check-option disk-space.include_remote=true",
+        ),
+        ("--vers", "pydebuprep --version"),
+        ("--no-color --vers", "pydebuprep --no-color --vers"),
+        ("report --vers", "pydebuprep report --vers"),
+    ],
+)
+def test_bash_completes_interactively(tmp_path: Path, line: str, expected: str) -> None:
+    assert bash_pty_complete(tmp_path, line) == expected
+
+
+@needs_zsh
+def test_bash_script_works_without_bash_completion(tmp_path: Path) -> None:
+    got = bash_pty_complete(tmp_path, "--format ji", with_bash_completion=False)
+    assert got == "pydebuprep --format jira"

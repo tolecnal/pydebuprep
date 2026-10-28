@@ -48,6 +48,8 @@ class CompletionSpec:
     global_flags: list[OptionSpec]
     check_ids: list[str]
     check_options: list[str]
+    # "check.option" -> values worth offering after the '=' (booleans only, for now)
+    check_option_values: dict[str, list[str]] = field(default_factory=dict)
 
 
 def _option(action: argparse.Action) -> OptionSpec:
@@ -65,6 +67,9 @@ def _option(action: argparse.Action) -> OptionSpec:
 
 
 def completion_spec() -> CompletionSpec:
+    # Relies on argparse internals (_actions, _choices_actions, _SubParsersAction,
+    # _AppendAction), stable from 3.10 to 3.14; test_spec_covers_every_command_and_option
+    # and the drift tests catch a change.
     from pydebuprep.cli import build_parser
 
     parser = build_parser()
@@ -90,6 +95,12 @@ def completion_spec() -> CompletionSpec:
         check_options=sorted(
             f"{cls.id}.{o.name}=" for cls in checks.ALL_CHECKS for o in cls.options
         ),
+        check_option_values={
+            f"{cls.id}.{o.name}": ["true", "false"]
+            for cls in checks.ALL_CHECKS
+            for o in cls.options
+            if isinstance(o.default, bool)
+        },
     )
 
 
@@ -124,7 +135,39 @@ def bash_completion() -> str:
         if c.positional_choices
     )
     global_flags = _words(sorted(f for o in spec.global_flags for f in o.flags))
+    option_values = "\n".join(
+        f'        {key}) values="{_words(vals)}" ;;'
+        for key, vals in sorted(spec.check_option_values.items())
+    )
     return f"""# bash completion for pydebuprep -- {HEADER.format(shell="bash")}
+#
+# Installed packages load this automatically through bash-completion. Elsewhere:
+#   source <(pydebuprep completion bash)
+
+_pydebuprep_files() {{
+    # Use bash-completion's _filedir when available, plain compgen otherwise.
+    if declare -F _filedir >/dev/null; then
+        _filedir "$@"
+    elif [[ $1 == -d ]]; then
+        COMPREPLY=($(compgen -d -- "$cur"))
+    else
+        COMPREPLY=($(compgen -f -- "$cur"))
+    fi
+}}
+
+_pydebuprep_check_option() {{
+    if [[ $cur == *=* ]]; then
+        # readline replaces only the text after '=', so reply with values alone.
+        local values=""
+        case ${{cur%%=*}} in
+{option_values}
+        esac
+        COMPREPLY=($(compgen -W "$values" -- "${{cur#*=}}"))
+        return
+    fi
+    COMPREPLY=($(compgen -W "{_words(spec.check_options)}" -- "$cur"))
+    compopt -o nospace 2>/dev/null
+}}
 
 _pydebuprep_list() {{
     # Complete one item of a comma-separated list.
@@ -139,15 +182,23 @@ _pydebuprep_list() {{
 
 _pydebuprep() {{
     local cur prev words cword
-    _init_completion -n =: || return
+    if declare -F _init_completion >/dev/null; then
+        _init_completion -n =: || return
+    else
+        cur=${{COMP_WORDS[COMP_CWORD]}}
+        prev=${{COMP_WORDS[COMP_CWORD - 1]}}
+        words=("${{COMP_WORDS[@]}}")
+        cword=$COMP_CWORD
+    fi
 
+    # Like the CLI: a command is only recognised as the first word.
     local commands="{_words(list(spec.commands))}"
-    local cmd="" i
-    for ((i = 1; i < cword; i++)); do
+    local cmd=""
+    if ((cword > 1)); then
         case " $commands " in
-            *" ${{words[i]}} "*) cmd=${{words[i]}}; break ;;
+            *" ${{words[1]}} "*) cmd=${{words[1]}} ;;
         esac
-    done
+    fi
 
     case $prev in
 {cases}
@@ -162,9 +213,9 @@ _pydebuprep() {{
     esac
 
     if [[ $cur == -* ]]; then
-        [[ -z $cmd ]] && opts="$opts {global_flags}"
+        ((cword == 1)) && opts="$opts {global_flags}"
         COMPREPLY=($(compgen -W "$opts" -- "$cur"))
-    elif [[ -z $cmd ]]; then
+    elif ((cword == 1)); then
         COMPREPLY=($(compgen -W "$commands" -- "$cur"))
     elif [[ -n $words_for_cmd ]]; then
         COMPREPLY=($(compgen -W "$words_for_cmd" -- "$cur"))
@@ -179,16 +230,13 @@ def _value_action_bash(opt: OptionSpec, spec: CompletionSpec) -> str:
     if opt.kind == "choices":
         return f'COMPREPLY=($(compgen -W "{_words(opt.choices)}" -- "$cur"))'
     if opt.kind == "file":
-        return "_filedir"
+        return "_pydebuprep_files"
     if opt.kind == "dir":
-        return "_filedir -d"
+        return "_pydebuprep_files -d"
     if opt.kind == "checks":
         return f'_pydebuprep_list "{_words(spec.check_ids)}"'
     if opt.kind == "check-options":
-        return (
-            f'COMPREPLY=($(compgen -W "{_words(spec.check_options)}" -- "$cur")); '
-            "compopt -o nospace 2>/dev/null"
-        )
+        return "_pydebuprep_check_option"
     return ":"
 
 
@@ -233,9 +281,6 @@ def zsh_completion() -> str:
     functions = []
     for c in spec.commands.values():
         specs = _zsh_specs(c.options)
-        if c.name == "report":
-            own = {f for o in c.options for f in o.flags}
-            specs += _zsh_specs([o for o in spec.global_flags if not set(o.flags) & own])
         if c.positional_choices:
             specs.append(f"'1:{c.name}:({' '.join(c.positional_choices)})'")
         body = " \\\n        ".join(specs) if specs else ""
@@ -245,19 +290,48 @@ def zsh_completion() -> str:
             if body
             else f"_pydebuprep_{c.name.replace('-', '_')}() {{\n    _message 'no options'\n}}"
         )
+    report = spec.commands["report"]
+    own = {f for o in report.options for f in o.flags}
+    first_specs = _zsh_specs(report.options) + _zsh_specs(
+        [o for o in spec.global_flags if not set(o.flags) & own]
+    )
+    first = " \\\n        ".join(first_specs)
+    option_values = "\n".join(
+        f"        {key}) values=({' '.join(vals)}) ;;"
+        for key, vals in sorted(spec.check_option_values.items())
+    )
     check_ids = " ".join(spec.check_ids)
     check_options = " ".join(spec.check_options)
     return f"""#compdef pydebuprep
 # zsh completion for pydebuprep -- {HEADER.format(shell="zsh")}
+#
+# Installed packages put this in a directory on $fpath. Elsewhere, after compinit:
+#   source <(pydebuprep completion zsh)
 
 _pydebuprep_checks() {{
     _values -s , 'check' {check_ids}
 }}
 
 _pydebuprep_check_options() {{
+    if [[ $PREFIX == *=* ]]; then
+        local -a values
+        case ${{PREFIX%%=*}} in
+{option_values}
+        esac
+        compset -P '*='
+        compadd -a values
+        return
+    fi
     local -a opts
     opts=({check_options})
     compadd -S '' -a opts
+}}
+
+# Options valid when they come first, i.e. for the implicit report command; only
+# here are the top-level flags (--version, --help) allowed.
+_pydebuprep_first() {{
+    _arguments -s -S \\
+        {first}
 }}
 
 {chr(10).join(chr(10).join([f, ""]) for f in functions)}
@@ -270,6 +344,10 @@ _pydebuprep() {{
         _describe -t commands 'pydebuprep command' commands
         return
     fi
+    if (( CURRENT == 2 )); then
+        _pydebuprep_first
+        return
+    fi
     local cmd=report
     if (( ${{commands[(I)${{words[2]}}:*]}} )); then
         cmd=${{words[2]}}
@@ -279,5 +357,10 @@ _pydebuprep() {{
     _pydebuprep_${{cmd//-/_}}
 }}
 
-_pydebuprep "$@"
+# Autoloaded from fpath (packaged install) or sourced: source <(pydebuprep completion zsh)
+if [[ $zsh_eval_context[-1] == loadautofunc ]]; then
+    _pydebuprep "$@"
+else
+    compdef _pydebuprep pydebuprep
+fi
 """

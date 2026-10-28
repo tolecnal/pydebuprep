@@ -34,8 +34,9 @@ The package installs tab completion for bash
 (`/usr/share/bash-completion/completions/pydebuprep`, active when the
 `bash-completion` package is installed) and zsh
 (`/usr/share/zsh/vendor-completions/_pydebuprep`, picked up automatically,
-including if zsh is installed later). Elsewhere, generate them with
-`pydebuprep completion bash` or `pydebuprep completion zsh`.
+including if zsh is installed later). Without the package, load them with
+`source <(pydebuprep completion bash)` in `~/.bashrc`, or
+`source <(pydebuprep completion zsh)` after `compinit` in `~/.zshrc`.
 
 ## Usage
 
@@ -240,6 +241,7 @@ host never looks healthy just because a check couldn't look.
 python3 -m venv .venv --system-site-packages
 .venv/bin/pip install -e '.[dev]'
 make lint test
+make coverage   # branch coverage, must stay at or above fail_under (pyproject.toml)
 make generated  # after changing commands, flags, checks or options
 make deb        # needs: debhelper dh-python python3-all python3-setuptools python3-yaml python3-pytest
 ```

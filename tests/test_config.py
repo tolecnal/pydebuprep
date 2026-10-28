@@ -145,3 +145,12 @@ def test_example_config_documents_every_option() -> None:
 def test_shipped_example_matches_generator() -> None:
     shipped = Path(__file__).resolve().parent.parent / "examples" / "pydebuprep.conf"
     assert shipped.read_text() == example_config(), "regenerate with: make generated"
+
+
+@pytest.mark.skipif(__import__("os").geteuid() == 0, reason="root can read anything")
+def test_unreadable_config_has_hint(tmp_path: Path) -> None:
+    p = tmp_path / "pydebuprep.conf"
+    p.write_text("report: {}\n")
+    p.chmod(0)
+    with pytest.raises(ConfigError, match=r"permission denied .*--no-config"):
+        load_config(str(p))

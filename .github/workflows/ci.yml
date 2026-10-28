@@ -19,7 +19,7 @@ jobs:
       - name: Install shells for the completion tests
         run: sudo apt-get update && sudo apt-get install -y zsh bash-completion
       - run: python -m pip install -e '.[dev]'
-      - run: make lint test PYTHON=python
+      - run: make lint coverage PYTHON=python
 
   deb:
     runs-on: ubuntu-latest

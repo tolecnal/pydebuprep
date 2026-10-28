@@ -83,7 +83,10 @@ class Option:
                     return [value] if value else []
                 return [item.strip() for item in value.split(",") if item.strip()]
             if isinstance(value, (list, tuple)):
-                if not all(isinstance(item, (str, int, float)) for item in value):
+                if not all(
+                    isinstance(item, (str, int, float)) and not isinstance(item, bool)
+                    for item in value
+                ):
                     raise ValueError("expected a list of strings")
                 return [str(item) for item in value]
             raise ValueError("expected a list")

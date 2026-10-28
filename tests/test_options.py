@@ -158,3 +158,10 @@ def test_debsums_timeout_must_be_positive(value: int) -> None:
 
     with pytest.raises(ValueError, match="debsums: timeout_seconds must be greater than 0"):
         DebsumsCheck({"timeout_seconds": value})
+
+
+@pytest.mark.parametrize("value", [[True], [False, "x"]])
+def test_list_items_reject_booleans(value: Any) -> None:
+    """YAML turns yes/no/on/off into booleans; don't silently store "True"."""
+    with pytest.raises(ValueError, match=r"tunable\.ignore: expected a list of strings"):
+        Tunable({"ignore": value})

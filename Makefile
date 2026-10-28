@@ -1,6 +1,6 @@
 PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
-.PHONY: lint test deb clean generated
+.PHONY: lint test coverage deb clean generated
 
 lint:
 	$(PYTHON) -m ruff check src tests
@@ -10,6 +10,10 @@ lint:
 
 test:
 	$(PYTHON) -m pytest -q
+
+# Branch coverage; fails below fail_under in pyproject.toml.
+coverage:
+	$(PYTHON) -m pytest -q --cov --cov-report=term-missing
 
 # Files generated from the code; tests fail if they are out of date.
 generated:

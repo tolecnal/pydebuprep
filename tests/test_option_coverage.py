@@ -9,6 +9,7 @@ up automatically and are tested generically elsewhere.)
 from __future__ import annotations
 
 import importlib
+import inspect
 from pathlib import Path
 
 import pytest
@@ -56,16 +57,33 @@ def test_every_option_has_a_behaviour_test() -> None:
 
 
 @pytest.mark.parametrize("key", sorted(OPTION_TESTS))
-def test_named_test_exists(key: tuple[str, str]) -> None:
-    module_name, _, func = OPTION_TESTS[key].partition("::")
+def test_named_test_exercises_the_option(key: tuple[str, str]) -> None:
+    module_name, _, func_name = OPTION_TESTS[key].partition("::")
     module = importlib.import_module(module_name)
-    assert callable(getattr(module, func, None)), f"{OPTION_TESTS[key]} not found"
+    func = getattr(module, func_name, None)
+    assert callable(func), f"{OPTION_TESTS[key]} not found"
+    # The test must actually set the option, not just be any test that happens to exist.
+    assert key[1] in inspect.getsource(func), (
+        f"{OPTION_TESTS[key]} never mentions option {key[1]!r}"
+    )
+
+
+def _options_table() -> list[str]:
+    """Rows of the README table whose header is '| Check | Options (defaults) |'."""
+    lines = (ROOT / "README.md").read_text().splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith("| Check | Options"))
+    rows = []
+    for line in lines[start + 2 :]:
+        if not line.startswith("|"):
+            break
+        rows.append(line)
+    return rows
 
 
 @pytest.mark.parametrize("key", ALL_OPTIONS)
 def test_option_documented_in_readme(key: tuple[str, str]) -> None:
     check_id, name = key
-    rows = [line for line in (ROOT / "README.md").read_text().splitlines() if line.startswith("|")]
+    rows = _options_table()
     assert any(f"`{check_id}`" in row and f"`{name}`" in row for row in rows), (
         f"README options table has no row for {check_id} listing `{name}`"
     )
