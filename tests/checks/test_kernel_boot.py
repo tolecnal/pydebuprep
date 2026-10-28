@@ -239,3 +239,8 @@ def test_boot_space_same_fs_as_root_skipped() -> None:
 def test_boot_space_esp_checked() -> None:
     ctx = make_ctx(disks={"/": usage(80), "/boot": usage(5), "/boot/efi": usage(20)})
     assert [f.severity for f in BootSpaceCheck().run(ctx)] == [Severity.CRITICAL, Severity.WARNING]
+
+
+def test_boot_space_thresholds_configurable() -> None:
+    ctx = make_ctx(disks={"/": usage(80), "/boot": usage(20)})
+    assert BootSpaceCheck({"warning_pct": 15}).run(ctx) == []

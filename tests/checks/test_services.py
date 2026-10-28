@@ -229,3 +229,44 @@ def test_dmesg_not_permitted_skips() -> None:
     assert r.status is Status.SKIPPED
     assert r.skipped_reason is not None
     assert "kernel log is not readable" in r.skipped_reason
+
+
+def test_journal_ignore_patterns() -> None:
+    out = "\n".join([jline("networkctl", 'Interface "veth1" not found.'), jline("sshd", "boom")])
+    (f,) = JournalErrorsCheck({"ignore": ["^networkctl: Interface"]}).run(
+        make_ctx(commands={JOURNAL: out})
+    )
+    assert f.evidence == ["1x sshd: boom"]
+    assert "1 ignored" in f.detail
+
+
+def test_journal_all_ignored_ok() -> None:
+    out = jline("networkctl", 'Interface "veth1" not found.')
+    assert JournalErrorsCheck({"ignore": ["veth"]}).run(make_ctx(commands={JOURNAL: out})) == []
+
+
+def test_journal_invalid_regex_rejected() -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="journal-errors: invalid ignore pattern"):
+        JournalErrorsCheck({"ignore": ["("]})
+
+
+def test_dmesg_ignore_patterns() -> None:
+    ctx = make_ctx(commands={DMESG_ERR: "ACPI BIOS Error x\nreal error\n", DMESG_WARN: ""})
+    (f,) = DmesgErrorsCheck({"ignore": ["^ACPI"]}).run(ctx)
+    assert f.evidence == ["1x real error"]
+
+
+def test_systemd_failed_ignore_units() -> None:
+    out = "nginx.service loaded failed failed x\nfoo@1.service loaded failed failed y\n"
+    fs = SystemdFailedCheck({"ignore_units": ["foo@*"]}).run(make_ctx(commands={FAILED: out}))
+    assert titles(fs) == ["Unit nginx.service failed"]
+
+
+def test_systemd_timers_ignore_units() -> None:
+    commands = dict([(TIMERS, TIMER_OUT)])
+    assert (
+        SystemdTimersCheck({"ignore_units": ["certbot.timer"]}).run(make_ctx(commands=commands))
+        == []
+    )

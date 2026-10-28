@@ -84,3 +84,17 @@ def test_runner_skips_debsums_when_missing() -> None:
     r = run_check(DebsumsCheck(), make_ctx(available=set()))
     assert r.status is Status.SKIPPED
     assert r.skipped_reason == "command not found: debsums; sudo apt install debsums"
+
+
+def test_config_conflicts_critical_paths_configurable() -> None:
+    check = ConfigConflictsCheck({"critical_paths": ["/etc/nginx/"]})
+    fs = check.run(ctx_with("/etc/nginx/nginx.conf.dpkg-dist", "/etc/ssh/sshd_config.dpkg-dist"))
+    assert [(f.severity, f.title) for f in fs] == [
+        (Severity.CRITICAL, "Unmerged package config for /etc/nginx/nginx.conf"),
+        (Severity.WARNING, "1 config file has unmerged package versions"),
+    ]
+
+
+def test_debsums_timeout_option() -> None:
+    assert DebsumsCheck().opt("timeout_seconds") == 600
+    assert DebsumsCheck({"timeout_seconds": "1200"}).opt("timeout_seconds") == 1200

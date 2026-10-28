@@ -58,6 +58,8 @@ ALLOWED_COMMANDS: set[tuple[str, ...]] = {
     ("dmesg", "--level=warn", "--notime"),
     ("findmnt", "--verify"),
     ("findmnt", "-rn", "-o", "TARGET,SOURCE,FSTYPE"),
+    ("df", "-P", "-T", "-l", *_DF_EXCLUDE),
+    ("df", "-P", "-i", "-l", *_DF_EXCLUDE),
     ("df", "-P", "-T", *_DF_EXCLUDE),
     ("df", "-P", "-i", *_DF_EXCLUDE),
 }

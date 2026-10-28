@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from pydebuprep.checks.disk_space import DF_INODES, DF_SPACE, DiskSpaceCheck
+import pytest
+
+from pydebuprep.checks.disk_space import (
+    DF_INODES,
+    DF_INODES_ALL,
+    DF_SPACE,
+    DF_SPACE_ALL,
+    DiskSpaceCheck,
+)
 from pydebuprep.checks.fstab import FINDMNT_LIST, FINDMNT_VERIFY, FstabCheck
 from pydebuprep.model import Severity
 from pydebuprep.system import CommandResult
@@ -107,3 +115,51 @@ def test_fuse_mounts_excluded() -> None:
     )
     inodes = "Filesystem Inodes IUsed IFree IUse% Mounted on\ngdrive: 1000 1000 0 100% /home/u/mnt/gdrive\n"
     assert DiskSpaceCheck().run(make_ctx(commands={DF_SPACE: space, DF_INODES: inodes})) == []
+
+
+def test_disk_space_default_is_local_only() -> None:
+    assert "-l" in DF_SPACE
+    assert "-l" in DF_INODES
+    assert "-l" not in DF_SPACE_ALL
+    assert "-l" not in DF_INODES_ALL
+
+
+NAS = (
+    "Filesystem Type 1024-blocks Used Available Capacity Mounted on\n"
+    f"nas:/export nfs4 {100 * GB_BLOCKS} {99 * GB_BLOCKS} {GB_BLOCKS} 99% /mnt/nas\n"
+    f"gdrive: fuse.rclone {100 * GB_BLOCKS} {99 * GB_BLOCKS} {GB_BLOCKS} 99% /mnt/gdrive\n"
+)
+NAS_INODES = (
+    "Filesystem Inodes IUsed IFree IUse% Mounted on\n"
+    "nas:/export 1000 990 10 99% /mnt/nas\n"
+    "gdrive: 1000 1000 0 100% /mnt/gdrive\n"
+)
+
+
+def test_include_remote_checks_network_and_fuse_space() -> None:
+    ctx = make_ctx(commands={DF_SPACE_ALL: NAS, DF_INODES_ALL: NAS_INODES})
+    fs = DiskSpaceCheck({"include_remote": True}).run(ctx)
+    assert titles(fs) == [
+        "Low free space on /mnt/nas: 1% free",
+        "Low free inodes on /mnt/nas: 1% free",
+        "Low free space on /mnt/gdrive: 1% free",
+    ]
+
+
+def test_disk_space_thresholds_configurable() -> None:
+    ctx = make_ctx(commands={DF_SPACE: DF_OUT, DF_INODES: ""})
+    fs = DiskSpaceCheck({"critical_pct": 2, "warning_pct": 6}).run(ctx)
+    assert [(f.severity, f.title) for f in fs] == [
+        (Severity.WARNING, "Low free space on /: 5% free")
+    ]
+
+
+def test_disk_space_exclude_mounts() -> None:
+    ctx = make_ctx(commands={DF_SPACE: DF_OUT, DF_INODES: DFI_OUT})
+    fs = DiskSpaceCheck({"exclude_mounts": ["/", "/ho*"]}).run(ctx)
+    assert fs == []
+
+
+def test_disk_space_threshold_validation() -> None:
+    with pytest.raises(ValueError, match="critical_pct must be lower than warning_pct"):
+        DiskSpaceCheck({"critical_pct": 30})

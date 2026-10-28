@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydebuprep.checks.base import Check, Context
+from pydebuprep.checks.base import Check, Context, Option
 from pydebuprep.model import Finding, Severity
 
 LISTS_DIR = "/var/lib/apt/lists"
@@ -11,6 +11,11 @@ class AptListsAgeCheck(Check):
     id = "apt-lists-age"
     title = "Age of downloaded package lists"
     category = "release"
+    options = (Option("max_age_days", MAX_AGE_DAYS, "Report package lists older than this"),)
+
+    def validate(self) -> None:
+        if self.opt("max_age_days") < 0:
+            raise ValueError("max_age_days must not be negative")
 
     def run(self, ctx: Context) -> list[Finding]:
         sys = ctx.system
@@ -26,7 +31,7 @@ class AptListsAgeCheck(Check):
                 )
             ]
         days = int((sys.now().timestamp() - max(mtimes)) // 86400)
-        if days <= MAX_AGE_DAYS:
+        if days <= self.opt("max_age_days"):
             return []
         return [
             Finding(

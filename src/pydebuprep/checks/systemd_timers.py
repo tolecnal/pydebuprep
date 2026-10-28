@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import fnmatch
 from typing import Any
 
 from pydebuprep.checks._systemd import run_systemctl, unit_rows
-from pydebuprep.checks.base import Check, Context, count, run_checked
+from pydebuprep.checks.base import Check, Context, Option, count, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
 TIMERS = (
@@ -35,6 +36,10 @@ class SystemdTimersCheck(Check):
     title = "systemd timers"
     category = "services"
     requires_commands = ("systemctl",)
+    options = (Option("ignore_units", [], "Timers to leave out (shell-style patterns)"),)
+
+    def _ignored(self, unit: str) -> bool:
+        return any(fnmatch.fnmatchcase(unit, p) for p in self.opt("ignore_units"))
 
     def run(self, ctx: Context) -> list[Finding]:
         return [
@@ -45,7 +50,10 @@ class SystemdTimersCheck(Check):
                 remediation=[f"systemctl status {row[0]}", f"sudo systemctl enable --now {row[0]}"],
             )
             for row in _timers(ctx)
-            if row[1] == "loaded" and row[2] != "active" and _should_be_active(ctx, row[0])
+            if row[1] == "loaded"
+            and row[2] != "active"
+            and not self._ignored(row[0])
+            and _should_be_active(ctx, row[0])
         ]
 
     def collect_baseline(self, ctx: Context) -> Any:
@@ -53,7 +61,7 @@ class SystemdTimersCheck(Check):
 
     def compare(self, ctx: Context, before: Any) -> list[Finding]:
         active = {row[0] for row in _timers(ctx) if row[2] == "active"}
-        gone = sorted(set(before) - active)
+        gone = sorted(u for u in set(before) - active if not self._ignored(u))
         if not gone:
             return []
         return [

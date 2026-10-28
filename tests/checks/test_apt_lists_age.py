@@ -26,3 +26,8 @@ def test_old_lists_info() -> None:
 def test_fresh_lists_ok() -> None:
     ctx = make_ctx(files={LIST: ""}, mtimes={LIST: NOW - 3600})
     assert AptListsAgeCheck().run(ctx) == []
+
+
+def test_max_age_configurable() -> None:
+    ctx = make_ctx(files={LIST: ""}, mtimes={LIST: NOW - 10 * 86400})
+    assert AptListsAgeCheck({"max_age_days": 30}).run(ctx) == []

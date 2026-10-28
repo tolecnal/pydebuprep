@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import fnmatch
 from typing import Any
 
 from pydebuprep.checks._systemd import run_systemctl, unit_rows
-from pydebuprep.checks.base import Check, Context
+from pydebuprep.checks.base import Check, Context, Option
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
 LIST = ("systemctl", "list-units", "--no-legend", "--plain", "--no-pager")
@@ -17,6 +18,10 @@ class SystemdFailedCheck(Check):
     title = "Failed systemd units"
     category = "services"
     requires_commands = ("systemctl",)
+    options = (Option("ignore_units", [], "Units to leave out (shell-style patterns)"),)
+
+    def _ignored(self, unit: str) -> bool:
+        return any(fnmatch.fnmatchcase(unit, p) for p in self.opt("ignore_units"))
 
     def run(self, ctx: Context) -> list[Finding]:
         rows = unit_rows(run_systemctl(ctx, FAILED).stdout)
@@ -28,6 +33,7 @@ class SystemdFailedCheck(Check):
                 remediation=[f"systemctl status {row[0]}", f"journalctl -u {row[0]} -b"],
             )
             for row in rows
+            if not self._ignored(row[0])
         ]
 
     def collect_baseline(self, ctx: Context) -> Any:
@@ -35,7 +41,7 @@ class SystemdFailedCheck(Check):
 
     def compare(self, ctx: Context, before: Any) -> list[Finding]:
         now = {row[0] for row in unit_rows(run_systemctl(ctx, ACTIVE_SERVICES).stdout)}
-        gone = sorted(set(before) - now)
+        gone = sorted(u for u in set(before) - now if not self._ignored(u))
         if len(gone) > GROUP_ABOVE:
             return [
                 Finding(

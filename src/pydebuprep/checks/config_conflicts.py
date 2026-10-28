@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 
-from pydebuprep.checks.base import Check, Context, count
+from pydebuprep.checks.base import Check, Context, Option, count
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
 CONFLICT_SUFFIXES = (
@@ -14,8 +14,12 @@ CONFLICT_SUFFIXES = (
     ".ucf-old",
     ".ucf-dist",
 )
-CRITICAL_FILES = ("/etc/ssh/sshd_config", "/etc/sudoers")
-CRITICAL_DIRS = ("/etc/sudoers.d/", "/etc/ssh/sshd_config.d/")
+CRITICAL_PATHS = [
+    "/etc/ssh/sshd_config",
+    "/etc/ssh/sshd_config.d/",
+    "/etc/sudoers",
+    "/etc/sudoers.d/",
+]
 
 
 def _original(path: str) -> str | None:
@@ -25,14 +29,23 @@ def _original(path: str) -> str | None:
     return None
 
 
-def _is_critical(original: str) -> bool:
-    return original in CRITICAL_FILES or original.startswith(CRITICAL_DIRS)
-
-
 class ConfigConflictsCheck(Check):
     id = "config-conflicts"
     title = "Unmerged configuration files"
     category = "packages"
+    options = (
+        Option(
+            "critical_paths",
+            CRITICAL_PATHS,
+            "Config files whose unmerged updates are critical; a trailing / means a directory",
+        ),
+    )
+
+    def _is_critical(self, original: str) -> bool:
+        return any(
+            original.startswith(p) if p.endswith("/") else original == p
+            for p in self.opt("critical_paths")
+        )
 
     def run(self, ctx: Context) -> list[Finding]:
         errors: list[str] = []
@@ -55,9 +68,9 @@ class ConfigConflictsCheck(Check):
                 ],
             )
             for path, orig in leftovers
-            if _is_critical(orig)
+            if self._is_critical(orig)
         ]
-        others = [path for path, orig in leftovers if not _is_critical(orig)]
+        others = [path for path, orig in leftovers if not self._is_critical(orig)]
         if others:
             findings.append(
                 Finding(
