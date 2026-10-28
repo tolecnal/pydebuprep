@@ -29,22 +29,22 @@ _pydebuprep_first() {
     _arguments -s -S \
         '(--help -h)--help[show this help message and exit]' \
         '(--help -h)-h[show this help message and exit]' \
-        '(--format -f)--format[output format]:format:(text json yaml html markdown jira confluence)' \
+        '(--format -f)--format=[output format]:format:(text json yaml html markdown jira confluence)' \
         '(--format -f)-f[output format]:format:(text json yaml html markdown jira confluence)' \
-        '--output-dir[write the report to a timestamped file in DIR instead of stdout]:output-dir:_files -/' \
-        '(--output -o)--output[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
-        '(--output -o)-o[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
-        '--baseline[compare against this snapshot]:baseline:_files' \
-        '--no-baseline[do not compare against any snapshot]' \
-        '--snapshot-dir[where to look for the newest snapshot]:snapshot-dir:_files -/' \
-        '--checks[run only these checks]:checks:_pydebuprep_checks' \
-        '--skip[do not run these checks]:skip:_pydebuprep_checks' \
-        '--min-severity[hide findings below this severity]:min-severity:(info warning critical)' \
+        '(--output --output-dir -o)--output-dir=[write the report to a timestamped file in DIR instead of stdout]:output-dir:_files -/' \
+        '(--output --output-dir -o)--output=[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
+        '(--output --output-dir -o)-o[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
+        '(--baseline --no-baseline)--baseline=[compare against this snapshot]:baseline:_files' \
+        '(--baseline --no-baseline)--no-baseline[do not compare against any snapshot]' \
+        '--snapshot-dir=[where to look for the newest snapshot]:snapshot-dir:_files -/' \
+        '--checks=[run only these checks]:checks:_pydebuprep_checks' \
+        '--skip=[do not run these checks]:skip:_pydebuprep_checks' \
+        '--min-severity=[hide findings below this severity]:min-severity:(info warning critical)' \
         '--no-color[never colorize text output]' \
-        '*--check-option[set a check option, overriding the config file (repeatable)]:check-option:_pydebuprep_check_options' \
-        '(--config -c)--config[read settings from FILE]:config:_files' \
-        '(--config -c)-c[read settings from FILE]:config:_files' \
-        '--no-config[ignore any config file]' \
+        '*--check-option=[set a check option, overriding the config file (repeatable)]:check-option:_pydebuprep_check_options' \
+        '(--config --no-config -c)--config=[read settings from FILE]:config:_files' \
+        '(--config --no-config -c)-c[read settings from FILE]:config:_files' \
+        '(--config --no-config -c)--no-config[ignore any config file]' \
         '--version[show program'\''s version number and exit]'
 }
 
@@ -52,33 +52,33 @@ _pydebuprep_report() {
     _arguments -s -S \
         '(--help -h)--help[show this help message and exit]' \
         '(--help -h)-h[show this help message and exit]' \
-        '(--format -f)--format[output format]:format:(text json yaml html markdown jira confluence)' \
+        '(--format -f)--format=[output format]:format:(text json yaml html markdown jira confluence)' \
         '(--format -f)-f[output format]:format:(text json yaml html markdown jira confluence)' \
-        '--output-dir[write the report to a timestamped file in DIR instead of stdout]:output-dir:_files -/' \
-        '(--output -o)--output[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
-        '(--output -o)-o[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
-        '--baseline[compare against this snapshot]:baseline:_files' \
-        '--no-baseline[do not compare against any snapshot]' \
-        '--snapshot-dir[where to look for the newest snapshot]:snapshot-dir:_files -/' \
-        '--checks[run only these checks]:checks:_pydebuprep_checks' \
-        '--skip[do not run these checks]:skip:_pydebuprep_checks' \
-        '--min-severity[hide findings below this severity]:min-severity:(info warning critical)' \
+        '(--output --output-dir -o)--output-dir=[write the report to a timestamped file in DIR instead of stdout]:output-dir:_files -/' \
+        '(--output --output-dir -o)--output=[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
+        '(--output --output-dir -o)-o[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
+        '(--baseline --no-baseline)--baseline=[compare against this snapshot]:baseline:_files' \
+        '(--baseline --no-baseline)--no-baseline[do not compare against any snapshot]' \
+        '--snapshot-dir=[where to look for the newest snapshot]:snapshot-dir:_files -/' \
+        '--checks=[run only these checks]:checks:_pydebuprep_checks' \
+        '--skip=[do not run these checks]:skip:_pydebuprep_checks' \
+        '--min-severity=[hide findings below this severity]:min-severity:(info warning critical)' \
         '--no-color[never colorize text output]' \
-        '*--check-option[set a check option, overriding the config file (repeatable)]:check-option:_pydebuprep_check_options' \
-        '(--config -c)--config[read settings from FILE]:config:_files' \
-        '(--config -c)-c[read settings from FILE]:config:_files' \
-        '--no-config[ignore any config file]'
+        '*--check-option=[set a check option, overriding the config file (repeatable)]:check-option:_pydebuprep_check_options' \
+        '(--config --no-config -c)--config=[read settings from FILE]:config:_files' \
+        '(--config --no-config -c)-c[read settings from FILE]:config:_files' \
+        '(--config --no-config -c)--no-config[ignore any config file]'
 }
 
 _pydebuprep_snapshot() {
     _arguments -s -S \
         '(--help -h)--help[show this help message and exit]' \
         '(--help -h)-h[show this help message and exit]' \
-        '--snapshot-dir[where to store the snapshot]:snapshot-dir:_files -/' \
-        '*--check-option[set a check option, overriding the config file (repeatable)]:check-option:_pydebuprep_check_options' \
-        '(--config -c)--config[read settings from FILE]:config:_files' \
-        '(--config -c)-c[read settings from FILE]:config:_files' \
-        '--no-config[ignore any config file]'
+        '--snapshot-dir=[where to store the snapshot]:snapshot-dir:_files -/' \
+        '*--check-option=[set a check option, overriding the config file (repeatable)]:check-option:_pydebuprep_check_options' \
+        '(--config --no-config -c)--config=[read settings from FILE]:config:_files' \
+        '(--config --no-config -c)-c[read settings from FILE]:config:_files' \
+        '(--config --no-config -c)--no-config[ignore any config file]'
 }
 
 _pydebuprep_list_checks() {
@@ -93,9 +93,9 @@ _pydebuprep_configtest() {
     _arguments -s -S \
         '(--help -h)--help[show this help message and exit]' \
         '(--help -h)-h[show this help message and exit]' \
-        '(--config -c)--config[read settings from FILE]:config:_files' \
-        '(--config -c)-c[read settings from FILE]:config:_files' \
-        '--no-config[ignore any config file]'
+        '(--config --no-config -c)--config=[read settings from FILE]:config:_files' \
+        '(--config --no-config -c)-c[read settings from FILE]:config:_files' \
+        '(--config --no-config -c)--no-config[ignore any config file]'
 }
 
 _pydebuprep_example_config() {

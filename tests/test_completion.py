@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import re
 import shutil
 import subprocess
@@ -114,6 +115,8 @@ needs_bash_completion = pytest.mark.skipif(
         ("pydebuprep --no-color ", [], ["snapshot", "report"]),
         ("pydebuprep -o report --", ["--format"], []),
         ("pydebuprep --no-color --", ["--format"], ["--version"]),
+        # items already in the list aren't offered again
+        ("pydebuprep report --skip apt-held,apt-h", [], ["apt-held,apt-held"]),
     ],
 )
 def test_bash_completes(line: str, expected: list[str], absent: list[str]) -> None:
@@ -206,12 +209,13 @@ needs_zsh = pytest.mark.skipif(not shutil.which("zsh"), reason="zsh not installe
     ("line", "expected"),
     [
         ("--format ji", "pydebuprep --format jira"),
-        ("report --min-sev", "pydebuprep report --min-severity"),
+        # long options taking a value complete with '=' so the value can follow directly
+        ("report --min-sev", "pydebuprep report --min-severity="),
         ("--check-option disk-space.inc", "pydebuprep --check-option disk-space.include_remote="),
         ("conf", "pydebuprep configtest"),
         ("report --checks disk-sp", "pydebuprep report --checks disk-space,"),
         ("completion z", "pydebuprep completion zsh"),
-        ("snapshot --snap", "pydebuprep snapshot --snapshot-dir"),
+        ("snapshot --snap", "pydebuprep snapshot --snapshot-dir="),
         ("--vers", "pydebuprep --version"),
         # --version is only valid as the first word
         ("report --vers", "pydebuprep report --vers"),
@@ -256,3 +260,81 @@ def test_bash_completes_interactively(tmp_path: Path, line: str, expected: str) 
 def test_bash_script_works_without_bash_completion(tmp_path: Path) -> None:
     got = bash_pty_complete(tmp_path, "--format ji", with_bash_completion=False)
     assert got == "pydebuprep --format jira"
+
+
+def _parser_with(**kwargs: object) -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="pydebuprep")
+    sub = parser.add_subparsers(dest="command")
+    report = sub.add_parser("report", help="r")
+    report.add_argument("--thing", **kwargs)  # type: ignore[arg-type]
+    return parser
+
+
+@pytest.mark.parametrize("choice", ["a b", "c$x", "it's", "q`x`", 'd"e'])
+def test_unsafe_choices_rejected_at_generation(
+    monkeypatch: pytest.MonkeyPatch, choice: str
+) -> None:
+    monkeypatch.setattr("pydebuprep.cli.build_parser", lambda: _parser_with(choices=["ok", choice]))
+    with pytest.raises(ValueError, match="cannot be completed safely"):
+        bash_completion()
+    with pytest.raises(ValueError, match="cannot be completed safely"):
+        zsh_completion()
+
+
+def test_flag_with_different_values_per_command_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    def build() -> argparse.ArgumentParser:
+        parser = _parser_with(choices=["a", "b"])
+        sub = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+        other = sub.add_parser("other", help="o")
+        other.add_argument("--thing", choices=["x", "y"])
+        return parser
+
+    monkeypatch.setattr("pydebuprep.cli.build_parser", build)
+    with pytest.raises(ValueError, match="--thing completes differently"):
+        bash_completion()
+
+
+def test_help_placeholders_expanded(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "pydebuprep.cli.build_parser",
+        lambda: _parser_with(default="7", help="use %(default)s or 100%% of %(prog)s"),
+    )
+    (opt,) = [o for o in completion_spec().commands["report"].options if "--thing" in o.flags]
+    assert opt.help == "use 7 or 100% of pydebuprep"
+
+
+def test_mutually_exclusive_flags_recorded() -> None:
+    report = {o.flags[0]: o for o in completion_spec().commands["report"].options}
+    assert set(report["--baseline"].exclusive) == {"--no-baseline"}
+    assert set(report["--output"].exclusive) == {"--output-dir"}
+    assert set(report["--config"].exclusive) == {"--no-config"}
+    assert report["--format"].exclusive == []
+
+
+@needs_zsh
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ("--no-baseline --basel", "pydebuprep --no-baseline --basel"),
+        ("report --output-dir /tmp --outp", "pydebuprep report --output-dir /tmp --outp"),
+        ("--format=ji", "pydebuprep --format=jira"),
+        ("report --min-severity=crit", "pydebuprep report --min-severity=critical"),
+    ],
+)
+def test_zsh_exclusions_and_equals_forms(tmp_path: Path, line: str, expected: str) -> None:
+    assert zsh_complete(tmp_path, line) == expected
+
+
+@needs_zsh
+@needs_bash_completion
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ("--format=ji", "pydebuprep --format=jira"),
+        ("report --min-severity=crit", "pydebuprep report --min-severity=critical"),
+        ("--checks=disk-sp", "pydebuprep --checks=disk-space"),
+        ("--skip=apt-held,dis", "pydebuprep --skip=apt-held,disk-space"),
+    ],
+)
+def test_bash_equals_forms(tmp_path: Path, line: str, expected: str) -> None:
+    assert bash_pty_complete(tmp_path, line) == expected

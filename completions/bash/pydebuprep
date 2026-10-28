@@ -29,13 +29,16 @@ _pydebuprep_check_option() {
 }
 
 _pydebuprep_list() {
-    # Complete one item of a comma-separated list.
-    local prefix="" word="$cur"
+    # Complete one item of a comma-separated list, leaving out items already given.
+    local prefix="" word="$cur" item remaining=""
     if [[ $cur == *,* ]]; then
         prefix="${cur%,*},"
         word="${cur##*,}"
     fi
-    COMPREPLY=($(compgen -P "$prefix" -W "$1" -- "$word"))
+    for item in $1; do
+        [[ ",$prefix" == *",$item,"* ]] || remaining="$remaining $item"
+    done
+    COMPREPLY=($(compgen -P "$prefix" -W "$remaining" -- "$word"))
     compopt -o nospace 2>/dev/null
 }
 
@@ -48,6 +51,12 @@ _pydebuprep() {
         prev=${COMP_WORDS[COMP_CWORD - 1]}
         words=("${COMP_WORDS[@]}")
         cword=$COMP_CWORD
+    fi
+
+    # --flag=value: complete the value; readline replaces only the text after '='.
+    if [[ $cur == --*=* ]]; then
+        prev=${cur%%=*}
+        cur=${cur#*=}
     fi
 
     # Like the CLI: a command is only recognised as the first word.

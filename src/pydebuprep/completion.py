@@ -7,6 +7,7 @@ if they drift, so new commands, flags, checks and options are always completed.
 from __future__ import annotations
 
 import argparse
+import re
 from dataclasses import dataclass, field
 
 from pydebuprep import checks
@@ -32,6 +33,7 @@ class OptionSpec:
     kind: str = ""  # file, dir, checks, check-options, choices or "" (free text)
     choices: list[str] = field(default_factory=list)
     repeatable: bool = False
+    exclusive: list[str] = field(default_factory=list)  # flags it can't be combined with
 
 
 @dataclass
@@ -52,18 +54,56 @@ class CompletionSpec:
     check_option_values: dict[str, list[str]] = field(default_factory=dict)
 
 
-def _option(action: argparse.Action) -> OptionSpec:
+# Words written into the scripts unquoted (commands, flags, choices, check ids and options).
+SAFE_WORD = re.compile(r"^[A-Za-z0-9._,/:=+@-]+$")
+
+
+def _safe(word: str) -> str:
+    if not SAFE_WORD.match(word):
+        raise ValueError(
+            f"{word!r} cannot be completed safely: completion words may only contain "
+            "letters, digits and ._,/:=+@-"
+        )
+    return word
+
+
+def _help(action: argparse.Action, prog: str) -> str:
+    """Expand %(default)s-style placeholders the way argparse's help output does."""
+    text = action.help or ""
+    params = dict(vars(action), prog=prog)
+    if params.get("choices") is not None:
+        params["choices"] = ", ".join(str(c) for c in params["choices"])
+    try:
+        return text % params
+    except (KeyError, TypeError, ValueError):
+        return text
+
+
+def _option(action: argparse.Action, prog: str, exclusive: list[str]) -> OptionSpec:
     takes_value = action.nargs != 0
-    choices = [str(c) for c in action.choices] if action.choices else []
+    choices = [_safe(str(c)) for c in action.choices] if action.choices else []
     kind = "choices" if choices else (VALUE_KINDS.get(action.dest, "") if takes_value else "")
     return OptionSpec(
-        flags=sorted(action.option_strings, key=lambda f: (not f.startswith("--"), f)),
-        help=(action.help or "").replace("%%", "%"),
+        flags=[
+            _safe(f)
+            for f in sorted(action.option_strings, key=lambda f: (not f.startswith("--"), f))
+        ],
+        help=_help(action, prog),
         takes_value=takes_value,
         kind=kind,
         choices=choices,
         repeatable=isinstance(action, argparse._AppendAction),
+        exclusive=exclusive,
     )
+
+
+def _exclusions(parser: argparse.ArgumentParser) -> dict[argparse.Action, list[str]]:
+    excluded: dict[argparse.Action, list[str]] = {}
+    for group in parser._mutually_exclusive_groups:
+        flags = [f for a in group._group_actions for f in a.option_strings]
+        for action in group._group_actions:
+            excluded[action] = [f for f in flags if f not in action.option_strings]
+    return excluded
 
 
 def completion_spec() -> CompletionSpec:
@@ -80,20 +120,23 @@ def completion_spec() -> CompletionSpec:
             helps = {a.dest: a.help or "" for a in action._choices_actions}
             for name, sub in action.choices.items():
                 options, positional = [], []
+                excluded = _exclusions(sub)
                 for sub_action in sub._actions:
                     if sub_action.option_strings:
-                        options.append(_option(sub_action))
+                        options.append(
+                            _option(sub_action, parser.prog, excluded.get(sub_action, []))
+                        )
                     elif sub_action.choices:
-                        positional = [str(c) for c in sub_action.choices]
-                commands[name] = CommandSpec(name, helps.get(name, ""), options, positional)
+                        positional = [_safe(str(c)) for c in sub_action.choices]
+                commands[_safe(name)] = CommandSpec(name, helps.get(name, ""), options, positional)
         elif action.option_strings:
-            global_flags.append(_option(action))
+            global_flags.append(_option(action, parser.prog, []))
     return CompletionSpec(
         commands=commands,
         global_flags=global_flags,
-        check_ids=sorted(cls.id for cls in checks.ALL_CHECKS),
+        check_ids=sorted(_safe(cls.id) for cls in checks.ALL_CHECKS),
         check_options=sorted(
-            f"{cls.id}.{o.name}=" for cls in checks.ALL_CHECKS for o in cls.options
+            _safe(f"{cls.id}.{o.name}=") for cls in checks.ALL_CHECKS for o in cls.options
         ),
         check_option_values={
             f"{cls.id}.{o.name}": ["true", "false"]
@@ -113,14 +156,20 @@ def _words(items: list[str]) -> str:
 
 def bash_completion() -> str:
     spec = completion_spec()
+    # One `case $prev` arm per completion action; the script can't tell commands apart
+    # there, so a flag must complete the same way everywhere.
+    flag_action: dict[str, str] = {}
     value_cases: dict[str, list[str]] = {}
     for command in spec.commands.values():
         for opt in command.options:
-            if opt.takes_value:
-                value_cases.setdefault(_value_action_bash(opt, spec), [])
-                for flag in opt.flags:
-                    if flag not in value_cases[_value_action_bash(opt, spec)]:
-                        value_cases[_value_action_bash(opt, spec)].append(flag)
+            if not opt.takes_value:
+                continue
+            action = _value_action_bash(opt, spec)
+            for flag in opt.flags:
+                if flag_action.setdefault(flag, action) != action:
+                    raise ValueError(f"{flag} completes differently in different commands")
+                if flag not in value_cases.setdefault(action, []):
+                    value_cases[action].append(flag)
     cases = "\n".join(
         f"        {'|'.join(flags)})\n            {action}\n            return\n            ;;"
         for action, flags in value_cases.items()
@@ -170,13 +219,16 @@ _pydebuprep_check_option() {{
 }}
 
 _pydebuprep_list() {{
-    # Complete one item of a comma-separated list.
-    local prefix="" word="$cur"
+    # Complete one item of a comma-separated list, leaving out items already given.
+    local prefix="" word="$cur" item remaining=""
     if [[ $cur == *,* ]]; then
         prefix="${{cur%,*}},"
         word="${{cur##*,}}"
     fi
-    COMPREPLY=($(compgen -P "$prefix" -W "$1" -- "$word"))
+    for item in $1; do
+        [[ ",$prefix" == *",$item,"* ]] || remaining="$remaining $item"
+    done
+    COMPREPLY=($(compgen -P "$prefix" -W "$remaining" -- "$word"))
     compopt -o nospace 2>/dev/null
 }}
 
@@ -189,6 +241,12 @@ _pydebuprep() {{
         prev=${{COMP_WORDS[COMP_CWORD - 1]}}
         words=("${{COMP_WORDS[@]}}")
         cword=$COMP_CWORD
+    fi
+
+    # --flag=value: complete the value; readline replaces only the text after '='.
+    if [[ $cur == --*=* ]]; then
+        prev=${{cur%%=*}}
+        cur=${{cur#*=}}
     fi
 
     # Like the CLI: a command is only recognised as the first word.
@@ -265,11 +323,15 @@ def _zsh_specs(options: list[OptionSpec]) -> list[str]:
     specs = []
     for opt in options:
         help_text = _zsh_escape(opt.help.split(" (default")[0])
-        exclusive = "" if opt.repeatable or len(opt.flags) == 1 else f"({' '.join(opt.flags)})"
+        # Exclude the option's own aliases (unless repeatable) and its argparse group.
+        excluded = sorted(set(opt.exclusive) | (set() if opt.repeatable else set(opt.flags)))
+        exclusive = f"({' '.join(excluded)})" if len(excluded) > 1 or opt.exclusive else ""
         prefix = "*" if opt.repeatable else ""
         value = f":{opt.flags[0].lstrip('-')}:{_zsh_action(opt)}" if opt.takes_value else ""
         for flag in opt.flags:
-            specs.append(f"'{exclusive}{prefix}{flag}[{help_text}]{value}'")
+            # "--flag=" accepts the value either after '=' or as the next word.
+            name = f"{flag}=" if opt.takes_value and flag.startswith("--") else flag
+            specs.append(f"'{exclusive}{prefix}{name}[{help_text}]{value}'")
     return specs
 
 
