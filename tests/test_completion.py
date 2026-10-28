@@ -194,10 +194,14 @@ def zsh_complete(tmp_path: Path, line: str, *, sourced: bool = False) -> str:
     return pty_complete("zsh -f -i", setup, line)
 
 
-def bash_pty_complete(tmp_path: Path, line: str, *, with_bash_completion: bool = True) -> str:
+def bash_pty_complete(
+    tmp_path: Path, line: str, *, with_bash_completion: bool = True, cwd: Path | None = None
+) -> str:
     script = tmp_path / "pydebuprep.bash"
     script.write_text(bash_completion())
     bc = f"source {BASH_COMPLETION}; " if with_bash_completion else ""
+    if cwd is not None:
+        bc = f"cd {cwd}; " + bc
     return pty_complete("bash --norc --noprofile -i", BASH_SETUP.format(bc=bc, script=script), line)
 
 
@@ -338,3 +342,17 @@ def test_zsh_exclusions_and_equals_forms(tmp_path: Path, line: str, expected: st
 )
 def test_bash_equals_forms(tmp_path: Path, line: str, expected: str) -> None:
     assert bash_pty_complete(tmp_path, line) == expected
+
+
+@needs_zsh
+@pytest.mark.parametrize("with_bash_completion", [True, False])
+def test_bash_file_names_with_spaces(tmp_path: Path, with_bash_completion: bool) -> None:
+    if with_bash_completion and not BASH_COMPLETION.exists():
+        pytest.skip("bash-completion not installed")
+    work = tmp_path / "work"
+    work.mkdir()
+    (work / "my report.conf").write_text("")
+    got = bash_pty_complete(
+        tmp_path, "--config my", with_bash_completion=with_bash_completion, cwd=work
+    )
+    assert got == r"pydebuprep --config my\ report.conf"

@@ -3,9 +3,9 @@ PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 .PHONY: lint test coverage deb clean generated audit
 
 lint:
-	$(PYTHON) -m ruff check src tests
-	$(PYTHON) -m ruff format --check src tests
-	$(PYTHON) -m flake8 src tests
+	$(PYTHON) -m ruff check src tests scripts
+	$(PYTHON) -m ruff format --check src tests scripts
+	$(PYTHON) -m flake8 src tests scripts
 	$(PYTHON) -m mypy
 
 test:

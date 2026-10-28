@@ -10,7 +10,9 @@ import os
 import re
 import shutil
 import socket
-import subprocess
+
+# The only module that starts processes; every argv is checked against ALLOWED_COMMANDS.
+import subprocess  # nosec B404
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -149,7 +151,8 @@ class System:
         args = tuple(argv)
         env = {**os.environ, "LC_ALL": "C", "LANG": "C"}
         try:
-            proc = subprocess.run(
+            # Fixed, allowlisted argv; never a shell.
+            proc = subprocess.run(  # nosec B603
                 args,
                 capture_output=True,
                 timeout=timeout,

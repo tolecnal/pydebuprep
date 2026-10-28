@@ -68,7 +68,8 @@ def create_snapshot(
     try:
         if not target_dir.exists():
             target_dir.mkdir(parents=True, mode=0o750)
-            os.chmod(target_dir, 0o750)
+            # 0750 is stricter than the default: snapshots list packages and services.
+            os.chmod(target_dir, 0o750)  # nosec B103
         payload = json.dumps(snap, indent=2, ensure_ascii=False) + "\n"
         n = 0
         while True:
