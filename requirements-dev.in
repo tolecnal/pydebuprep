@@ -1,0 +1,10 @@
+# Development and CI tools. Pinned versions live in requirements-dev.txt:
+#   uv pip compile --python-version 3.10 requirements-dev.in -o requirements-dev.txt
+PyYAML
+pytest
+pytest-cov
+ruff
+flake8
+mypy
+types-PyYAML
+bandit

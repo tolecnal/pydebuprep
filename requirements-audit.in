@@ -1,0 +1,4 @@
+# pip-audit for the Security workflow, which runs on Python 3.12 (its dependencies need
+# a newer Python than requirements-dev.txt allows). Pinned versions:
+#   uv pip compile --python-version 3.12 requirements-audit.in -o requirements-audit.txt
+pip-audit

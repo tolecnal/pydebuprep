@@ -1,0 +1,110 @@
+name: Release
+
+# Pushing a tag vX.Y.Z builds the .deb once, installs and audits it on every supported
+# release, then publishes it with SHA256SUMS and a build-provenance attestation as a
+# GitHub Release. Run it manually to build and verify without publishing.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build .deb
+    runs-on: ubuntu-latest
+    container: debian:bookworm
+    permissions:
+      contents: read
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential devscripts lintian \
+            debhelper dh-python python3-all python3-setuptools python3-yaml python3-pytest
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the tag matches the package and Python versions
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          deb_version=$(dpkg-parsechangelog -S Version)
+          py_version=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/pydebuprep/__init__.py)
+          echo "tag=$TAG debian/changelog=$deb_version __version__=$py_version"
+          test "$TAG" = "v$deb_version"
+          test "$deb_version" = "$py_version"
+      - name: Build
+        run: dpkg-buildpackage -us -uc -b
+      - name: Lintian
+        run: lintian --fail-on error,warning ../*.deb
+      - name: Collect the package and checksums
+        run: |
+          mkdir dist
+          cp ../pydebuprep_*_all.deb dist/
+          cd dist && sha256sum ./*.deb > SHA256SUMS && cat SHA256SUMS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: deb
+          path: dist/
+          if-no-files-found: error
+
+  verify:
+    name: Install and audit (${{ matrix.image }})
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        image: ["debian:bookworm", "debian:trixie", "ubuntu:22.04", "ubuntu:24.04", "ubuntu:26.04"]
+    container: ${{ matrix.image }}
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: deb
+          path: dist
+      - name: Verify checksums
+        run: cd dist && sha256sum -c SHA256SUMS
+      - name: Install and smoke test
+        run: |
+          apt-get update
+          scripts/smoke-test.sh ./dist/pydebuprep_*_all.deb
+      - name: Prove a root run changes nothing (strace + filesystem timestamps)
+        run: scripts/ci-readonly-audit.sh
+
+  publish:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the release
+      id-token: write # sign the provenance attestation
+      attestations: write # store the attestation
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: deb
+          path: dist
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.deb
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" dist/*.deb dist/SHA256SUMS \
+            --title "pydebuprep ${TAG#v}" --generate-notes --verify-tag

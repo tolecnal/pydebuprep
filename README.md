@@ -238,14 +238,53 @@ host never looks healthy just because a check couldn't look.
 ## Development
 
 ```sh
-python3 -m venv .venv --system-site-packages
-.venv/bin/pip install -e '.[dev]'
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt && .venv/bin/pip install --no-deps -e .
 make lint test
 make coverage   # branch coverage, must stay at or above fail_under (pyproject.toml)
 make generated  # after changing commands, flags, checks or options
 sudo make audit # with the package installed: strace proves a root run changes nothing
 make deb        # needs: debhelper dh-python python3-all python3-setuptools python3-yaml python3-pytest
 ```
+
+## Releases
+
+Push a tag matching the version in `debian/changelog` and `src/pydebuprep/__init__.py`:
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+The **Release** workflow builds the `.deb` once and lints it with lintian. It then
+installs it on Debian 12, Debian 13, and Ubuntu 22.04, 24.04 and 26.04, runs a
+smoke test, and runs the read-only audit on each. Only if all of that passes
+does it publish a GitHub Release with the `.deb`, a `SHA256SUMS` file and a
+build-provenance attestation. To check a download:
+
+```sh
+sha256sum -c SHA256SUMS
+gh attestation verify pydebuprep_0.2.0_all.deb --repo OWNER/pydebuprep
+```
+
+Running the workflow by hand (workflow_dispatch) builds and verifies the package
+without publishing it.
+
+## Security checks
+
+| Workflow | What it covers |
+|---|---|
+| CodeQL | Python code and the workflow files (`security-extended` queries); results in the Security tab |
+| Security / Bandit | Python security lint; deliberate exceptions are marked `# nosec <id>` with a reason |
+| Security / ShellCheck | `scripts/*.sh`, the bash completion and the package maintainer scripts |
+| Security / pip-audit | Known vulnerabilities in the pinned tools (`requirements-dev.txt`, `requirements-audit.txt`) |
+| Security / zizmor | GitHub Actions security: pinning, permissions, credentials, injection; results in the Security tab |
+| Security / Dependency review | New vulnerable dependencies in pull requests |
+| CI / Package | Builds and audits the `.deb` on every release with `scripts/readonly-audit.sh` |
+
+Dependabot (`.github/dependabot.yml`) proposes weekly updates for the pinned action
+commits and Python tools. It waits 7 days before suggesting a new release, so a
+compromised version can be pulled first. The installed package's only runtime
+dependency, PyYAML, comes from Debian/Ubuntu and gets their security updates.
 
 ## License
 
