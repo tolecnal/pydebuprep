@@ -19,7 +19,11 @@ OS_RELEASE = 'ID=debian\nVERSION_ID="13"\nVERSION_CODENAME=trixie\n'
 
 
 def recording() -> FakeSystem:
-    return FakeSystem(files={"/etc/os-release": OS_RELEASE}, strict=False)
+    return FakeSystem(
+        files={"/etc/os-release": OS_RELEASE},
+        commands={("uname", "-r"): "6.12.48+deb13-amd64\n"},
+        strict=False,
+    )
 
 
 def run_everything(system: FakeSystem) -> None:

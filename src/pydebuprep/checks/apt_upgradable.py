@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydebuprep.checks.base import Check, Context, count, output_lines
+from pydebuprep.checks.base import Check, Context, count, output_lines, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
 from pydebuprep.system import apt_command
 
@@ -21,7 +21,7 @@ class AptUpgradableCheck(Check):
     requires_commands = ("apt",)
 
     def run(self, ctx: Context) -> list[Finding]:
-        lines = package_lines(ctx.system.run(apt_command("apt", "list", "--upgradable")).stdout)
+        lines = package_lines(run_checked(ctx, apt_command("apt", "list", "--upgradable")).stdout)
         if not lines:
             return []
         return [

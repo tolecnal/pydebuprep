@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydebuprep.checks.base import Check, Context, count
+from pydebuprep.checks.base import Check, Context, count, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
 PENDING_KERNEL = {"2": "an ABI-compatible kernel upgrade", "3": "a kernel version upgrade"}
@@ -15,7 +15,7 @@ class NeedrestartCheck(Check):
     install_hint = "sudo apt install needrestart"
 
     def run(self, ctx: Context) -> list[Finding]:
-        out = ctx.system.run(["needrestart", "-b", "-r", "l"], timeout=120).stdout
+        out = run_checked(ctx, ["needrestart", "-b", "-r", "l"], timeout=120).stdout
         services: list[str] = []
         kernel_state = ""
         for line in out.splitlines():

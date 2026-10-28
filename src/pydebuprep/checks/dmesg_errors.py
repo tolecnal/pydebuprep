@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from collections import Counter
 
-from pydebuprep.checks.base import Check, Context, count, output_lines
+from pydebuprep.checks.base import (
+    Check,
+    CheckSkipped,
+    CommandFailed,
+    Context,
+    count,
+    output_lines,
+    run_checked,
+)
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
 DMESG_ERR = ("dmesg", "--level=err", "--notime")
@@ -28,7 +36,15 @@ class DmesgErrorsCheck(Check):
             (DMESG_ERR, Severity.WARNING, "error"),
             (DMESG_WARN, Severity.INFO, "warning"),
         ):
-            total, evidence = _counted(ctx.system.run(list(argv)).stdout)
+            res = run_checked(ctx, argv, ok_codes=None)
+            if "Operation not permitted" in res.stderr:
+                raise CheckSkipped(
+                    "kernel log is not readable here (container or kernel.dmesg_restrict)"
+                )
+            if not res.ok:
+                stderr = res.stderr.strip().splitlines()
+                raise CommandFailed(stderr[0] if stderr else f"dmesg exited {res.returncode}")
+            total, evidence = _counted(res.stdout)
             if total:
                 findings.append(
                     Finding(

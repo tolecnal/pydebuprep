@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from pydebuprep import __version__, checks
-from pydebuprep.checks.base import Context, running_kernel
+from pydebuprep.checks.base import CommandFailed, Context, running_kernel
 from pydebuprep.model import CATEGORY_ORDER, CheckResult, Host, Report, Severity, compute_summary
 from pydebuprep.osinfo import detect_os
 from pydebuprep.render import EXTENSIONS, FORMATS, render
@@ -149,10 +149,24 @@ def _load_baseline(args: argparse.Namespace) -> tuple[str, dict[str, Any]] | Non
 
 def _write(text: str, path: Path) -> None:
     try:
-        with open(path, "x", encoding="utf-8") as fh:
+        with open(path, "x", encoding="utf-8", errors="replace") as fh:
             fh.write(text)
     except OSError as exc:
         raise ToolError(f"cannot write {path}: {exc.strerror or exc}") from exc
+
+
+def _print(text: str) -> None:
+    """Write to stdout; a reader that went away (`| head`) is not an error."""
+    try:
+        sys.stdout.write(text)
+        sys.stdout.flush()
+    except BrokenPipeError:
+        # Point stdout at /dev/null so the interpreter's final flush doesn't raise again.
+        try:
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(devnull, sys.stdout.fileno())
+        except (OSError, ValueError):
+            pass
 
 
 def cmd_report(args: argparse.Namespace, system: System) -> int:
@@ -162,12 +176,16 @@ def cmd_report(args: argparse.Namespace, system: System) -> int:
     ctx = Context(system, osinfo, loaded[1] if loaded else None)
     results = run_checks(selected, ctx)
     summary = compute_summary(results)
+    try:
+        kernel = running_kernel(ctx)
+    except CommandFailed:
+        kernel = "unknown"
     host = Host(
         hostname=system.hostname(),
         os_id=osinfo.id,
         os_version=osinfo.version_id,
         codename=osinfo.codename,
-        kernel=running_kernel(ctx),
+        kernel=kernel,
         is_root=system.is_root(),
     )
     now = system.now()
@@ -181,7 +199,7 @@ def cmd_report(args: argparse.Namespace, system: System) -> int:
     )
     path = resolve_output_path(args.output, args.output_dir, host.hostname, args.format, now)
     if path is None:
-        sys.stdout.write(render(report, args.format, color=use_color(args.no_color)))
+        _print(render(report, args.format, color=use_color(args.no_color)))
     else:
         _write(render(report, args.format), path)
         print(f"Report written to {path}", file=sys.stderr)

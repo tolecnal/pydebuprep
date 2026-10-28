@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydebuprep.checks.base import Check, Context, count
+from pydebuprep.checks.base import Check, Context, count, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
 DPKG_RC_ARGV = ("dpkg-query", "-W", "-f=${db:Status-Abbrev} ${Package}\n")
@@ -14,7 +14,7 @@ class DpkgRcCheck(Check):
     requires_commands = ("dpkg-query",)
 
     def run(self, ctx: Context) -> list[Finding]:
-        out = ctx.system.run(list(DPKG_RC_ARGV)).stdout
+        out = run_checked(ctx, DPKG_RC_ARGV).stdout
         pkgs = [line.split()[-1] for line in out.splitlines() if line.startswith("rc")]
         if not pkgs:
             return []

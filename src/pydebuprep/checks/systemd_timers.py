@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from pydebuprep.checks._systemd import run_systemctl, unit_rows
-from pydebuprep.checks.base import Check, Context, count
+from pydebuprep.checks.base import Check, Context, count, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
 TIMERS = (
@@ -19,8 +19,8 @@ TIMERS = (
 
 def _should_be_active(ctx: Context, unit: str) -> bool:
     """Enabled, and its start conditions hold (timers with unmet conditions idle by design)."""
-    res = ctx.system.run(
-        ["systemctl", "show", "-p", "UnitFileState", "-p", "ConditionResult", unit]
+    res = run_checked(
+        ctx, ["systemctl", "show", "-p", "UnitFileState", "-p", "ConditionResult", unit]
     )
     props = dict(line.partition("=")[::2] for line in res.stdout.splitlines())
     return props.get("UnitFileState") == "enabled" and props.get("ConditionResult") != "no"

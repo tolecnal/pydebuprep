@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydebuprep.checks.base import Check, Context, output_lines
+from pydebuprep.checks.base import Check, Context, output_lines, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
 from pydebuprep.system import apt_command
 
@@ -13,7 +13,7 @@ class DpkgAuditCheck(Check):
 
     def run(self, ctx: Context) -> list[Finding]:
         findings: list[Finding] = []
-        audit = ctx.system.run(["dpkg", "--audit"])
+        audit = run_checked(ctx, ["dpkg", "--audit"], ok_codes=(0, 1))
         lines = output_lines(audit.stdout)
         if lines:
             findings.append(
@@ -24,7 +24,7 @@ class DpkgAuditCheck(Check):
                     remediation=["sudo dpkg --configure -a", "sudo apt -f install"],
                 )
             )
-        check = ctx.system.run(apt_command("apt-get", "check"))
+        check = run_checked(ctx, apt_command("apt-get", "check"), ok_codes=None)
         if not check.ok:
             evidence = output_lines(check.stderr) or output_lines(check.stdout)
             findings.append(

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from pydebuprep.checks.apt_upgradable import package_lines
-from pydebuprep.checks.base import Check, Context, count
+from pydebuprep.checks.base import Check, Context, count, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
 from pydebuprep.system import apt_command
 
@@ -11,7 +11,7 @@ PKG_VERSIONS_ARGV = ("dpkg-query", "-W", "-f=${Package}\t${Version}\n")
 
 
 def installed_versions(ctx: Context) -> dict[str, str]:
-    out = ctx.system.run(list(PKG_VERSIONS_ARGV)).stdout
+    out = run_checked(ctx, PKG_VERSIONS_ARGV).stdout
     versions = {}
     for line in out.splitlines():
         name, _, version = line.partition("\t")
@@ -27,7 +27,7 @@ class ObsoletePackagesCheck(Check):
     requires_commands = ("apt", "dpkg-query")
 
     def run(self, ctx: Context) -> list[Finding]:
-        out = ctx.system.run(apt_command("apt", "list", "--installed")).stdout
+        out = run_checked(ctx, apt_command("apt", "list", "--installed")).stdout
         local = []
         for line in package_lines(out):
             if "[" not in line or "local" not in line.rsplit("[", 1)[1]:

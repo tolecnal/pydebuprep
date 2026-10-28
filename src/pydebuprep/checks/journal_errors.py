@@ -4,7 +4,7 @@ import json
 import re
 from collections import Counter
 
-from pydebuprep.checks.base import Check, Context, count
+from pydebuprep.checks.base import Check, Context, count, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
 JOURNAL = ("journalctl", "-p", "err", "-b", "--no-pager", "-o", "json")
@@ -31,7 +31,7 @@ class JournalErrorsCheck(Check):
     requires_commands = ("journalctl",)
 
     def run(self, ctx: Context) -> list[Finding]:
-        res = ctx.system.run(list(JOURNAL), timeout=60)
+        res = run_checked(ctx, JOURNAL, timeout=60)
         counts: Counter[tuple[str, str]] = Counter()
         examples: dict[tuple[str, str], str] = {}
         variants: dict[tuple[str, str], set[str]] = {}

@@ -207,3 +207,25 @@ def test_inactive_timer_with_unmet_condition_or_disabled_ignored() -> None:
     assert titles(SystemdTimersCheck().run(make_ctx(commands=commands))) == [
         "Timer certbot.timer is not active"
     ]
+
+
+def test_boot_time_without_systemd_skips() -> None:
+    res = CommandResult(
+        ANALYZE,
+        1,
+        "",
+        "System has not been booted with systemd as init system (PID 1). Can't operate.\n",
+    )
+    r = run_check(BootTimeCheck(), make_ctx(commands={ANALYZE: res}))
+    assert r.status is Status.SKIPPED
+    assert r.skipped_reason == "systemd is not running on this system"
+
+
+def test_dmesg_not_permitted_skips() -> None:
+    res = CommandResult(
+        DMESG_ERR, 1, "", "dmesg: read kernel buffer failed: Operation not permitted\n"
+    )
+    r = run_check(DmesgErrorsCheck(), make_ctx(commands={DMESG_ERR: res}))
+    assert r.status is Status.SKIPPED
+    assert r.skipped_reason is not None
+    assert "kernel log is not readable" in r.skipped_reason

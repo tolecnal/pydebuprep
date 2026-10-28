@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from pydebuprep.checks.base import Check, Context, running_kernel
+from pydebuprep.checks.base import Check, Context, run_checked, running_kernel
 from pydebuprep.model import Finding, Severity
 
 TRAILING_NOTE = re.compile(r"\s*\(.*\)\s*$")
@@ -38,7 +38,7 @@ def parse_dkms_status(text: str) -> list[DkmsEntry]:
 
 
 def _modules(ctx: Context) -> list[DkmsEntry]:
-    return parse_dkms_status(ctx.system.run(["dkms", "status"], timeout=60).stdout)
+    return parse_dkms_status(run_checked(ctx, ["dkms", "status"], timeout=60).stdout)
 
 
 class DkmsCheck(Check):

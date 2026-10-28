@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from pydebuprep.checks.base import Check, Context
+from pydebuprep.checks.base import Check, Context, run_checked
 from pydebuprep.checks.kernel_running import installed_kernels
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
@@ -56,7 +56,7 @@ class BootloaderCheck(Check):
         return findings
 
     def _check_efi(self, ctx: Context) -> list[Finding]:
-        res = ctx.system.run(["efibootmgr", "-v"])
+        res = run_checked(ctx, ["efibootmgr", "-v"], ok_codes=None)
         if not res.ok:
             return [
                 Finding(

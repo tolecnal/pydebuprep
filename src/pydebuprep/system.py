@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import glob as _glob
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -27,37 +28,45 @@ APT_RO_OPTS: tuple[str, ...] = (
 
 APT_PROGRAMS = ("apt", "apt-get", "apt-cache")
 
-ALLOWED_PREFIXES: tuple[tuple[str, ...], ...] = (
+_DF_EXCLUDE = ("-x", "tmpfs", "-x", "devtmpfs", "-x", "squashfs", "-x", "overlay", "-x", "efivarfs")
+_UNITS = ("--no-legend", "--plain", "--no-pager")
+
+# Every command pydebuprep may run, matched against the WHOLE argv: any extra argument,
+# however harmless it looks, is rejected. apt commands must carry APT_RO_OPTS right after
+# the program name; they are written here without them.
+ALLOWED_COMMANDS: set[tuple[str, ...]] = {
     ("dpkg", "--audit"),
-    ("dpkg", "--compare-versions"),
-    ("dpkg-query", "-W"),
+    ("dpkg-query", "-W", "-f=${db:Status-Abbrev} ${Package}\n"),
+    ("dpkg-query", "-W", "-f=${Package}\t${Version}\n"),
     ("apt-get", "check"),
     ("apt-get", "-s", "autoremove"),
-    ("apt", "list"),
-    ("apt-cache", "policy"),
+    ("apt", "list", "--upgradable"),
+    ("apt", "list", "--installed"),
     ("apt-mark", "showhold"),
     ("debsums", "-c"),
     ("uname", "-r"),
     ("needrestart", "-b", "-r", "l"),
     ("dkms", "status"),
     ("efibootmgr", "-v"),
-    ("systemctl", "list-units"),
-    ("systemctl", "list-timers"),
-    ("systemctl", "show", "-p"),
+    ("systemctl", "list-units", "--state=failed", *_UNITS),
+    ("systemctl", "list-units", "--type=service", "--state=active", *_UNITS),
+    ("systemctl", "list-units", "--type=timer", "--all", *_UNITS),
     ("systemd-analyze",),
-    ("journalctl", "-p"),
-    ("dmesg", "--level=err"),
-    ("dmesg", "--level=warn"),
+    ("systemd-analyze", "blame", "--no-pager"),
+    ("journalctl", "-p", "err", "-b", "--no-pager", "-o", "json"),
+    ("dmesg", "--level=err", "--notime"),
+    ("dmesg", "--level=warn", "--notime"),
     ("findmnt", "--verify"),
-    ("findmnt", "-rn"),
-    ("df", "-P"),
-)
-
-# Commands whose whole argv must match exactly, because any further argument
-# could change state.
-EXACT_ONLY: dict[str, tuple[tuple[str, ...], ...]] = {
-    "systemd-analyze": (("systemd-analyze",), ("systemd-analyze", "blame", "--no-pager")),
+    ("findmnt", "-rn", "-o", "TARGET,SOURCE,FSTYPE"),
+    ("df", "-P", "-T", *_DF_EXCLUDE),
+    ("df", "-P", "-i", *_DF_EXCLUDE),
 }
+
+# Commands taking exactly one trailing operand, which must be a plain unit name.
+UNIT_QUERIES: set[tuple[str, ...]] = {
+    ("systemctl", "show", "-p", "UnitFileState", "-p", "ConditionResult"),
+}
+UNIT_NAME = re.compile(r"^[A-Za-z0-9@_.:\\-]+$")
 
 DEFAULT_TIMEOUT = 30.0
 
@@ -74,17 +83,23 @@ def _strip_apt_opts(argv: Sequence[str]) -> tuple[str, ...]:
     return argv
 
 
+def _is_allowed(argv: tuple[str, ...]) -> bool:
+    if argv and argv[0] in APT_PROGRAMS:
+        n = len(APT_RO_OPTS)
+        if argv[1 : 1 + n] != APT_RO_OPTS:
+            return False
+        argv = (argv[0], *argv[1 + n :])
+    if argv in ALLOWED_COMMANDS:
+        return True
+    head, operand = argv[:-1], argv[-1] if argv else ""
+    return head in UNIT_QUERIES and not operand.startswith("-") and bool(UNIT_NAME.match(operand))
+
+
 def check_allowed(argv: Sequence[str]) -> None:
-    stripped = _strip_apt_opts(argv)
-    if not stripped:
-        raise DisallowedCommandError("empty command")
-    exact = EXACT_ONLY.get(stripped[0])
-    if exact is not None:
-        if stripped in exact:
-            return
-    elif any(stripped[: len(p)] == p for p in ALLOWED_PREFIXES):
-        return
-    raise DisallowedCommandError(f"command not on the read-only allowlist: {' '.join(argv)}")
+    if not _is_allowed(tuple(argv)):
+        raise DisallowedCommandError(
+            f"command not on the read-only allowlist: {' '.join(argv) or '(empty)'}"
+        )
 
 
 @dataclass

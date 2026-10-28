@@ -98,3 +98,27 @@ def test_text_ansi_with_color() -> None:
 def test_unknown_format_raises() -> None:
     with pytest.raises(ValueError, match="unknown format"):
         render(make_sample_report(), "pdf")
+
+
+SURROGATE_PATH = "/etc/foo\udcff.conf.dpkg-dist"
+
+
+@pytest.mark.parametrize("fmt", FORMATS)
+def test_surrogate_escaped_paths_render_as_valid_utf8(fmt: str) -> None:
+    r = make_sample_report()
+    r.results[0].findings[0].evidence = [SURROGATE_PATH]
+    out = render(r, fmt)
+    out.encode("utf-8")  # must not raise
+    assert "foo" in out
+
+
+@pytest.mark.parametrize("fmt", ["text", "markdown"])
+def test_terminal_control_sequences_stripped(fmt: str) -> None:
+    r = make_sample_report()
+    r.results[0].findings[0].evidence = ["\x1b]2;pwned\x07 evil \x9b31m"]
+    r.results[0].findings[0].title = "title \x1b[2J"
+    out = render(r, fmt)
+    assert "\x1b" not in out
+    assert "\x07" not in out
+    assert "\x9b" not in out
+    assert "evil" in out

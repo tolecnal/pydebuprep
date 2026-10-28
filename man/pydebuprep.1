@@ -107,7 +107,7 @@ Print usage and exit.
 No findings at warning level or above.
 .TP
 .B 1
-The most severe finding is a warning.
+The most severe finding is a warning, or a check failed to run.
 .TP
 .B 2
 At least one critical finding.
@@ -116,7 +116,8 @@ At least one critical finding.
 pydebuprep itself failed: invalid arguments, an unreadable baseline, or an
 output file that could not be written.
 .PP
-Skipped checks do not affect the exit status.
+Skipped checks do not affect the exit status. A check that fails to run (for
+example because a command timed out) raises it to at least 1.
 .SH FILES
 .TP
 .I /var/lib/pydebuprep/snapshots/

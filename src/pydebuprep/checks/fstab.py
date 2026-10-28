@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from pydebuprep.checks.base import Check, Context, count, output_lines
+from pydebuprep.checks.base import Check, Context, count, output_lines, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
 FINDMNT_VERIFY = ("findmnt", "--verify")
@@ -25,7 +25,7 @@ def _unescape(text: str) -> str:
 
 def _mounted(ctx: Context) -> list[str]:
     targets = []
-    for line in ctx.system.run(list(FINDMNT_LIST)).stdout.splitlines():
+    for line in run_checked(ctx, FINDMNT_LIST).stdout.splitlines():
         fields = line.split()
         if len(fields) >= 3 and fields[-1] not in VIRTUAL_FS:
             targets.append(_unescape(fields[0]))
@@ -39,7 +39,7 @@ class FstabCheck(Check):
     requires_commands = ("findmnt",)
 
     def run(self, ctx: Context) -> list[Finding]:
-        res = ctx.system.run(list(FINDMNT_VERIFY))
+        res = run_checked(ctx, FINDMNT_VERIFY, ok_codes=None)
         problems: dict[str, list[str]] = {"E": [], "W": []}
         target = ""
         unverified = False

@@ -174,6 +174,9 @@ def compute_summary(results: list[CheckResult]) -> Summary:
         exit_code = 2
     elif counts[Severity.WARNING]:
         exit_code = 1
+    elif by_status[Status.ERROR]:
+        # A check that could not run may be hiding a problem; don't report "all clear".
+        exit_code = 1
     else:
         exit_code = 0
     return Summary(

@@ -199,3 +199,37 @@ def test_list_checks_uses_report_category_order(
     run(["list-checks"])
     out = capsys.readouterr().out
     assert out.index("warn-check") < out.index("root-crit")
+
+
+def test_surrogate_in_output_file_does_not_crash(tmp_path: Path) -> None:
+    class Weird(Check):
+        id = "weird"
+        title = "Weird"
+        category = "packages"
+
+        def run(self, ctx: Context) -> list[Finding]:
+            return [Finding(Severity.WARNING, "w", evidence=["/etc/a\udcff.dpkg-old"])]
+
+    checks.ALL_CHECKS = [Weird]
+    rc = run(["--format", "json", "--output-dir", str(tmp_path), "--no-baseline"])
+    assert rc == 1
+    (f,) = tmp_path.iterdir()
+    assert "/etc/a" in f.read_text(encoding="utf-8")
+
+
+def test_broken_pipe_is_quiet(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Closed:
+        def write(self, _: str) -> int:
+            raise BrokenPipeError
+
+        def flush(self) -> None:
+            raise BrokenPipeError
+
+        def isatty(self) -> bool:
+            return False
+
+        def fileno(self) -> int:
+            raise OSError
+
+    monkeypatch.setattr("sys.stdout", Closed())
+    assert run(["--no-baseline"], root=False) == 1

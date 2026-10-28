@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from pydebuprep.checks.base import Check, Context, running_kernel
+from pydebuprep.checks.base import Check, CommandFailed, Context, running_kernel
 from pydebuprep.model import BaselineInfo
 
 DEFAULT_SNAPSHOT_DIR = "/var/lib/pydebuprep/snapshots"
@@ -44,12 +44,16 @@ def build_snapshot(checks: Sequence[Check], ctx: Context) -> dict[str, Any]:
         else:
             data[check.id] = value
     os_info = ctx.osinfo
+    try:
+        kernel = running_kernel(ctx)
+    except CommandFailed:
+        kernel = "unknown"
     return {
         "schema_version": SCHEMA_VERSION,
         "created_at": ctx.system.now().isoformat(timespec="seconds"),
         "hostname": ctx.system.hostname(),
         "os": {"id": os_info.id, "version_id": os_info.version_id, "codename": os_info.codename},
-        "kernel": running_kernel(ctx),
+        "kernel": kernel,
         "checks": data,
         "skipped": skipped,
     }

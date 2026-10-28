@@ -6,14 +6,17 @@ from pydebuprep import system
 from pydebuprep.system import APT_RO_OPTS, DisallowedCommandError, System, check_allowed
 
 
-def _allow(monkeypatch: pytest.MonkeyPatch, *prefixes: tuple[str, ...]) -> None:
-    monkeypatch.setattr(system, "ALLOWED_PREFIXES", system.ALLOWED_PREFIXES + prefixes)
+def _allow(monkeypatch: pytest.MonkeyPatch, *argvs: tuple[str, ...]) -> None:
+    monkeypatch.setattr(system, "ALLOWED_COMMANDS", system.ALLOWED_COMMANDS | set(argvs))
 
 
-def test_check_allowed_accepts_apt_with_ro_opts() -> None:
+def test_check_allowed_accepts_exact_commands() -> None:
     check_allowed(("apt", *APT_RO_OPTS, "list", "--upgradable"))
     check_allowed(("systemd-analyze",))
     check_allowed(("systemd-analyze", "blame", "--no-pager"))
+    check_allowed(
+        ("systemctl", "show", "-p", "UnitFileState", "-p", "ConditionResult", "cron.timer")
+    )
 
 
 @pytest.mark.parametrize(
@@ -28,6 +31,26 @@ def test_check_allowed_accepts_apt_with_ro_opts() -> None:
         ("systemd-analyze", "blame", "--no-pager", "extra"),
         ("sh", "-c", "ls"),
         (),
+        # Trailing arguments after a once-allowed prefix must not slip through.
+        ("journalctl", "-p", "3", "--vacuum-size=1K"),
+        ("journalctl", "-p", "err", "-b", "--no-pager", "-o", "json", "--rotate"),
+        ("dmesg", "--level=err", "--clear"),
+        ("dmesg", "--level=warn", "-c"),
+        ("dmesg", "--level=err", "--notime", "-n", "1"),
+        ("efibootmgr", "-v", "-B", "-b", "0000"),
+        ("efibootmgr", "-v", "-o", "0001,0000"),
+        ("apt-get", *APT_RO_OPTS, "-s", "autoremove", "--no-simulate", "-y"),
+        ("apt-get", *APT_RO_OPTS, "-s", "autoremove", "-o", "APT::Get::Simulate=0"),
+        ("apt-cache", *APT_RO_OPTS, "policy", "-o", "Dir::Cache::pkgcache=/etc/x"),
+        ("apt-get", "check"),  # missing the read-only apt options
+        ("apt", "list", "--upgradable"),
+        ("debsums", "-c", "--generate=all"),
+        ("dkms", "status", "install", "-m", "x", "-v", "1"),
+        ("needrestart", "-b", "-r", "l", "-r", "a"),
+        ("systemctl", "list-units", "--state=failed", "--no-legend", "--plain", "--no-pager", "x"),
+        ("systemctl", "show", "-p", "UnitFileState", "-p", "ConditionResult", "--now", "x"),
+        ("systemctl", "show", "-p", "UnitFileState", "-p", "ConditionResult", "a", "b"),
+        ("systemctl", "show", "-p", "UnitFileState", "-p", "ConditionResult", "-H"),
     ],
 )
 def test_check_allowed_rejects_writes(argv: tuple[str, ...]) -> None:
@@ -41,7 +64,7 @@ def test_run_rejects_disallowed() -> None:
 
 
 def test_run_timeout_returns_result(monkeypatch: pytest.MonkeyPatch) -> None:
-    _allow(monkeypatch, ("sleep",))
+    _allow(monkeypatch, ("sleep", "5"))
     res = System().run(["sleep", "5"], timeout=0.1)
     assert res.timed_out
     assert not res.ok
@@ -55,7 +78,7 @@ def test_run_missing_binary_returns_127(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 def test_run_decodes_invalid_utf8(monkeypatch: pytest.MonkeyPatch) -> None:
-    _allow(monkeypatch, ("printf",))
+    _allow(monkeypatch, ("printf", "\\377ok"))
     res = System().run(["printf", "\\377ok"])
     assert res.stdout.endswith("ok")
     assert "�" in res.stdout

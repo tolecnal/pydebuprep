@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from pydebuprep.checks.base import Check, Context, count
+from pydebuprep.checks.base import Check, Context, count, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
 from pydebuprep.system import apt_command
 
@@ -16,7 +16,7 @@ class AptAutoremoveCheck(Check):
     requires_commands = ("apt-get",)
 
     def run(self, ctx: Context) -> list[Finding]:
-        out = ctx.system.run(apt_command("apt-get", "-s", "autoremove")).stdout
+        out = run_checked(ctx, apt_command("apt-get", "-s", "autoremove")).stdout
         pkgs = [m.group(1).strip() for m in map(REMV.match, out.splitlines()) if m]
         if not pkgs:
             return []

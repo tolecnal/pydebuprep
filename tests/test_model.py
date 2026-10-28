@@ -40,7 +40,20 @@ def test_summary_ignores_skipped_and_error() -> None:
         CheckResult("c", "C", "boot", Status.OK),
     ]
     s = compute_summary(r)
-    assert (s.skipped, s.error, s.ok, s.exit_code) == (1, 1, 1, 0)
+    assert (s.skipped, s.error, s.ok, s.exit_code) == (1, 1, 1, 1)
+
+
+def test_summary_skipped_only_exit_0() -> None:
+    r = [CheckResult("a", "A", "boot", Status.SKIPPED, skipped_reason="requires root")]
+    assert compute_summary(r).exit_code == 0
+
+
+def test_summary_error_does_not_lower_critical() -> None:
+    r = [
+        CheckResult("b", "B", "boot", Status.ERROR, error="boom"),
+        CheckResult("c", "C", "boot", Status.FINDINGS, [Finding(Severity.CRITICAL, "x")]),
+    ]
+    assert compute_summary(r).exit_code == 2
 
 
 def test_info_only_exit_0() -> None:

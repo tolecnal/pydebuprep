@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydebuprep.checks.base import Check, Context, count, output_lines
+from pydebuprep.checks.base import Check, Context, count, output_lines, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
 DEBSUMS_TIMEOUT = 600.0
@@ -15,7 +15,8 @@ class DebsumsCheck(Check):
     install_hint = "sudo apt install debsums"
 
     def run(self, ctx: Context) -> list[Finding]:
-        res = ctx.system.run(["debsums", "-c"], timeout=DEBSUMS_TIMEOUT)
+        # debsums exits 2 when files changed and 1 when files are missing; both are findings.
+        res = run_checked(ctx, ["debsums", "-c"], ok_codes=(0, 1, 2), timeout=DEBSUMS_TIMEOUT)
         changed = output_lines(res.stdout)
         missing = [line for line in output_lines(res.stderr) if "missing file" in line]
         problems = changed + missing

@@ -2,7 +2,15 @@ from __future__ import annotations
 
 import re
 
-from pydebuprep.checks.base import Check, Context, output_lines
+from pydebuprep.checks._systemd import not_systemd
+from pydebuprep.checks.base import (
+    Check,
+    CheckSkipped,
+    CommandFailed,
+    Context,
+    output_lines,
+    run_checked,
+)
 from pydebuprep.model import Finding, Severity
 
 ANALYZE = ("systemd-analyze",)
@@ -18,7 +26,9 @@ class BootTimeCheck(Check):
     requires_commands = ("systemd-analyze",)
 
     def run(self, ctx: Context) -> list[Finding]:
-        res = ctx.system.run(list(ANALYZE))
+        res = run_checked(ctx, ANALYZE, ok_codes=None)
+        if not_systemd(res):
+            raise CheckSkipped("systemd is not running on this system")
         if "not yet finished" in res.stderr + res.stdout:
             return [
                 Finding(
@@ -30,10 +40,11 @@ class BootTimeCheck(Check):
                 )
             ]
         if not res.ok:
-            return []
+            stderr = res.stderr.strip().splitlines()
+            raise CommandFailed(stderr[0] if stderr else f"systemd-analyze exited {res.returncode}")
         lines = output_lines(res.stdout)
         match = TOTAL.search(lines[0]) if lines else None
-        blame = [line.strip() for line in output_lines(ctx.system.run(list(BLAME)).stdout)][:TOP]
+        blame = [line.strip() for line in output_lines(run_checked(ctx, BLAME).stdout)][:TOP]
         return [
             Finding(
                 Severity.INFO,

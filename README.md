@@ -69,11 +69,13 @@ sudo pydebuprep report --format html --output-dir /var/tmp
 | Code | Meaning |
 |---|---|
 | 0 | Nothing at warning level or above |
-| 1 | The most severe finding is a warning |
+| 1 | The most severe finding is a warning, or a check failed to run (status `error`) |
 | 2 | At least one critical finding |
 | 3 | pydebuprep itself failed (bad arguments, unreadable baseline, unwritable output) |
 
-Skipped checks don't affect the exit code.
+Skipped checks (not root, tool not installed) don't affect the exit code. A check
+that errors (for example a command that timed out) raises it to at least 1, so a
+host never looks healthy just because a check couldn't look.
 
 ## Checks
 
@@ -156,9 +158,11 @@ Skipped checks don't affect the exit code.
 2. To take part in snapshots, also implement `collect_baseline(ctx)` and
    `compare(ctx, before)`.
 3. Add the class to `ALL_CHECKS` in `src/pydebuprep/checks/__init__.py`.
-4. Run commands only through `ctx.system.run()`. If you need a new command, add a
-   read-only prefix to `ALLOWED_PREFIXES` in `src/pydebuprep/system.py`, and use
-   `apt_command()` for anything apt.
+4. Run commands only through `run_checked(ctx, argv)`, which turns a timeout or an
+   unexpected exit status into a check error instead of empty output. If you need a
+   new command, add its **complete** argv to `ALLOWED_COMMANDS` in
+   `src/pydebuprep/system.py`. Matching is exact, so no extra argument can ever slip
+   through. Use `apt_command()` for anything apt.
 5. Write tests under `tests/checks/` with `FakeSystem` and real command output.
 
 ## Development

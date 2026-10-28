@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydebuprep.checks.base import Check, Context, count, output_lines
+from pydebuprep.checks.base import Check, Context, count, output_lines, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
 
 def held_packages(ctx: Context) -> list[str]:
-    return sorted(output_lines(ctx.system.run(["apt-mark", "showhold"]).stdout))
+    return sorted(output_lines(run_checked(ctx, ["apt-mark", "showhold"]).stdout))
 
 
 class AptHeldCheck(Check):
