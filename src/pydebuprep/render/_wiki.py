@@ -18,11 +18,22 @@ from pydebuprep.render._common import (
 )
 
 _SPECIAL = re.compile(r"([\\{}\[\]|*_!^~+#])")
+# A '-' starting a word opens a list item or -strikethrough-; "--" becomes a dash.
+_DASH = re.compile(r"(?<![^\s-])-|-(?=-)")
+# Icons such as (i), (x), (on), (/), (+); the inner '+', '!' and '*' are already escaped.
+_EMOTICON = re.compile(r"\((?=(?:[ynix/?-]|on|off|\\[!+]|\\\*[rgby]?)\))")
+# Block markup that only works at the start of a line.
+_BLOCK_START = re.compile(r"^(?=h[1-6]\.|bq\.)")
+ZERO_WIDTH_SPACE = "\u200b"
 
 
 def esc(text: str) -> str:
-    # Both products turn "--" into a dash, which would break command-line options.
-    return _SPECIAL.sub(r"\\\1", text).replace("--", r"\-\-")
+    text = _SPECIAL.sub(r"\\\1", text)
+    text = _DASH.sub(r"\\-", text)
+    text = text.replace("??", r"\?\?")
+    text = _EMOTICON.sub(r"\\(", text)
+    # These have no backslash escape; an invisible character stops the match.
+    return _BLOCK_START.sub(ZERO_WIDTH_SPACE, text)
 
 
 def noformat(lines: list[str]) -> list[str]:

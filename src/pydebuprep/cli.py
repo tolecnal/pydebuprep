@@ -171,11 +171,8 @@ def _check_settings(args: argparse.Namespace, config: Config) -> dict[str, dict[
         option = known.get(check_id, {}).get(name)
         if option is not None and isinstance(option.default, list):
             # Repeating a list option adds to it; the command line replaces the config value.
-            try:
-                items = option.coerce(value)
-            except ValueError as exc:
-                raise ValueError(f"{check_id}.{name}: {exc}") from None
-            from_cli.setdefault((check_id, name), []).extend(items)
+            # (A string always coerces to a list, so this cannot fail.)
+            from_cli.setdefault((check_id, name), []).extend(option.coerce(value))
         else:
             settings.setdefault(check_id, {})[name] = value
     for (check_id, name), items in from_cli.items():
@@ -277,7 +274,8 @@ def cmd_report(args: argparse.Namespace, system: System) -> int:
         _ensure_writable_dir(Path(output).parent, "output directory")
     osinfo = detect_os(system)
     loaded = _load_baseline(args, config, snapshot_dir)
-    if loaded:
+    if loaded and "os-release" not in {c.id for c in selected}:
+        # os-release reports these itself; repeat them only when it isn't running.
         for warning in baseline_warnings(loaded[1], system.hostname(), osinfo.codename):
             print(f"pydebuprep: warning: {warning}", file=sys.stderr)
     ctx = Context(system, osinfo, loaded[1] if loaded else None)

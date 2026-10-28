@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -178,7 +179,22 @@ def load_config(path: str | None, *, default_path: str = DEFAULT_CONFIG_PATH) ->
     except (OSError, UnicodeDecodeError) as exc:
         reason = getattr(exc, "strerror", None) or str(exc)
         raise ConfigError([f"cannot read config file {target}: {reason}"]) from None
-    return parse_config(text, target)
+    return _resolve_paths(parse_config(text, target), os.path.dirname(os.path.abspath(target)))
+
+
+def _resolve_paths(config: Config, base: str) -> Config:
+    """Relative paths in a config file are relative to the file, not the working directory."""
+
+    def resolve(path: str) -> str:
+        return path if os.path.isabs(path) else os.path.normpath(os.path.join(base, path))
+
+    report = config.report
+    if report.output_dir is not None:
+        report.output_dir = resolve(report.output_dir)
+    report.snapshot_dir = resolve(report.snapshot_dir)
+    if report.baseline not in ("auto", "none"):
+        report.baseline = resolve(report.baseline)
+    return config
 
 
 def _yaml_value(value: Any) -> str:

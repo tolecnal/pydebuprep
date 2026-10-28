@@ -154,3 +154,19 @@ def test_unreadable_config_has_hint(tmp_path: Path) -> None:
     p.chmod(0)
     with pytest.raises(ConfigError, match=r"permission denied .*--no-config"):
         load_config(str(p))
+
+
+def test_load_config_resolves_relative_paths(tmp_path: Path) -> None:
+    p = tmp_path / "pydebuprep.conf"
+    p.write_text("report:\n  output_dir: out\n  snapshot_dir: ./snaps\n  baseline: none\n")
+    cfg = load_config(str(p))
+    assert cfg.report.output_dir == str(tmp_path / "out")
+    assert cfg.report.snapshot_dir == str(tmp_path / "snaps")
+    assert cfg.report.baseline == "none"
+
+
+def test_load_config_keeps_absolute_paths(tmp_path: Path) -> None:
+    p = tmp_path / "pydebuprep.conf"
+    p.write_text("report:\n  output_dir: /var/tmp/x\n  baseline: /srv/s.json\n")
+    cfg = load_config(str(p))
+    assert (cfg.report.output_dir, cfg.report.baseline) == ("/var/tmp/x", "/srv/s.json")

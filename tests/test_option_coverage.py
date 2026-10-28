@@ -8,8 +8,7 @@ up automatically and are tested generically elsewhere.)
 
 from __future__ import annotations
 
-import importlib
-import inspect
+import ast
 from pathlib import Path
 
 import pytest
@@ -56,16 +55,26 @@ def test_every_option_has_a_behaviour_test() -> None:
     assert not stale, f"OPTION_TESTS lists options that no longer exist: {stale}"
 
 
+def _test_source(ref: str) -> str | None:
+    """Source of tests/<module>.py::<function>, read with ast so pytest's import mode
+    doesn't matter."""
+    module, _, name = ref.partition("::")
+    path = ROOT / "tests" / (module.replace(".", "/") + ".py")
+    if not path.exists():
+        return None
+    text = path.read_text()
+    for node in ast.walk(ast.parse(text)):
+        if isinstance(node, ast.FunctionDef) and node.name == name:
+            return ast.get_source_segment(text, node)
+    return None
+
+
 @pytest.mark.parametrize("key", sorted(OPTION_TESTS))
 def test_named_test_exercises_the_option(key: tuple[str, str]) -> None:
-    module_name, _, func_name = OPTION_TESTS[key].partition("::")
-    module = importlib.import_module(module_name)
-    func = getattr(module, func_name, None)
-    assert callable(func), f"{OPTION_TESTS[key]} not found"
+    source = _test_source(OPTION_TESTS[key])
+    assert source is not None, f"{OPTION_TESTS[key]} not found"
     # The test must actually set the option, not just be any test that happens to exist.
-    assert key[1] in inspect.getsource(func), (
-        f"{OPTION_TESTS[key]} never mentions option {key[1]!r}"
-    )
+    assert key[1] in source, f"{OPTION_TESTS[key]} never mentions option {key[1]!r}"
 
 
 def _options_table() -> list[str]:

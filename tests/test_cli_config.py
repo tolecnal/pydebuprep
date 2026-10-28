@@ -308,3 +308,48 @@ def test_missing_env_config_is_an_error(
     monkeypatch.setenv("PYDEBUPREP_CONFIG", str(tmp_path / "typo.conf"))
     assert run(["--no-baseline"]) == 3
     assert "typo.conf: file not found" in capsys.readouterr().err
+
+
+def test_baseline_mismatch_not_repeated_on_stderr_when_os_release_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from pydebuprep.checks.os_release import OsReleaseCheck
+
+    monkeypatch.setattr(checks, "ALL_CHECKS", [OsReleaseCheck, Knob])
+    snaps = tmp_path / "snaps"
+    main(
+        ["snapshot", "--snapshot-dir", str(snaps)],
+        system=FakeSystem(
+            files={"/etc/os-release": OS_RELEASE},
+            commands={("uname", "-r"): "x\n"},
+            hostname="elsewhere",
+        ),
+    )
+    capsys.readouterr()
+    run(["--snapshot-dir", str(snaps), "--format", "json"])
+    captured = capsys.readouterr()
+    assert "warning: baseline" not in captured.err
+    titles = [
+        f["title"] for r in json.loads(captured.out)["results"] for f in r["baseline_diff"] or []
+    ]
+    assert "Baseline is from host elsewhere" in titles
+
+
+def test_relative_paths_in_config_resolve_against_config_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    etc = tmp_path / "etc"
+    etc.mkdir()
+    (etc / "reports").mkdir()
+    assert run(["snapshot", "--snapshot-dir", str(etc / "snaps")]) == 0
+    snap = Path(capsys.readouterr().out.strip())
+    c = etc / "pydebuprep.conf"
+    c.write_text(
+        f"report:\n  output_dir: reports\n  baseline: snaps/{snap.name}\n  snapshot_dir: snaps\n"
+    )
+    elsewhere = tmp_path / "cwd"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    assert run(["--config", str(c), "--format", "json"]) == 1
+    (report,) = (etc / "reports").iterdir()
+    assert json.loads(report.read_text())["baseline"]["path"] == str(snap)

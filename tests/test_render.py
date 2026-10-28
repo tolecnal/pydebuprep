@@ -181,3 +181,34 @@ def test_wiki_double_hyphen_not_turned_into_dash(fmt: str) -> None:
     )
     out = render(r, fmt)
     assert r"# sudo apt autoremove \-\-purge" in out
+
+
+@pytest.mark.parametrize("fmt", ["jira", "confluence"])
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("- not a list item", r"\- not a list item"),
+        ("keep -this- intact", r"keep \-this- intact"),
+        ("apt-sources stays", "apt-sources stays"),
+        ("a--b", r"a\-\-b"),
+        ("??not a citation??", r"\?\?not a citation\?\?"),
+        (
+            "no (i) (x) (on) (off) (-) (/) (y) emoticons",
+            r"no \(i) \(x) \(on) \(off) \(-) \(/) \(y) emoticons",
+        ),
+        ("ordinary (parentheses) stay", "ordinary (parentheses) stay"),
+    ],
+)
+def test_wiki_markup_triggers_escaped(fmt: str, text: str, expected: str) -> None:
+    r = make_sample_report()
+    r.results[0].findings[1] = Finding(Severity.INFO, "t", detail=text)
+    assert f"\n{expected}\n" in render(r, fmt)
+
+
+@pytest.mark.parametrize("fmt", ["jira", "confluence"])
+@pytest.mark.parametrize("start", ["h1. x", "h6. x", "bq. x", "----"])
+def test_wiki_block_markers_at_line_start_neutralised(fmt: str, start: str) -> None:
+    r = make_sample_report()
+    r.results[0].findings[1] = Finding(Severity.INFO, "t", detail=start)
+    out = render(r, fmt)
+    assert f"\n{start}" not in out.replace(r"\-\-\-\-", "")
