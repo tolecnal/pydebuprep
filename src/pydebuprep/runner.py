@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from pydebuprep.checks.base import Check, Context
+from pydebuprep.checks.base import Check, CheckSkipped, Context
 from pydebuprep.model import CheckResult, Finding, Status, sort_findings, sort_results
 
 
@@ -27,6 +27,12 @@ def run_check(check: Check, ctx: Context) -> CheckResult:
             if before is not None:
                 diff = sort_findings(check.compare(ctx, before))
         result.baseline_diff = diff
+    except CheckSkipped as exc:
+        result.status = Status.SKIPPED
+        result.skipped_reason = str(exc)
+        result.findings = []
+        result.baseline_diff = None
+        return result
     except Exception as exc:
         result.status = Status.ERROR
         result.error = _describe(exc)

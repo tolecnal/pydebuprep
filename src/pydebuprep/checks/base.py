@@ -10,6 +10,10 @@ from pydebuprep.osinfo import OsInfo
 from pydebuprep.system import System
 
 
+class CheckSkipped(Exception):
+    """Raised by a check that discovers at run time it cannot run here."""
+
+
 @dataclass
 class Context:
     system: System

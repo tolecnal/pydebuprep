@@ -6,7 +6,7 @@ import pytest
 
 from fakes import FakeSystem
 from pydebuprep import checks
-from pydebuprep.checks.base import Check, Context
+from pydebuprep.checks.base import Check, CheckSkipped, Context
 from pydebuprep.model import Finding, Severity, Status
 from pydebuprep.osinfo import OsInfo
 from pydebuprep.runner import run_check, run_checks
@@ -138,3 +138,18 @@ def test_get_checks_skip(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(checks, "ALL_CHECKS", [OkCheck, Boom])
     assert [c.id for c in checks.get_checks(skip=["boom"])] == ["ok-check"]
     assert [c.id for c in checks.get_checks(["boom"])] == ["boom"]
+
+
+class NotHere(Check):
+    id = "not-here"
+    title = "N"
+    category = "services"
+
+    def run(self, ctx: Context) -> list[Finding]:
+        raise CheckSkipped("systemd is not running")
+
+
+def test_check_skipped_exception_becomes_skipped() -> None:
+    r = run_check(NotHere(), ctx())
+    assert r.status is Status.SKIPPED
+    assert r.skipped_reason == "systemd is not running"
