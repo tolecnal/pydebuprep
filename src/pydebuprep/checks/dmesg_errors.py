@@ -33,7 +33,11 @@ class DmesgErrorsCheck(Check):
     category = "services"
     requires_root = True
     requires_commands = ("dmesg",)
-    options = (Option("ignore", [], "Regular expressions; matching kernel messages are left out"),)
+    options = (
+        Option(
+            "ignore", [], "Regular expressions; matching kernel messages are left out", split=False
+        ),
+    )
 
     def validate(self) -> None:
         self.patterns = compile_patterns(self.opt("ignore"))

@@ -47,6 +47,9 @@ class Option:
     name: str
     default: Any
     help: str
+    # For list options: whether a single string is split on commas. Off for values that
+    # may themselves contain commas, such as regular expressions.
+    split: bool = True
 
     def coerce(self, value: Any) -> Any:
         """Convert a config-file or command-line value; raises ValueError with a reason."""
@@ -76,8 +79,12 @@ class Option:
                 raise ValueError("expected a number") from None
         if isinstance(default, list):
             if isinstance(value, str):
+                if not self.split:
+                    return [value] if value else []
                 return [item.strip() for item in value.split(",") if item.strip()]
             if isinstance(value, (list, tuple)):
+                if not all(isinstance(item, (str, int, float)) for item in value):
+                    raise ValueError("expected a list of strings")
                 return [str(item) for item in value]
             raise ValueError("expected a list")
         if isinstance(value, (dict, list)):

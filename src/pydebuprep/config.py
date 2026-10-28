@@ -168,6 +168,13 @@ def load_config(path: str | None, *, default_path: str = DEFAULT_CONFIG_PATH) ->
         if not explicit:
             return Config.defaults()
         raise ConfigError([f"cannot read config file {target}: file not found"]) from None
+    except PermissionError:
+        raise ConfigError(
+            [
+                f"cannot read config file {target}: permission denied "
+                "(make it readable, run as root, or use --no-config)"
+            ]
+        ) from None
     except (OSError, UnicodeDecodeError) as exc:
         reason = getattr(exc, "strerror", None) or str(exc)
         raise ConfigError([f"cannot read config file {target}: {reason}"]) from None

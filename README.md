@@ -59,11 +59,11 @@ sudo pydebuprep report --format html --output-dir /var/tmp
 |---|---|
 | `--format text\|json\|yaml\|html\|markdown\|jira\|confluence` | Output format (default `text`). Every format has the same structure. |
 | `--output-dir DIR` | Write to a timestamped file in `DIR` instead of stdout. |
-| `--output FILE` | Write to `FILE`; if it exists, a timestamp is added instead of overwriting. |
+| `--output FILE` | Write to `FILE`; if it exists, a timestamp is added instead of overwriting. `-o -` forces standard output even when the config sets `output_dir`. |
 | `--checks ID,...` / `--skip ID,...` | Run only, or leave out, specific checks. |
 | `--min-severity warning\|critical` | Hide lower-severity findings (the exit code still counts them). |
 | `--no-color` | Plain text output (also when not a TTY or `NO_COLOR` is set). |
-| `--check-option CHECK.OPTION=VALUE` | Set a check option (repeatable); see `pydebuprep list-checks --verbose`. |
+| `--check-option CHECK.OPTION=VALUE` | Set a check option; repeat it to add items to a list option. See `pydebuprep list-checks --verbose`. |
 | `--config FILE` / `--no-config` | Use another config file, or none. |
 
 ### Pasting into Jira or Confluence
@@ -77,7 +77,7 @@ written against the documented markup; check them in your own Jira/Confluence
 version before relying on the layout.
 
 ```sh
-sudo pydebuprep --format jira --no-color | xclip -selection clipboard
+sudo pydebuprep --format jira -o - | xclip -selection clipboard
 ```
 
 ## Configuration

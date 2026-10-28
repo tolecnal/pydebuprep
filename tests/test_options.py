@@ -117,3 +117,44 @@ def test_every_registered_option_has_help_and_valid_default() -> None:
         for option in cls.options:
             assert option.help, (cls.id, option.name)
         cls()  # defaults must validate
+
+
+class Patterns(Check):
+    id = "patterns"
+    title = "Patterns"
+    category = "services"
+    options = (Option("ignore", [], "Regular expressions", split=False),)
+
+    def run(self, ctx: Context) -> list[Finding]:
+        return []
+
+
+def test_unsplit_list_option_keeps_commas() -> None:
+    assert Patterns({"ignore": "a{1,3}"}).opt("ignore") == ["a{1,3}"]
+    assert Patterns({"ignore": "x, y"}).opt("ignore") == ["x, y"]
+    assert Patterns({"ignore": ""}).opt("ignore") == []
+    assert Patterns({"ignore": ["a,b", "c"]}).opt("ignore") == ["a,b", "c"]
+
+
+@pytest.mark.parametrize("value", [[{"a": 1}], [["x"]], [None]])
+def test_list_items_must_be_scalars(value: Any) -> None:
+    with pytest.raises(ValueError, match=r"tunable\.ignore: expected a list of strings"):
+        Tunable({"ignore": value})
+
+
+def test_regex_options_do_not_split() -> None:
+    from pydebuprep.checks.dmesg_errors import DmesgErrorsCheck
+    from pydebuprep.checks.journal_errors import JournalErrorsCheck
+
+    assert JournalErrorsCheck({"ignore": "Failed (a|b), retrying"}).opt("ignore") == [
+        "Failed (a|b), retrying"
+    ]
+    assert DmesgErrorsCheck({"ignore": "x{1,2}"}).opt("ignore") == ["x{1,2}"]
+
+
+@pytest.mark.parametrize("value", [0, -5])
+def test_debsums_timeout_must_be_positive(value: int) -> None:
+    from pydebuprep.checks.debsums import DebsumsCheck
+
+    with pytest.raises(ValueError, match="debsums: timeout_seconds must be greater than 0"):
+        DebsumsCheck({"timeout_seconds": value})

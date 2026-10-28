@@ -75,5 +75,6 @@ def _no_host_config(
     monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
 ) -> None:
     """Never let a real /etc/pydebuprep.conf on the test machine leak into tests."""
-    missing = tmp_path_factory.mktemp("noconf") / "pydebuprep.conf"
-    monkeypatch.setenv("PYDEBUPREP_CONFIG", str(missing))
+    empty = tmp_path_factory.mktemp("conf") / "pydebuprep.conf"
+    empty.write_text("")
+    monkeypatch.setenv("PYDEBUPREP_CONFIG", str(empty))

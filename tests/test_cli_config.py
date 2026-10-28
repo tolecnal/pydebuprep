@@ -212,7 +212,11 @@ def test_configtest_ok(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> No
     assert "Syntax OK" in out
 
 
-def test_configtest_without_default_file(capsys: pytest.CaptureFixture[str]) -> None:
+def test_configtest_without_default_file(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.delenv("PYDEBUPREP_CONFIG")
+    monkeypatch.setattr("pydebuprep.cli.DEFAULT_CONFIG_PATH", "/nonexistent/pydebuprep.conf")
     assert run(["configtest"]) == 0
     out = capsys.readouterr().out
     assert "not found; built-in defaults apply" in out
@@ -245,3 +249,62 @@ def test_list_checks_verbose_shows_options(capsys: pytest.CaptureFixture[str]) -
     out = capsys.readouterr().out
     assert "level = low" in out
     assert "How loud" in out
+
+
+class Lists(Check):
+    id = "lists"
+    title = "Lists"
+    category = "services"
+    options = (Option("ignore", [], "Regexes", split=False), Option("names", [], "Names"))
+
+    def run(self, ctx: Context) -> list[Finding]:
+        return [
+            Finding(Severity.INFO, f"ignore={self.opt('ignore')!r} names={self.opt('names')!r}")
+        ]
+
+
+def test_repeated_check_option_appends_to_list_and_replaces_config(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(checks, "ALL_CHECKS", [Lists])
+    c = conf(tmp_path, "checks:\n  lists:\n    ignore: [from-config]\n")
+    run(
+        [
+            "--config",
+            c,
+            "--no-baseline",
+            "--format",
+            "json",
+            "--check-option",
+            "lists.ignore=a{1,3}",
+            "--check-option",
+            "lists.ignore=b, c",
+            "--check-option",
+            "lists.names=x,y",
+        ]
+    )
+    data = json.loads(capsys.readouterr().out)
+    assert data["results"][0]["findings"][0]["title"] == (
+        "ignore=['a{1,3}', 'b, c'] names=['x', 'y']"
+    )
+
+
+def test_dash_output_means_stdout_even_with_config_output_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    out = tmp_path / "reports"
+    out.mkdir()
+    c = conf(tmp_path, f"report:\n  output_dir: {out}\n")
+    assert run(["--config", c, "-o", "-", "--no-baseline"]) == 1
+    assert "pydebuprep report" in capsys.readouterr().out
+    assert list(out.iterdir()) == []
+    assert not (tmp_path / "-").exists()
+
+
+def test_missing_env_config_is_an_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("PYDEBUPREP_CONFIG", str(tmp_path / "typo.conf"))
+    assert run(["--no-baseline"]) == 3
+    assert "typo.conf: file not found" in capsys.readouterr().err

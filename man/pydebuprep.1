@@ -92,6 +92,9 @@ Write the report to
 .IR FILE .
 If it already exists, a UTC timestamp is inserted before the extension; an
 existing file is never overwritten.
+.B \-o \-
+writes to standard output, even when the configuration sets
+.BR output_dir .
 .TP
 .BI \-\-baseline " FILE"
 Compare against this snapshot instead of the newest one.
@@ -123,7 +126,10 @@ environment variable is set.
 .TP
 .BI \-\-check\-option " CHECK.OPTION=VALUE"
 Set an option of one check, overriding the configuration file. May be given
-more than once. Use
+more than once; repeating a list option adds an item each time. List values are
+otherwise split on commas, except for regular\-expression options such as
+.BR ignore ,
+which take each value whole. Use
 .B list\-checks \-\-verbose
 to see the options.
 .TP
@@ -159,8 +165,9 @@ The most severe finding is a warning, or a check failed to run.
 At least one critical finding.
 .TP
 .B 3
-pydebuprep itself failed: invalid arguments, an unreadable baseline, or an
-output file that could not be written.
+pydebuprep itself failed: invalid arguments, an invalid or unreadable
+configuration file, an unreadable baseline, or an output file that could not be
+written.
 .PP
 Skipped checks do not affect the exit status. A check that fails to run (for
 example because a command timed out) raises it to at least 1.

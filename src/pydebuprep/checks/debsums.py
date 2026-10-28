@@ -15,6 +15,10 @@ class DebsumsCheck(Check):
     install_hint = "sudo apt install debsums"
     options = (Option("timeout_seconds", int(DEBSUMS_TIMEOUT), "Give up after this many seconds"),)
 
+    def validate(self) -> None:
+        if self.opt("timeout_seconds") <= 0:
+            raise ValueError("timeout_seconds must be greater than 0")
+
     def run(self, ctx: Context) -> list[Finding]:
         # debsums exits 2 when files changed and 1 when files are missing; both are findings.
         res = run_checked(

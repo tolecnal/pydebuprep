@@ -85,7 +85,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--output",
         "-o",
         metavar="FILE",
-        help="write the report to FILE (a timestamp is added if FILE exists)",
+        help="write the report to FILE (a timestamp is added if FILE exists); "
+        "'-' means standard output, overriding a configured output_dir",
     )
     base = report.add_mutually_exclusive_group()
     base.add_argument("--baseline", metavar="FILE", help="compare against this snapshot")
@@ -152,14 +153,30 @@ def default_config_path() -> str:
 def _load_config(args: argparse.Namespace) -> Config:
     if args.no_config:
         return Config.defaults()
-    return load_config(args.config, default_path=default_config_path())
+    # A path named on the command line or in the environment must exist; only the
+    # built-in default location is optional.
+    explicit = args.config or os.environ.get(CONFIG_ENV) or None
+    return load_config(explicit, default_path=DEFAULT_CONFIG_PATH)
 
 
 def _check_settings(args: argparse.Namespace, config: Config) -> dict[str, dict[str, Any]]:
     settings = copy.deepcopy(config.check_settings)
+    known = {cls.id: {o.name: o for o in cls.options} for cls in checks.ALL_CHECKS}
+    from_cli: dict[tuple[str, str], list[Any]] = {}
     for text in args.check_option:
         check_id, name, value = checks.parse_check_option(text)
-        settings.setdefault(check_id, {})[name] = value
+        option = known.get(check_id, {}).get(name)
+        if option is not None and isinstance(option.default, list):
+            # Repeating a list option adds to it; the command line replaces the config value.
+            try:
+                items = option.coerce(value)
+            except ValueError as exc:
+                raise ValueError(f"{check_id}.{name}: {exc}") from None
+            from_cli.setdefault((check_id, name), []).extend(items)
+        else:
+            settings.setdefault(check_id, {})[name] = value
+    for (check_id, name), items in from_cli.items():
+        settings.setdefault(check_id, {})[name] = items
     checks.get_checks(settings=settings)  # validate every setting, used or not
     return settings
 
@@ -247,12 +264,14 @@ def cmd_report(args: argparse.Namespace, system: System) -> int:
     fmt = args.format or config.report.format
     min_severity = args.min_severity or config.report.min_severity
     snapshot_dir = args.snapshot_dir or config.report.snapshot_dir
-    output_dir = None if args.output else (args.output_dir or config.report.output_dir)
+    to_stdout = args.output == "-"
+    output = None if to_stdout else args.output
+    output_dir = None if (to_stdout or output) else (args.output_dir or config.report.output_dir)
     selected = _select_checks(args, config)
     if output_dir is not None:
         _ensure_writable_dir(Path(output_dir), "output directory")
-    elif args.output:
-        _ensure_writable_dir(Path(args.output).parent, "output directory")
+    elif output:
+        _ensure_writable_dir(Path(output).parent, "output directory")
     osinfo = detect_os(system)
     loaded = _load_baseline(args, config, snapshot_dir)
     if loaded:
@@ -282,7 +301,7 @@ def cmd_report(args: argparse.Namespace, system: System) -> int:
         summary=summary,
         results=_filter_for_display(results, Severity(min_severity)),
     )
-    path = resolve_output_path(args.output, output_dir, host.hostname, fmt, now)
+    path = resolve_output_path(output, output_dir, host.hostname, fmt, now)
     if path is None:
         _print(render(report, fmt, color=use_color(args.no_color, config.report.color)))
     else:

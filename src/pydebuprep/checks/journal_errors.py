@@ -45,6 +45,7 @@ class JournalErrorsCheck(Check):
             [],
             "Regular expressions; messages matching any of them (as 'IDENTIFIER: message') "
             "are left out",
+            split=False,
         ),
     )
 
