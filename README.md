@@ -245,7 +245,7 @@ host never looks healthy just because a check couldn't look.
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt && .venv/bin/pip install --no-deps -e .
 make lint test
-make coverage   # branch coverage, must stay at or above fail_under (pyproject.toml)
+make coverage   # line and branch coverage, enforced at 100% (pyproject.toml)
 make generated  # after changing commands, flags, checks or options
 sudo make audit # with the package installed: strace proves a root run changes nothing
 make deb        # needs: debhelper dh-python python3-all python3-setuptools python3-yaml python3-pytest

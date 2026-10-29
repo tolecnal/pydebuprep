@@ -11,12 +11,14 @@ WARNING_PCT = 25.0
 
 
 def _human(n: int) -> str:
+    if n < 1024:
+        return f"{n} B"
     size = float(n)
-    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
-        if size < 1024 or unit == "TiB":
-            return f"{size:.1f} {unit}" if unit != "B" else f"{int(size)} B"
+    for unit in ("KiB", "MiB", "GiB"):
         size /= 1024
-    return f"{n} B"
+        if size < 1024:
+            return f"{size:.1f} {unit}"
+    return f"{size / 1024:.1f} TiB"
 
 
 THRESHOLD_OPTIONS = (

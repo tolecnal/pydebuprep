@@ -77,8 +77,6 @@ Some of the obvious commands write state: `nginx -t` can create log files, and
       host. Consider a VM-based job, or a container booted with systemd as PID 1.
 - [ ] `efibootmgr -v` has never been exercised by the audit (no EFI firmware in CI
       containers). It is read-only by design and by the exact-argv allowlist.
-- [ ] Branch coverage is enforced at 95% (`fail_under` in `pyproject.toml`). Raise it
-      as coverage improves; `system.py` (82%) is the main gap.
 
 ## Decisions to revisit
 
