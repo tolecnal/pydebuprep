@@ -4,8 +4,9 @@ What is still open, as of 2026-10-29. Remove items as they are done.
 
 ## Housekeeping
 
-- [ ] Close Dependabot PR #1 (raises the `setuptools>=59` build floor to 84.2.1).
-      #2 stops Dependabot from proposing it again; the closing comment explains why.
+- [ ] Close Dependabot PR #1 (raises the `setuptools>=59` build floor to 84.2.1), with a
+      note that the floor is a compatibility promise for Ubuntu 22.04's setuptools 59.
+      #2 (merged) stops Dependabot from proposing it again.
 
 ## GitHub repository settings
 
