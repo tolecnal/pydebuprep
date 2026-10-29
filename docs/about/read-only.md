@@ -59,9 +59,20 @@ with something to autoremove; 0.3.1 fixed it.
 
 ## What it does write
 
-- `snapshot` writes its snapshot file, and nothing else.
-- `report` and `convert` write the report file you asked for with `--output` or
-  `--output-dir`, and never overwrite an existing file.
+The hard rule: pydebuprep **never changes the system's state or any file the
+operating system uses.** Within that, it writes only:
+
+- **the snapshot file**, when you run `snapshot`;
+- **the report file you asked for** with `--output` or `--output-dir` (never
+  overwriting an existing file);
+- **temporary scratch files**, when a check needs a file to work with — for example
+  to hand a signing key to `gpgv` in a form it can read. They go in a private
+  directory of pydebuprep's own, created under `/tmp` with mode `0700` (files `0600`,
+  never following symlinks), and the directory is removed before the check returns.
+  Commands may write only into that directory, and the allowlist enforces it.
+
+The audit holds pydebuprep to this: a scratch file that outlives the run, or a write
+anywhere else, fails it.
 
 ## What "read-only" can't cover
 
