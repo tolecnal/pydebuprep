@@ -18,3 +18,4 @@ debian/debhelper-build-stamp
 *.buildinfo
 *.changes
 .coverage
+debian/*.debhelper

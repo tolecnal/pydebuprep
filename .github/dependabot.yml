@@ -21,6 +21,10 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    ignore:
+      # pyproject.toml's build-system floor (setuptools>=59) is a compatibility
+      # promise, not a pin: Ubuntu 22.04 ships setuptools 59. Don't raise it.
+      - dependency-name: setuptools
     groups:
       dev-tools:
         patterns: ["*"]
