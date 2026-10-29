@@ -131,6 +131,7 @@ The package also installs the example as
 | `debsums` | `timeout_seconds` (600) |
 | `boot-space` | `warning_pct` (25.0), `critical_pct` (10.0) |
 | `disk-space` | `include_remote` (false), `warning_pct` (25.0), `critical_pct` (10.0), `exclude_mounts` ([]), `important_mounts` (["/", "/var"]) and `min_free_mib` (2048): an absolute free-space floor for those mounts |
+| `python-venvs` | `search_paths` (/opt, /srv, /usr/local, /root, /home, /var/www) and `max_depth` (5): where to look for virtualenvs; `exclude_paths` (\*/.cache/\*): ones to leave out |
 | `network` | `ignore_interfaces` (lo, veth\*, docker\*, br-\*, virbr\*, vnet\*, tap\*, cni\*, flannel\*, cali\*): left out of the baseline comparison |
 | `dmesg-errors`, `journal-errors` | `ignore` ([]): regular expressions for messages to leave out |
 | `systemd-failed`, `systemd-timers` | `ignore_units` ([]): unit name patterns to leave out |
@@ -176,6 +177,12 @@ host never looks healthy just because a check couldn't look.
 | `systemd-failed` | services | Failed units; services active or enabled before the upgrade that aren't now |
 | `systemd-timers` | services | Enabled timers that aren't active |
 | `disk-space` | storage | Free space and inodes on local filesystems (network mounts optional); a minimum free-space floor for `/` and `/var` |
+| `postgresql` | applications | Clusters still on an older major version than the newest installed server, or left behind after migrating; clusters that should start but are down; clusters online before but not now |
+| `mariadb` | applications | Data directory not upgraded to the new server version (root) |
+| `postfix` | applications | `postconf -n` warnings and errors (`postfix check` isn't used: it creates directories) |
+| `bind` | applications | `named-checkconf` errors (root) |
+| `docker` | applications | Unhealthy or restarting containers; containers running before but not now. Only queried when `docker.service` is running, so the daemon is never started (root) |
+| `python-venvs` | applications | Virtualenvs whose Python no longer exists, or built for an older Python |
 | `network` | network | Default route and DNS servers; interfaces, addresses, routes, DNS and the network manager (ifupdown, netplan, NetworkManager, systemd-networkd) compared with the baseline |
 | `firewall` | network | ufw or nftables enabled but no rules loaded; rules lost since the baseline (root; only queries already-loaded kernel modules) |
 | `apparmor` | security | AppArmor enabled, profiles in complain mode, denials this boot, profiles no longer enforced (root) |

@@ -7,7 +7,16 @@ from enum import Enum
 from typing import Any
 
 SCHEMA_VERSION = "1"
-CATEGORY_ORDER = ("release", "packages", "boot", "services", "network", "security", "storage")
+CATEGORY_ORDER = (
+    "release",
+    "packages",
+    "boot",
+    "services",
+    "applications",
+    "network",
+    "security",
+    "storage",
+)
 EVIDENCE_LIMIT = 20
 
 

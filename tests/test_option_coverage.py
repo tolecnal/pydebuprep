@@ -18,6 +18,15 @@ from pydebuprep import checks
 ROOT = Path(__file__).resolve().parent.parent
 
 OPTION_TESTS: dict[tuple[str, str], str] = {
+    ("python-venvs", "exclude_paths"): "checks.test_applications::test_venvs_in_caches_are_skipped",
+    (
+        "python-venvs",
+        "search_paths",
+    ): "checks.test_applications::test_venvs_search_paths_and_depth_options",
+    (
+        "python-venvs",
+        "max_depth",
+    ): "checks.test_applications::test_venvs_search_paths_and_depth_options",
     (
         "network",
         "ignore_interfaces",

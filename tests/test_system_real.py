@@ -108,3 +108,24 @@ def test_clock_unsynchronized(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_loaded_modules() -> None:
     mods = System().loaded_modules()
     assert isinstance(mods, set)
+
+
+def test_find_files_limits_depth_and_skips_symlinked_dirs(tmp_path: Path) -> None:
+    (tmp_path / "a" / "b" / "c").mkdir(parents=True)
+    (tmp_path / "a" / "pyvenv.cfg").write_text("")
+    (tmp_path / "a" / "b" / "c" / "pyvenv.cfg").write_text("")
+    (tmp_path / "link").symlink_to(tmp_path / "a")
+    s = System()
+    assert s.find_files([str(tmp_path)], "pyvenv.cfg", max_depth=1) == [
+        str(tmp_path / "a" / "pyvenv.cfg")
+    ]
+    assert s.find_files([str(tmp_path), str(tmp_path / "missing")], "pyvenv.cfg", max_depth=5) == [
+        str(tmp_path / "a" / "b" / "c" / "pyvenv.cfg"),
+        str(tmp_path / "a" / "pyvenv.cfg"),
+    ]
+
+
+def test_python_version() -> None:
+    import sys
+
+    assert System().python_version() == f"{sys.version_info.major}.{sys.version_info.minor}"

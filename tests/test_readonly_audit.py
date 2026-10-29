@@ -86,3 +86,17 @@ def test_adjtimex_read_allowed_but_changes_flagged(tmp_path: Path) -> None:
     assert audit(tmp_path, glibc_read)[0] == 0
     glibc_change = "100 clock_adjtime(CLOCK_REALTIME, {modes=ADJ_SETOFFSET, time={tv_sec=1}}) = 0\n"
     assert audit(tmp_path, glibc_change)[0] == 1
+
+
+def test_signals_within_the_traced_run_are_allowed(tmp_path: Path) -> None:
+    # Go programs (docker) preempt their own threads with SIGURG.
+    trace = (
+        "201 tgkill(200, 202, SIGURG) = 0\n200 kill(201, SIGTERM) = 0\n202 kill(200, SIGCHLD) = 0\n"
+    )
+    assert audit(tmp_path, trace)[0] == 0
+
+
+def test_signals_to_other_processes_are_flagged(tmp_path: Path) -> None:
+    rc, out = audit(tmp_path, "100 tgkill(4242, 4242, SIGURG) = 0\n")
+    assert rc == 1
+    assert "tgkill(4242" in out

@@ -35,6 +35,7 @@ with `SHA256SUMS`, and the SLSA provenance attestation verified with
       - `SECURITY.md`;
       - new checks: network, firewall, time-sync, apparmor, unattended-upgrades, cron,
         ssh-server; boot critical chain; a free-space floor for `/` and `/var`;
+      - application checks: postgresql, mariadb, postfix, bind, docker, python-venvs;
       - 100% line and branch coverage, enforced.
 - [ ] Decide whether to publish an APT repository as well, for example signed and
       served from GitHub Pages, so hosts can `apt install pydebuprep` and get
@@ -43,17 +44,18 @@ with `SHA256SUMS`, and the SLSA provenance attestation verified with
 ## Checks not implemented yet
 
 Done on 2026-10-29: network, firewall, time-sync, AppArmor, unattended-upgrades, cron,
-ssh-server, the boot critical chain and the `/` and `/var` free-space floor. Still open
-(each must pass `scripts/readonly-audit.sh` with the service installed):
+ssh-server, the boot critical chain, the `/` and `/var` free-space floor, and the
+application checks postgresql, mariadb, postfix, bind, docker and python-venvs. Each
+passes `scripts/readonly-audit.sh` with the service installed.
 
-- [ ] Services:
-      - PostgreSQL old clusters (`pg_lsclusters`); MariaDB/MySQL upgrade state;
-      - nginx/apache config validity, done without writing;
-      - postfix and BIND config checks (`postfix check` creates directories: not usable);
-      - Docker/Podman/libvirt/LXD workloads compared with the baseline;
-      - Python virtualenvs built against the old system Python.
 - [ ] Dropped from the wish list, with reasons:
       - WireGuard/OpenVPN tunnels: covered by the network check's interface comparison;
+      - nginx and Apache config tests: `nginx -t` writes its PID file, cache directories
+        and logs; `apache2ctl -t` creates run directories. A broken config still shows
+        up in systemd-failed once the service fails to start;
+      - `postfix check`: creates missing directories, so postfix uses `postconf -n`;
+      - Podman, LXD (`lxc`) and libvirt (`virsh`) clients: they create configuration or
+        storage directories on first use, or need a daemon that may not be running;
       - `ufw status`: writes `/run/ufw.lock`, so the firewall check reads ufw's config
         and the loaded rules instead;
       - loaded DKMS modules (`lsmod`), `~` versions, `apt policy` for key packages:
