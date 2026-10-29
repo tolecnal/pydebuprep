@@ -11,6 +11,7 @@ from pydebuprep.checks._apt_metadata import (
     legacy_keyring_finding,
     metadata_findings,
     security_finding,
+    signature_findings,
 )
 from pydebuprep.checks.base import Check, Context
 from pydebuprep.model import Finding, Severity, truncate_evidence
@@ -281,6 +282,7 @@ class AptSourcesCheck(Check):
         findings += keyring_findings(ctx.system, enabled)
         findings += legacy_keyring_finding(ctx.system)
         findings += metadata_findings(ctx.system, enabled)
+        findings += signature_findings(ctx.system, enabled)
         distro = [e for e in enabled if is_distro(e, codename) and e.type == "deb"]
         findings += security_finding(codename, distro)
 

@@ -25,6 +25,8 @@ TMP = "/tmp/"  # nosec B108
 LINE = re.compile(r"(\d+)\s+(.*)")
 CALL = re.compile(r"(\w+)\((.*)\)\s+=\s+(-?\d+|\?)")
 QUOTED = re.compile(r'"((?:[^"\\]|\\.)*)"')
+# Calls whose first argument is a directory descriptor their (first) path is relative to.
+DIRFD_CALLS = ("openat", "openat2", "unlinkat", "mkdirat", "fchmodat", "fchownat", "mknodat")
 
 
 class Auditor:
@@ -37,6 +39,7 @@ class Auditor:
         self.violations: list[str] = []
         self.run_pids: set[str] = set()  # every process and thread in the traced run
         self.signals: list[tuple[str, str]] = []  # (target pid, where), judged in finish()
+        self.fds: dict[tuple[str, str], str] = {}  # (pid, fd) -> path it was opened as
 
     def allowed(self, path: str) -> bool:
         return path.startswith(HARMLESS) or path.startswith(self.allow)
@@ -65,6 +68,14 @@ class Auditor:
         name, args, result = call.groups()
         where = f"{self.programs.get(pid, f'pid {pid}')}: {name}({args[:160]})"
         targets = QUOTED.findall(args)
+        if name in DIRFD_CALLS and targets and not targets[0].startswith("/"):
+            # Relative to an open directory (shutil.rmtree does this): resolve it, or mark
+            # it unknown so it can't pass as a scratch file.
+            dirfd = args.split(",", 1)[0].strip()
+            base = self.fds.get((pid, dirfd), f"<fd {dirfd}>")
+            targets[0] = f"{base.rstrip('/')}/{targets[0]}"
+        if name.startswith("open") and result.isdigit() and targets:
+            self.fds[(pid, result)] = targets[0]
         if result.startswith("-"):
             if self.strict_attempt(name, args, targets):
                 self.violations.append(f"{where} (failed attempt)")

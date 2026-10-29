@@ -15,7 +15,9 @@ import socket
 # The only module that starts processes; every argv is checked against ALLOWED_COMMANDS.
 import subprocess  # nosec B404
 import sys
+import tempfile
 from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -116,6 +118,21 @@ SHOW_UNITS: tuple[str, ...] = (
 )
 MAX_UNITS = 256
 
+# Scratch files: some commands need a file to write to (sqv), or a key in a form they
+# can read (gpgv and armored keys). They go in a private directory of pydebuprep's own
+# under /tmp (mode 0700, files 0600), removed before the run ends; never anywhere else.
+SCRATCH_ROOT = "/tmp"  # nosec B108 - a private mkdtemp directory, not a fixed path
+SCRATCH_PREFIX = "pydebuprep-"
+SCRATCH_DIR = re.compile(r"^/tmp/pydebuprep-[A-Za-z0-9_]+$")
+_ACTIVE_SCRATCH: set[str] = set()
+
+# Verifying an apt repository's InRelease against keyrings (apt-sources): any number of
+# keyrings from apt's own directories or the scratch directory, and the file to verify
+# from apt's lists. sqv also needs an output file, which must be in the scratch directory.
+SIGNATURE_PROGRAMS = ("sqv", "gpgv")
+KEYRING_DIRS = ("/etc/apt/", "/usr/share/keyrings/")
+APT_LISTS_DIR = "/var/lib/apt/lists/"
+
 DEFAULT_TIMEOUT = 30.0
 TIME_ERROR = 5  # adjtimex(): the clock is not synchronised
 
@@ -140,11 +157,45 @@ def _is_allowed(argv: tuple[str, ...]) -> bool:
         argv = (argv[0], *argv[1 + n :])
     if argv in ALLOWED_COMMANDS:
         return True
+    if argv and argv[0] in SIGNATURE_PROGRAMS:
+        return _is_signature_check(argv)
     if argv[: len(SHOW_UNITS)] == SHOW_UNITS:
         units = argv[len(SHOW_UNITS) :]
         return 0 < len(units) <= MAX_UNITS and all(_plain_unit(u) for u in units)
     head, operand = argv[:-1], argv[-1] if argv else ""
     return head in UNIT_QUERIES and _plain_unit(operand)
+
+
+def _normal_path(path: str) -> bool:
+    return path.startswith("/") and os.path.normpath(path) == path
+
+
+def _in_scratch(path: str) -> bool:
+    return _normal_path(path) and SCRATCH_DIR.match(os.path.dirname(path)) is not None
+
+
+def _is_signature_check(argv: tuple[str, ...]) -> bool:
+    rest = list(argv[1:])
+    keyrings = 0
+    while len(rest) >= 2 and rest[0] == "--keyring":
+        ring = rest[1]
+        if not (_normal_path(ring) and (ring.startswith(KEYRING_DIRS) or _in_scratch(ring))):
+            return False
+        keyrings += 1
+        rest = rest[2:]
+    if argv[0] == "sqv":
+        if rest[:2] != ["--cleartext", "--output"] or len(rest) < 3 or not _in_scratch(rest[2]):
+            return False
+        rest = rest[3:]
+    target = rest[0] if len(rest) == 1 else ""
+    name = target.removeprefix(APT_LISTS_DIR)
+    return (
+        keyrings > 0
+        and _normal_path(target)
+        and target.startswith(APT_LISTS_DIR)
+        and "/" not in name
+        and name.endswith("_InRelease")
+    )
 
 
 def _plain_unit(name: str) -> bool:
@@ -222,8 +273,38 @@ class System:
         except OSError:
             return None
 
+    def read_bytes(self, path: str) -> bytes | None:
+        try:
+            with open(path, "rb") as fh:
+                return fh.read()
+        except OSError:
+            return None
+
     def exists(self, path: str) -> bool:
         return os.path.exists(path)
+
+    @contextmanager
+    def scratch_dir(self) -> Iterator[str]:
+        """A private directory for scratch files, removed with everything in it after."""
+        path = tempfile.mkdtemp(prefix=SCRATCH_PREFIX, dir=SCRATCH_ROOT)
+        _ACTIVE_SCRATCH.add(path)
+        try:
+            yield path
+        finally:
+            _ACTIVE_SCRATCH.discard(path)
+            shutil.rmtree(path, ignore_errors=True)
+
+    def write_scratch(self, directory: str, name: str, data: bytes) -> str:
+        """Create NAME (mode 0600) in an active scratch directory; never anywhere else."""
+        if directory not in _ACTIVE_SCRATCH:
+            raise ValueError(f"{directory} is not a pydebuprep scratch directory")
+        if not name or "/" in name or name in (".", ".."):
+            raise ValueError(f"{name!r} is not a plain file name")
+        path = os.path.join(directory, name)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
+        with os.fdopen(os.open(path, flags, 0o600), "wb") as fh:
+            fh.write(data)
+        return path
 
     def readlink(self, path: str) -> str | None:
         try:

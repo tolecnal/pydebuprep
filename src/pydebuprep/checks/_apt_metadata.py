@@ -6,6 +6,8 @@ so whether a repository is reachable right now can't be known; the findings say 
 
 from __future__ import annotations
 
+import base64
+import binascii
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
@@ -18,6 +20,20 @@ if TYPE_CHECKING:  # pragma: no cover - typing only; apt_sources imports this mo
 
 LISTS_DIR = "/var/lib/apt/lists"
 LEGACY_KEYRING = "/etc/apt/trusted.gpg"
+DEFAULT_KEYRINGS = ("/etc/apt/trusted.gpg.d/*.gpg", "/etc/apt/trusted.gpg.d/*.asc")
+ARMOR_BEGIN = "-----BEGIN PGP PUBLIC KEY BLOCK-----"
+ARMOR_END = "-----END PGP PUBLIC KEY BLOCK-----"
+VERIFY_TIMEOUT = 30.0
+# Lines in sqv's or gpgv's error output that say why verification failed.
+VERDICTS = (
+    "BAD signature",
+    "Can't check",
+    "No public key",
+    "Missing key",
+    "manipulated",
+    "expired",
+    "revoked",
+)
 # Characters apt's URItoFileName escapes as %xx (QuoteString), besides control and
 # non-ASCII bytes; '/' then becomes '_'.
 QUOTED = set('\\|{}[]<>"^~_=!@#$%&*')
@@ -66,7 +82,7 @@ def parse_release(text: str) -> dict[str, str]:
 def keyring_paths(signed_by: str) -> list[str] | None:
     """Keyring files a Signed-By value names; None when it holds an inline key or
     fingerprints, which aren't files."""
-    if not signed_by or signed_by.startswith("-----BEGIN"):
+    if not signed_by or signed_by.strip().startswith("-----BEGIN"):
         return None
     items = signed_by.replace(",", " ").split()
     paths = [i for i in items if i.startswith("/")]
@@ -209,3 +225,111 @@ def security_finding(codename: str, distro: Sequence[SourceEntry]) -> list[Findi
             ],
         )
     ]
+
+
+def dearmor(text: str) -> bytes | None:
+    """The binary form of ASCII-armored public keys (gpgv can't read armor), or None.
+
+    Also takes a deb822 inline key, whose lines were joined with spaces and whose blank
+    line is a lone '.'.
+    """
+    keys = b""
+    for block in text.split(ARMOR_BEGIN)[1:]:
+        body = block.split(ARMOR_END, 1)[0].strip()
+        lines = body.replace(" . ", "\n\n").replace(" ", "\n").splitlines()
+        if "" in lines:  # armor headers (Version:, Comment:) end at the first blank line
+            lines = lines[lines.index("") + 1 :]
+        data = "".join(line for line in lines if line and not line.startswith("="))
+        try:
+            keys += base64.b64decode(data, validate=True)
+        except (binascii.Error, ValueError):
+            return None
+    return keys or None
+
+
+def _keyrings(system: System, entry: SourceEntry) -> list[bytes] | None:
+    """The keys apt would verify ENTRY with, in binary form; None if they can't be had."""
+    signed_by = entry.signed_by.strip()
+    if signed_by.startswith("-----BEGIN"):
+        key = dearmor(signed_by)
+        return None if key is None else [key]
+    if signed_by:
+        paths = keyring_paths(signed_by)
+        if paths is None:
+            return None  # fingerprints: not verified here
+    else:
+        paths = [LEGACY_KEYRING] + [p for pattern in DEFAULT_KEYRINGS for p in system.glob(pattern)]
+    rings = []
+    for path in paths:
+        data = system.read_bytes(path)
+        if not data:
+            continue
+        if data.lstrip().startswith(ARMOR_BEGIN.encode()):
+            data = dearmor(data.decode("ascii", errors="replace")) or b""
+        if data:
+            rings.append(data)
+    return rings or None
+
+
+def signature_findings(system: System, entries: Sequence[SourceEntry]) -> list[Finding]:
+    """Downloaded InRelease files that no longer verify against the configured keys.
+
+    apt verified each file when it downloaded it, so a failure means the keys changed
+    since: the next apt update will reject the repository. Uses sqv (Debian 13) or gpgv;
+    keys are copied to a private scratch directory as binary, since gpgv can't read
+    armored keys and keyrings may live anywhere.
+    """
+    program = next((p for p in ("sqv", "gpgv") if system.which(p)), None)
+    if program is None:
+        return []
+    targets = []
+    seen: set[tuple[str, str]] = set()
+    for e in entries:
+        path = list_file(e.uri, e.suite, "InRelease")
+        if (e.norm_uri, e.suite) in seen or path is None or system.read_text(path) is None:
+            continue
+        seen.add((e.norm_uri, e.suite))
+        rings = _keyrings(system, e)
+        if rings is not None:
+            targets.append((e, path, rings))
+    if not targets:
+        return []
+    failed = []
+    with system.scratch_dir() as scratch:
+        for n, (e, path, rings) in enumerate(targets):
+            argv = [program]
+            for i, ring in enumerate(rings):
+                argv += ["--keyring", system.write_scratch(scratch, f"key-{n}-{i}.gpg", ring)]
+            if program == "sqv":
+                argv += ["--cleartext", "--output", f"{scratch}/out-{n}"]
+            res = system.run([*argv, path], timeout=VERIFY_TIMEOUT)
+            if res.timed_out or res.returncode == 0:
+                continue
+            reason = _verdict(res.stderr)
+            failed.append(f"{e.uri} {e.suite}: {reason or f'exit status {res.returncode}'}")
+    if not failed:
+        return []
+    return [
+        Finding(
+            Severity.CRITICAL,
+            f"Metadata of {count(len(failed), 'repository', 'repositories')} doesn't "
+            "verify against its keys",
+            detail="apt checked these files when it downloaded them, so the keys changed "
+            "since (removed, replaced or expired): the next apt update will reject these "
+            "repositories and they get no updates.",
+            evidence=truncate_evidence(failed),
+            remediation=[
+                "Get the vendor's current key (reinstall its keyring package, or download "
+                "it again) and point Signed-By at it",
+                "sudo apt update",
+            ],
+        )
+    ]
+
+
+def _verdict(stderr: str) -> str:
+    """The line of a verifier's error output that says why, without its gpgv: prefix."""
+    lines = [ln.strip().removeprefix("gpgv:").strip() for ln in stderr.splitlines()]
+    lines = [ln for ln in lines if ln]
+    chosen = [ln for ln in lines if any(v in ln for v in VERDICTS)]
+    return (chosen or lines or [""])[-1]

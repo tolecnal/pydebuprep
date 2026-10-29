@@ -66,7 +66,8 @@ def ctx(**kw: Any) -> Any:
     }
     for path in kw.pop("remove", []):
         files.pop(path)
-    return make_ctx(files=files, **kw)
+    # No signature verifier unless a test asks for one (FakeSystem has every program).
+    return make_ctx(files=files, available=kw.pop("available", set()), **kw)
 
 
 def findings(**kw: Any) -> list[Any]:
@@ -317,3 +318,172 @@ def test_disabled_and_source_only_entries_are_not_checked() -> None:
 def test_local_repositories_have_no_lists_to_check() -> None:
     local = "deb [trusted=yes] file:/srv/repo ./\ndeb [trusted=yes] file:/srv/other trixie main\n"
     assert findings(files={"/etc/apt/sources.list.d/local.list": local}) == []
+
+
+# --- signatures ----------------------------------------------------------------------
+
+from pydebuprep.checks._apt_metadata import dearmor  # noqa: E402
+from pydebuprep.system import CommandResult  # noqa: E402
+
+SCRATCH = "/tmp/pydebuprep-test"
+ARMORED = (
+    "-----BEGIN PGP PUBLIC KEY BLOCK-----\n"
+    "Comment: vendor key\n"
+    "\n"
+    "mQENS0VZREFUQQ==\n"
+    "=abcd\n"
+    "-----END PGP PUBLIC KEY BLOCK-----\n"
+)
+KEY_BYTES = b"\x99\x01\x0dKEYDATA"
+DEBIAN_TARGETS = [
+    ("deb.debian.org_debian_dists_trixie_InRelease"),
+    ("deb.debian.org_debian_dists_trixie-updates_InRelease"),
+    ("security.debian.org_debian-security_dists_trixie-security_InRelease"),
+]
+
+
+def verify(program: str, n: int, target: str, *rings: int) -> tuple[str, ...]:
+    argv = [program]
+    for i in rings:
+        argv += ["--keyring", f"{SCRATCH}/key-{n}-{i}.gpg"]
+    if program == "sqv":
+        argv += ["--cleartext", "--output", f"{SCRATCH}/out-{n}"]
+    return (*argv, f"{LISTS}/{target}")
+
+
+def debian_ok(program: str) -> dict[tuple[str, ...], str]:
+    return {verify(program, n, t, 0): "" for n, t in enumerate(DEBIAN_TARGETS)}
+
+
+def test_dearmor() -> None:
+    assert dearmor(ARMORED) == KEY_BYTES
+    assert dearmor(ARMORED + ARMORED) == KEY_BYTES + KEY_BYTES
+    folded = " ".join(ARMORED.replace("\n\n", "\n.\n").splitlines())  # a deb822 inline key
+    assert dearmor(folded) == KEY_BYTES
+    assert (
+        dearmor("-----BEGIN PGP PUBLIC KEY BLOCK-----\n!!!\n-----END PGP PUBLIC KEY BLOCK-----")
+        is None
+    )
+    assert dearmor("not armored") is None
+
+
+@pytest.mark.parametrize("program", ["sqv", "gpgv"])
+def test_signatures_that_verify_have_no_findings(program: str) -> None:
+    c = ctx(commands=debian_ok(program), available={program})
+    assert AptSourcesCheck().run(c) == []
+    # every keyring went through the scratch directory as binary
+    assert c.system.scratch_files[f"{SCRATCH}/key-0-0.gpg"] == b"binary key"
+
+
+def test_signature_failure_is_critical() -> None:
+    commands: dict[tuple[str, ...], Any] = debian_ok("sqv")
+    bad = verify("sqv", 2, DEBIAN_TARGETS[2], 0)
+    commands[bad] = CommandResult(
+        bad, 1, "", "Verifying signature:\n  Missing key 4CB5, which is needed\n"
+    )
+    (f,) = AptSourcesCheck().run(ctx(commands=commands, available={"sqv"}))
+    assert (f.severity, f.title) == (
+        Severity.CRITICAL,
+        "Metadata of 1 repository doesn't verify against its keys",
+    )
+    assert f.evidence == [
+        "http://security.debian.org/debian-security trixie-security: Missing key 4CB5, which is needed"
+    ]
+
+
+def test_armored_and_inline_keys_are_dearmored() -> None:
+    vendor = {
+        "/etc/apt/sources.list.d/vendor.list": VENDOR,
+        "/etc/apt/keyrings/vendor.asc": ARMORED,
+        VENDOR_LIST: release("trixie", "trixie"),
+    }
+    commands = {
+        **debian_ok("gpgv"),
+        verify("gpgv", 3, "apt.example.com_repo_dists_trixie_InRelease", 0): "",
+    }
+    c = ctx(files=vendor, commands=commands, available={"gpgv"})
+    assert AptSourcesCheck().run(c) == []
+    assert c.system.scratch_files[f"{SCRATCH}/key-3-0.gpg"] == KEY_BYTES
+
+
+def test_default_keyrings_without_signed_by() -> None:
+    sources = "deb http://deb.debian.org/debian trixie main\ndeb http://security.debian.org/debian-security trixie-security main\n"
+    files = {
+        "/etc/apt/sources.list.d/debian.sources": "",
+        "/etc/apt/sources.list": sources,
+        "/etc/apt/trusted.gpg.d/debian-archive.gpg": "binary key",
+        "/etc/apt/trusted.gpg.d/vendor.asc": ARMORED,
+    }
+    commands = {
+        verify("sqv", 0, DEBIAN_TARGETS[0], 0, 1): "",
+        verify("sqv", 1, DEBIAN_TARGETS[2], 0, 1): "",
+    }
+    c = ctx(files=files, commands=commands, available={"sqv"})
+    assert AptSourcesCheck().run(c) == []
+
+
+def test_unverifiable_sources_are_skipped() -> None:
+    fingerprint = VENDOR.replace("/etc/apt/keyrings/vendor.asc", "0123456789ABCDEF")
+    no_keys = "deb https://apt.example.com/repo trixie main\n"
+    broken = DEBIAN.replace(
+        f"Signed-By: {DEBIAN_KEY}\n\nTypes",
+        "Signed-By:\n -----BEGIN PGP PUBLIC KEY BLOCK-----\n .\n !!\n -----END PGP PUBLIC KEY BLOCK-----\n\nTypes",
+        1,
+    )
+    for files in (
+        {
+            "/etc/apt/sources.list.d/vendor.list": fingerprint,
+            VENDOR_LIST: release("trixie", "trixie"),
+        },
+        {"/etc/apt/sources.list.d/vendor.list": no_keys, VENDOR_LIST: release("trixie", "trixie")},
+        {"/etc/apt/sources.list.d/debian.sources": broken},
+    ):
+        commands = {k: v for k, v in debian_ok("sqv").items()}
+        c = ctx(files=files, commands=commands, available={"sqv"}, strict=False)
+        assert AptSourcesCheck().run(c) == []
+        assert all("apt.example.com" not in " ".join(call) for call in c.system.calls)
+
+
+def test_no_verifier_or_timeout_means_no_finding() -> None:
+    assert AptSourcesCheck().run(ctx(available=set())) == []
+    commands: dict[tuple[str, ...], Any] = debian_ok("gpgv")
+    slow = verify("gpgv", 0, DEBIAN_TARGETS[0], 0)
+    commands[slow] = CommandResult(slow, -1, "", "", True)
+    assert AptSourcesCheck().run(ctx(commands=commands, available={"gpgv"})) == []
+
+
+def test_undecodable_armored_keyring_is_left_out() -> None:
+    garbage = "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n!!!\n-----END PGP PUBLIC KEY BLOCK-----\n"
+    vendor = {
+        "/etc/apt/sources.list.d/vendor.list": VENDOR.replace(
+            "vendor.asc", "vendor.asc,/etc/apt/keyrings/ok.gpg"
+        ),
+        "/etc/apt/keyrings/vendor.asc": garbage,
+        "/etc/apt/keyrings/ok.gpg": "binary key",
+        VENDOR_LIST: release("trixie", "trixie"),
+    }
+    commands = {
+        **debian_ok("sqv"),
+        verify("sqv", 3, "apt.example.com_repo_dists_trixie_InRelease", 0): "",
+    }
+    c = ctx(files=vendor, commands=commands, available={"sqv"})
+    assert AptSourcesCheck().run(c) == []
+    assert c.system.scratch_files[f"{SCRATCH}/key-3-0.gpg"] == b"binary key"
+
+
+def test_gpgv_failure_reason_is_its_verdict() -> None:
+    commands: dict[tuple[str, ...], Any] = debian_ok("gpgv")
+    bad = verify("gpgv", 0, DEBIAN_TARGETS[0], 0)
+    stderr = (
+        "gpgv: Signature made Thu Oct 29 20:52:49 2026 UTC\n"
+        "gpgv:                using RSA key ED541312A33F1128F10B1C6C54404762BBB6E853\n"
+        'gpgv: BAD signature from "Debian Archive Automatic Signing Key"\n'
+    )
+    commands[bad] = CommandResult(bad, 1, "", stderr)
+    (f,) = AptSourcesCheck().run(ctx(commands=commands, available={"gpgv"}))
+    assert f.evidence == [
+        'http://deb.debian.org/debian trixie: BAD signature from "Debian Archive Automatic Signing Key"'
+    ]
+    commands[bad] = CommandResult(bad, 2, "", "")
+    (f,) = AptSourcesCheck().run(ctx(commands=commands, available={"gpgv"}))
+    assert f.evidence == ["http://deb.debian.org/debian trixie: exit status 2"]

@@ -51,6 +51,12 @@ if [ -d /run/systemd/system ]; then
         export AUDIT_UNATTRIBUTED="${AUDIT_UNATTRIBUTED:-report}"
     fi
     [ ! -d /sys/firmware/efi/efivars ] || AUDIT_EXPECT="$AUDIT_EXPECT efibootmgr"
+    # apt-sources verifies repository signatures with whichever apt uses (scratch files).
+    if command -v sqv >/dev/null; then
+        AUDIT_EXPECT="$AUDIT_EXPECT sqv"
+    else
+        AUDIT_EXPECT="$AUDIT_EXPECT gpgv"
+    fi
     if grep -q '^nameserver 127\.0\.0\.5[34]' /etc/resolv.conf; then
         AUDIT_EXPECT="$AUDIT_EXPECT resolvectl"
     fi

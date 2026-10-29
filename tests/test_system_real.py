@@ -136,3 +136,37 @@ def test_real_readlink(tmp_path: Path) -> None:
     link.symlink_to("target")
     assert System().readlink(str(link)) == "target"
     assert System().readlink(str(tmp_path / "missing")) is None
+
+
+def test_scratch_dir_is_private_and_removed() -> None:
+    system = System()
+    with system.scratch_dir() as scratch:
+        assert scratch.startswith("/tmp/pydebuprep-")
+        assert os.stat(scratch).st_mode & 0o777 == 0o700
+        path = system.write_scratch(scratch, "key.gpg", b"data")
+        assert path == f"{scratch}/key.gpg"
+        assert os.stat(path).st_mode & 0o777 == 0o600
+        with open(path, "rb") as fh:
+            assert fh.read() == b"data"
+    assert not os.path.exists(scratch)
+
+
+def test_write_scratch_refuses_other_directories(tmp_path: Path) -> None:
+    system = System()
+    with pytest.raises(ValueError, match="not a pydebuprep scratch directory"):
+        system.write_scratch(str(tmp_path), "x", b"")
+    with system.scratch_dir() as scratch:
+        for name in ("../escape", "a/b", "", ".."):
+            with pytest.raises(ValueError, match="plain file name"):
+                system.write_scratch(scratch, name, b"")
+        system.write_scratch(scratch, "once", b"")
+        with pytest.raises(FileExistsError):
+            system.write_scratch(scratch, "once", b"")
+    with pytest.raises(ValueError, match="not a pydebuprep scratch directory"):
+        system.write_scratch(scratch, "late", b"")  # removed already
+
+
+def test_read_bytes(tmp_path: Path) -> None:
+    (tmp_path / "k.gpg").write_bytes(b"\x99\x00")
+    assert System().read_bytes(str(tmp_path / "k.gpg")) == b"\x99\x00"
+    assert System().read_bytes(str(tmp_path / "missing")) is None
