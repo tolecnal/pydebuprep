@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+import gzip
+import zlib
 from typing import Any
+from urllib.parse import unquote
 
+from pydebuprep.checks._apt_metadata import LISTS_DIR, parse_release
 from pydebuprep.checks.apt_upgradable import package_lines
 from pydebuprep.checks.base import Check, Context, count, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
 from pydebuprep.system import apt_command
 
 PKG_VERSIONS_ARGV = ("dpkg-query", "-W", "-f=${Package}\t${Version}\n")
+# Origin names of the distributions' own archives (from their Release files).
+DISTRO_ORIGINS = {"Debian", "Debian Backports", "Ubuntu"}
+NAMES_SHOWN = 10
 
 
 def installed_versions(ctx: Context) -> dict[str, str]:
@@ -20,6 +27,56 @@ def installed_versions(ctx: Context) -> dict[str, str]:
     return versions
 
 
+def _read_list(ctx: Context, path: str) -> str | None:
+    """A Packages index, plain or gzip (other compressions aren't read)."""
+    if not path.endswith(".gz"):
+        return ctx.system.read_text(path)
+    data = ctx.system.read_bytes(path)
+    try:
+        return None if data is None else gzip.decompress(data).decode("utf-8", "replace")
+    except (OSError, EOFError, zlib.error):
+        return None
+
+
+def _origin_name(ctx: Context, path: str, inreleases: list[str]) -> str:
+    """Who a Packages index comes from: "Debian" or "Ubuntu" for the distributions'
+    archives, otherwise the vendor's Origin with its host ("Docker (download.docker.com)"),
+    since vendors name their Origin freely."""
+    head = path.split("_binary-", 1)[0]
+    dists = [r for r in inreleases if head.startswith(r[: -len("InRelease")])]
+    fields = parse_release(ctx.system.read_text(max(dists, key=len)) or "") if dists else {}
+    host = unquote(path.rsplit("/", 1)[-1].split("_", 1)[0])
+    origin = fields.get("Origin") or fields.get("Label") or ""
+    if origin in DISTRO_ORIGINS:
+        return origin
+    return f"{origin} ({host})" if origin and origin != host else host
+
+
+def package_origins(ctx: Context, installed: dict[str, str]) -> dict[str, str]:
+    """Where each installed version comes from: the distribution's Origin when it has the
+    version, otherwise the vendor's. Packages found in no index are left out."""
+    inreleases = ctx.system.glob(f"{LISTS_DIR}/*_InRelease")
+    found: dict[str, set[str]] = {}
+    indexes = ctx.system.glob(f"{LISTS_DIR}/*_Packages") + ctx.system.glob(
+        f"{LISTS_DIR}/*_Packages.gz"
+    )
+    for path in indexes:
+        text = _read_list(ctx, path)
+        if text is None:
+            continue
+        origin = _origin_name(ctx, path, inreleases)
+        name = ""
+        for line in text.splitlines():
+            if line.startswith("Package:"):
+                name = line[8:].strip()
+            elif line.startswith("Version:") and installed.get(name) == line[8:].strip():
+                found.setdefault(name, set()).add(origin)
+    return {
+        name: min(origins & DISTRO_ORIGINS) if origins & DISTRO_ORIGINS else min(origins)
+        for name, origins in found.items()
+    }
+
+
 class ObsoletePackagesCheck(Check):
     id = "obsolete-packages"
     title = "Packages not available from any repository"
@@ -27,6 +84,40 @@ class ObsoletePackagesCheck(Check):
     requires_commands = ("apt", "dpkg-query")
 
     def run(self, ctx: Context) -> list[Finding]:
+        return self._local(ctx) + self._third_party(ctx)
+
+    @staticmethod
+    def _third_party(ctx: Context) -> list[Finding]:
+        origins = package_origins(ctx, installed_versions(ctx))
+        vendors: dict[str, list[str]] = {}
+        for name, origin in origins.items():
+            if origin not in DISTRO_ORIGINS:
+                vendors.setdefault(origin, []).append(name)
+        if not vendors:
+            return []
+        total = sum(len(names) for names in vendors.values())
+        evidence = []
+        for origin, names in sorted(vendors.items()):
+            names.sort()
+            more = f", … ({len(names)})" if len(names) > NAMES_SHOWN else ""
+            evidence.append(f"{origin}: {', '.join(names[:NAMES_SHOWN])}{more}")
+        return [
+            Finding(
+                Severity.INFO,
+                f"{count(total, 'package comes', 'packages come')} from third-party repositories",
+                detail="They get updates only from their vendors, not from the "
+                "distribution's security team. Release upgrades often disable these "
+                "repositories.",
+                evidence=truncate_evidence(evidence),
+                remediation=[
+                    "Keep each vendor's repository enabled and pointing at this release",
+                    "Inspect one with: apt policy PACKAGE",
+                ],
+            )
+        ]
+
+    @staticmethod
+    def _local(ctx: Context) -> list[Finding]:
         out = run_checked(ctx, apt_command("apt", "list", "--installed")).stdout
         local = []
         for line in package_lines(out):
@@ -53,19 +144,48 @@ class ObsoletePackagesCheck(Check):
         ]
 
     def collect_baseline(self, ctx: Context) -> Any:
-        return installed_versions(ctx)
+        versions = installed_versions(ctx)
+        return {"versions": versions, "origins": package_origins(ctx, versions)}
 
     def compare(self, ctx: Context, before: Any) -> list[Finding]:
+        # Snapshots from before 0.4 hold the versions only.
+        new_format = isinstance(before, dict) and isinstance(before.get("versions"), dict)
+        versions = before["versions"] if new_format else before
+        origins_before = before.get("origins", {}) if new_format else {}
         now = installed_versions(ctx)
-        removed = sorted(name for name in before if name not in now)
-        if not removed:
-            return []
-        return [
-            Finding(
-                Severity.INFO,
-                f"{count(len(removed), 'package')} removed since baseline",
-                detail="Removed by the upgrade or by hand; check nothing you rely on is gone.",
-                evidence=truncate_evidence([f"{n} {before[n]}" for n in removed]),
-                remediation=["Reinstall anything still needed: sudo apt install PACKAGE"],
+        findings = []
+        removed = sorted(name for name in versions if name not in now)
+        if removed:
+            findings.append(
+                Finding(
+                    Severity.INFO,
+                    f"{count(len(removed), 'package')} removed since baseline",
+                    detail="Removed by the upgrade or by hand; check nothing you rely on is gone.",
+                    evidence=truncate_evidence([f"{n} {versions[n]}" for n in removed]),
+                    remediation=["Reinstall anything still needed: sudo apt install PACKAGE"],
+                )
             )
-        ]
+        if origins_before:
+            origins_now = package_origins(ctx, now)
+            moved = sorted(
+                f"{name}: {old} → {origins_now[name]}"
+                for name, old in origins_before.items()
+                if name in origins_now and origins_now[name] != old
+            )
+            if moved:
+                findings.append(
+                    Finding(
+                        Severity.WARNING,
+                        f"{count(len(moved), 'package comes', 'packages come')} from a "
+                        "different origin than before the upgrade",
+                        detail="A vendor's package was replaced by the distribution's, or "
+                        "the reverse; their versions, configuration and update policies can "
+                        "differ.",
+                        evidence=truncate_evidence(moved),
+                        remediation=[
+                            "Check each with: apt policy PACKAGE",
+                            "Pin the origin you want in /etc/apt/preferences.d/ if needed",
+                        ],
+                    )
+                )
+        return findings

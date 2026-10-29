@@ -288,7 +288,7 @@ for each check's options.
 (packages) Held packages
 .TP
 .B apt\-upgradable
-(packages) Upgrades still pending
+(packages) Pending security updates, packages kept back, updates deferred by phasing, and other upgrades, separately
 .TP
 .B config\-conflicts
 (packages) \fB\(**.dpkg\-dist\fR, \fB\(**.dpkg\-new\fR, \fB\(**.ucf\-dist\fR... left in \fB/etc\fR (critical for sshd/sudoers)
@@ -297,13 +297,13 @@ for each check's options.
 (packages) Package files that no longer match their checksums (root, needs \fBdebsums\fR)
 .TP
 .B dpkg\-audit
-(packages) \fBdpkg \-\-audit\fR and \fBapt\-get check\fR
+(packages) Packages unpacked but not configured, needing reinstalling, or waiting for triggers (separately); dpkg \-\-audit and apt\-get check
 .TP
 .B dpkg\-rc
 (packages) Removed packages with leftover config
 .TP
 .B obsolete\-packages
-(packages) Installed packages no repository provides any more
+(packages) Installed packages no repository provides any more; packages from third\-party repositories, by vendor; packages whose origin changed since the baseline
 .TP
 .B boot\-space
 (boot) Free space and inodes on \fB/boot\fR and the EFI partition

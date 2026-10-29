@@ -50,6 +50,7 @@ ALLOWED_COMMANDS: set[tuple[str, ...]] = {
     ("dpkg-query", "-W", "-f=${Package}\t${Version}\n"),
     ("apt-get", "check"),
     ("apt-get", "-s", "autoremove"),
+    ("apt-get", "-s", "upgrade"),
     ("apt", "list", "--upgradable"),
     ("apt", "list", "--installed"),
     ("apt-mark", "showhold"),
