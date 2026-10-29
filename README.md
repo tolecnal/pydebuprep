@@ -123,7 +123,7 @@ The package also installs the example as
 | Check | Options (defaults) |
 |---|---|
 | `apt-lists-age` | `max_age_days` (7) |
-| `config-conflicts` | `critical_paths` (sshd_config, sshd_config.d/, sudoers, sudoers.d/) |
+| `config-conflicts` | `critical_paths` (sshd_config, sshd_config.d/, sudoers, sudoers.d/), `ignore_paths` ([]): patterns for files to leave out, e.g. ones Ansible manages |
 | `debsums` | `timeout_seconds` (600) |
 | `boot-space` | `warning_pct` (25.0), `critical_pct` (10.0) |
 | `disk-space` | `include_remote` (false), `warning_pct` (25.0), `critical_pct` (10.0), `exclude_mounts` ([]) |
