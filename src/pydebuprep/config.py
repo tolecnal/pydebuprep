@@ -9,10 +9,9 @@ import textwrap
 from dataclasses import dataclass, field
 from typing import Any
 
-import yaml
-
 from pydebuprep import checks
 from pydebuprep.checks.base import Option
+from pydebuprep.deps import require_yaml
 from pydebuprep.model import CATEGORY_ORDER, Severity
 from pydebuprep.render import FORMATS
 from pydebuprep.snapshot import DEFAULT_SNAPSHOT_DIR
@@ -138,6 +137,7 @@ def _check_settings(
 
 def parse_config(text: str, source: str) -> Config:
     """Parse and validate a config file; ConfigError lists every problem found."""
+    yaml = require_yaml()
     try:
         data = yaml.safe_load(text)
     except yaml.YAMLError as exc:
@@ -237,8 +237,16 @@ def _yaml_value(value: Any) -> str:
     if isinstance(value, list):
         return "[" + ", ".join(json.dumps(v) for v in value) + "]"
     text = str(value)
-    plain = yaml.safe_load(text) == text and ": " not in text and not text.startswith("#")
-    return text if plain else json.dumps(text)
+    return text if _plain_yaml_scalar(text) else json.dumps(text)
+
+
+YAML_WORDS = {"null", "true", "false", "yes", "no", "on", "off", "y", "n", "~", ""}
+PLAIN = re.compile(r"[A-Za-z_/][A-Za-z0-9_./@+-]*")
+
+
+def _plain_yaml_scalar(text: str) -> bool:
+    """Whether TEXT reads back as the same string when written unquoted in YAML."""
+    return bool(PLAIN.fullmatch(text)) and text.lower() not in YAML_WORDS
 
 
 def _option_lines(option: Option) -> list[str]:
