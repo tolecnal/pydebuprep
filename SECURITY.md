@@ -83,9 +83,9 @@ changes on each supported release, and published with checksums and a signed
 build-provenance attestation:
 
 ```sh
-gh release download v0.3.0 -R tolecnal/pydebuprep
+gh release download v0.3.1 -R tolecnal/pydebuprep
 sha256sum -c SHA256SUMS
-gh attestation verify pydebuprep_0.3.0_all.deb -R tolecnal/pydebuprep
+gh attestation verify pydebuprep_0.3.1_all.deb -R tolecnal/pydebuprep
 ```
 
 Install only packages that pass both checks.

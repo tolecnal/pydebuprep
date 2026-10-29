@@ -1,3 +1,18 @@
+pydebuprep (0.3.1) unstable; urgency=medium
+
+  * Fix: a root report no longer writes /var/log/apt/eipp.log.xz. When
+    there were packages to autoremove, `apt-get -s autoremove` replaced
+    apt's solver log; Dir::Log::Planner= is now part of the read-only apt
+    options on every apt call.
+  * Every pull request now builds the package and proves a root run changes
+    nothing on all supported releases: in plain containers, in containers
+    booted with systemd (services running, UEFI variables mounted), and on
+    Ubuntu runner VMs. systemctl, journalctl, systemd-analyze, resolvectl,
+    docker and efibootmgr are now exercised; the audit also fails if PID 1
+    starts, stops or reloads anything during the run.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Thu, 29 Oct 2026 20:00:13 +0100
+
 pydebuprep (0.3.0) unstable; urgency=medium
 
   * New checks:

@@ -68,7 +68,7 @@ sudo apt install ./pydebuprep_*_all.deb
 Without the GitHub CLI, download a specific version and skip the attestation check:
 
 ```sh
-VERSION=0.3.0
+VERSION=0.3.1
 wget https://github.com/tolecnal/pydebuprep/releases/download/v$VERSION/pydebuprep_${VERSION}_all.deb \
      https://github.com/tolecnal/pydebuprep/releases/download/v$VERSION/SHA256SUMS
 sha256sum -c SHA256SUMS && sudo apt install ./pydebuprep_${VERSION}_all.deb
@@ -342,7 +342,7 @@ Bump the version in `debian/changelog` (`dch -v X.Y.Z`) and in
 `main` (release tags are protected: only maintainers can create them):
 
 ```sh
-git tag -a v0.3.0 -m "pydebuprep 0.3.0" && git push origin v0.3.0
+git tag -a v0.3.1 -m "pydebuprep 0.3.1" && git push origin v0.3.1
 ```
 
 The **Release** workflow builds the `.deb` once and lints it with lintian. It then
@@ -353,7 +353,7 @@ build-provenance attestation. To check a download:
 
 ```sh
 sha256sum -c SHA256SUMS
-gh attestation verify pydebuprep_0.3.0_all.deb --repo tolecnal/pydebuprep
+gh attestation verify pydebuprep_0.3.1_all.deb --repo tolecnal/pydebuprep
 ```
 
 Running the workflow by hand (workflow_dispatch) builds and verifies the package
