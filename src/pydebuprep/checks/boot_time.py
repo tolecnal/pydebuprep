@@ -15,6 +15,7 @@ from pydebuprep.model import Finding, Severity
 
 ANALYZE = ("systemd-analyze",)
 BLAME = ("systemd-analyze", "blame", "--no-pager")
+CRITICAL_CHAIN = ("systemd-analyze", "critical-chain", "--no-pager")
 TOTAL = re.compile(r"=\s*(\S+)\s*$")
 TOP = 10
 
@@ -45,12 +46,28 @@ class BootTimeCheck(Check):
         lines = output_lines(res.stdout)
         match = TOTAL.search(lines[0]) if lines else None
         blame = [line.strip() for line in output_lines(run_checked(ctx, BLAME).stdout)][:TOP]
-        return [
+        findings = [
             Finding(
                 Severity.INFO,
                 f"Boot took {match.group(1)}" if match else "Boot time",
                 detail=" ".join(lines),
                 evidence=blame,
-                remediation=["systemd-analyze critical-chain shows what the boot waited on"],
+                remediation=["systemd-analyze blame   # every unit, slowest first"],
             )
         ]
+        chain = [
+            line.strip()
+            for line in output_lines(run_checked(ctx, CRITICAL_CHAIN).stdout)
+            if not line.startswith("The time")
+        ]
+        if chain:
+            findings.append(
+                Finding(
+                    Severity.INFO,
+                    "Boot critical chain",
+                    detail="The chain of units the boot waited on; slow ones show a +time.",
+                    evidence=chain[: TOP + 5],
+                    remediation=["systemd-analyze critical-chain UNIT   # for one unit"],
+                )
+            )
+        return findings

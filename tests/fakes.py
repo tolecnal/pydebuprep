@@ -24,6 +24,7 @@ class FakeSystem(System):
         hostname: str = "testhost",
         now: datetime = FROZEN_NOW,
         walk_errors: list[str] | None = None,
+        clock_synced: bool | None = True,
         strict: bool = True,
     ) -> None:
         self.commands = commands or {}
@@ -35,6 +36,7 @@ class FakeSystem(System):
         self._hostname = hostname
         self._now = now
         self.walk_errors = walk_errors or []
+        self.clock_synced = clock_synced
         self.strict = strict
         self.calls: list[tuple[str, ...]] = []
         self.timeouts: list[float] = []
@@ -91,3 +93,6 @@ class FakeSystem(System):
 
     def now(self) -> datetime:
         return self._now
+
+    def clock_synchronized(self) -> bool | None:
+        return self.clock_synced

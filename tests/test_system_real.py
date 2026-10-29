@@ -71,3 +71,40 @@ def test_which_identity_and_clock() -> None:
     assert s.is_root() == (os.geteuid() == 0)
     assert s.hostname() == socket.gethostname()
     assert s.now().tzinfo is timezone.utc
+
+
+def test_clock_synchronized_reads_kernel_state() -> None:
+    assert System().clock_synchronized() in (True, False)
+
+
+def test_clock_synchronized_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    def no_libc(*a: object, **k: object) -> object:
+        raise OSError("no libc")
+
+    monkeypatch.setattr(system.ctypes, "CDLL", no_libc)
+    assert System().clock_synchronized() is None
+
+
+def test_clock_synchronized_error_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Libc:
+        @staticmethod
+        def adjtimex(buf: object) -> int:
+            return -1
+
+    monkeypatch.setattr(system.ctypes, "CDLL", lambda *a, **k: Libc())
+    assert System().clock_synchronized() is None
+
+
+def test_clock_unsynchronized(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Libc:
+        @staticmethod
+        def adjtimex(buf: object) -> int:
+            return 5  # TIME_ERROR
+
+    monkeypatch.setattr(system.ctypes, "CDLL", lambda *a, **k: Libc())
+    assert System().clock_synchronized() is False
+
+
+def test_loaded_modules() -> None:
+    mods = System().loaded_modules()
+    assert isinstance(mods, set)

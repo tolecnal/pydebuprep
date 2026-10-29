@@ -73,3 +73,16 @@ def test_unfinished_and_resumed_calls(tmp_path: Path) -> None:
         "100 <... openat resumed>) = 3\n"
     )
     assert audit(tmp_path, trace)[0] == 1
+
+
+def test_adjtimex_read_allowed_but_changes_flagged(tmp_path: Path) -> None:
+    read = "100 adjtimex({modes=0, offset=0, freq=0, status=STA_PLL}) = 0 (TIME_OK)\n"
+    assert audit(tmp_path, read)[0] == 0
+    change = "100 adjtimex({modes=ADJ_OFFSET|ADJ_FREQUENCY, offset=5}) = 0 (TIME_OK)\n"
+    assert audit(tmp_path, change)[0] == 1
+    glibc_read = (
+        "100 clock_adjtime(CLOCK_REALTIME, {modes=0, offset=-3, status=STA_PLL}) = 0 (TIME_OK)\n"
+    )
+    assert audit(tmp_path, glibc_read)[0] == 0
+    glibc_change = "100 clock_adjtime(CLOCK_REALTIME, {modes=ADJ_SETOFFSET, time={tv_sec=1}}) = 0\n"
+    assert audit(tmp_path, glibc_change)[0] == 1

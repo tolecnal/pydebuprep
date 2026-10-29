@@ -74,6 +74,9 @@ class Auditor:
                 self.violations.append(where)
             elif len(targets) == 2 and targets[0] in self.created_tmp:
                 self.created_tmp[targets[1]] = self.created_tmp.pop(targets[0])
+        elif name in ("adjtimex", "clock_adjtime"):
+            if not re.search(r"\bmodes=0\b", args):  # modes=0 only reads the clock state
+                self.violations.append(where)
         elif name in ("kill", "tkill", "tgkill"):
             if not re.search(r",\s*0\)?$", args):  # signal 0 only probes for existence
                 self.violations.append(where)

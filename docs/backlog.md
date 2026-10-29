@@ -32,40 +32,32 @@ with `SHA256SUMS`, and the SLSA provenance attestation verified with
       - shared `logs: ignore:` regex list for journal-errors and dmesg-errors;
         dmesg-errors reports how many messages were ignored;
       - runs without PyYAML when YAML isn't needed, with an install hint otherwise;
-      - `SECURITY.md`.
+      - `SECURITY.md`;
+      - new checks: network, firewall, time-sync, apparmor, unattended-upgrades, cron,
+        ssh-server; boot critical chain; a free-space floor for `/` and `/var`;
+      - 100% line and branch coverage, enforced.
 - [ ] Decide whether to publish an APT repository as well, for example signed and
       served from GitHub Pages, so hosts can `apt install pydebuprep` and get
       updates. Today the package is published only as a release asset.
 
 ## Checks not implemented yet
 
-Version 1 covers packages, boot, services, logs and storage. These items from the
-original wish list are still open. Each new check must pass `scripts/readonly-audit.sh`.
-Some of the obvious commands write state: `nginx -t` can create log files, and
-`certbot renew --dry-run` and `unattended-upgrade --dry-run` write state files.
+Done on 2026-10-29: network, firewall, time-sync, AppArmor, unattended-upgrades, cron,
+ssh-server, the boot critical chain and the `/` and `/var` free-space floor. Still open
+(each must pass `scripts/readonly-audit.sh` with the service installed):
 
-- [ ] Networking: addresses, routes, DNS (`ip`, `resolvectl`). Watch for a switch
-      between ifupdown, netplan, NetworkManager and systemd-networkd.
-- [ ] Firewall rules loaded (`nft list ruleset`, `iptables -S`, `ufw status`).
-- [ ] Time synchronisation (`timedatectl`).
-- [ ] AppArmor status and recent denials (`aa-status`, journal).
-- [ ] unattended-upgrades enabled, with the right origins for the new release.
-- [ ] cron jobs and timers review.
 - [ ] Services:
       - PostgreSQL old clusters (`pg_lsclusters`); MariaDB/MySQL upgrade state;
       - nginx/apache config validity, done without writing;
-      - postfix and BIND config checks;
-      - WireGuard/OpenVPN;
-      - Docker/Podman/libvirt/LXD;
-      - Python virtualenvs built against the old system Python;
-      - SSH algorithms clients still use.
-- [ ] Smaller ideas:
-      - `systemd-analyze critical-chain`;
-      - DKMS/out-of-tree modules loaded (`lsmod`);
-      - packages with `~` versions;
-      - `apt policy` for key packages.
-- [ ] `disk-space`: the design asked to emphasise `/` and `/var`. Today all local
-      filesystems are treated the same.
+      - postfix and BIND config checks (`postfix check` creates directories: not usable);
+      - Docker/Podman/libvirt/LXD workloads compared with the baseline;
+      - Python virtualenvs built against the old system Python.
+- [ ] Dropped from the wish list, with reasons:
+      - WireGuard/OpenVPN tunnels: covered by the network check's interface comparison;
+      - `ufw status`: writes `/run/ufw.lock`, so the firewall check reads ufw's config
+        and the loaded rules instead;
+      - loaded DKMS modules (`lsmod`), `~` versions, `apt policy` for key packages:
+        little value beyond the existing dkms and obsolete-packages checks.
 
 ## Verification gaps
 

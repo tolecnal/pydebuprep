@@ -18,6 +18,18 @@ from pydebuprep import checks
 ROOT = Path(__file__).resolve().parent.parent
 
 OPTION_TESTS: dict[tuple[str, str], str] = {
+    (
+        "network",
+        "ignore_interfaces",
+    ): "checks.test_network_time::test_network_ignore_interfaces_option",
+    (
+        "disk-space",
+        "important_mounts",
+    ): "checks.test_storage::test_important_mounts_warning_band_and_options",
+    (
+        "disk-space",
+        "min_free_mib",
+    ): "checks.test_storage::test_important_mounts_warning_band_and_options",
     ("apt-lists-age", "max_age_days"): "checks.test_apt_lists_age::test_max_age_configurable",
     (
         "boot-space",

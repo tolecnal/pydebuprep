@@ -7,6 +7,16 @@ from collections.abc import Sequence
 from pydebuprep.checks.base import CheckSkipped, CommandFailed, Context
 from pydebuprep.system import CommandResult
 
+LIST = ("systemctl", "list-units", "--no-legend", "--plain", "--no-pager")
+ACTIVE_SERVICES = (*LIST[:2], "--type=service", "--state=active", *LIST[2:])
+ENABLED_SERVICES = (
+    "systemctl",
+    "list-unit-files",
+    "--type=service",
+    "--state=enabled",
+    "--no-legend",
+    "--no-pager",
+)
 NOT_SYSTEMD_MARKERS = ("not been booted with systemd", "Failed to connect to bus")
 
 
@@ -33,3 +43,11 @@ def unit_rows(text: str) -> list[list[str]]:
         if fields:
             rows.append(fields)
     return rows
+
+
+def active_services(ctx: Context) -> set[str] | None:
+    """Names of active services, or None when systemd isn't running (e.g. a container)."""
+    try:
+        return {row[0] for row in unit_rows(run_systemctl(ctx, ACTIVE_SERVICES).stdout)}
+    except CheckSkipped:
+        return None

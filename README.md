@@ -130,7 +130,8 @@ The package also installs the example as
 | `config-conflicts` | `critical_paths` (sshd_config, sshd_config.d/, sudoers, sudoers.d/), `ignore_paths` ([]): patterns for files to leave out, e.g. ones Ansible manages |
 | `debsums` | `timeout_seconds` (600) |
 | `boot-space` | `warning_pct` (25.0), `critical_pct` (10.0) |
-| `disk-space` | `include_remote` (false), `warning_pct` (25.0), `critical_pct` (10.0), `exclude_mounts` ([]) |
+| `disk-space` | `include_remote` (false), `warning_pct` (25.0), `critical_pct` (10.0), `exclude_mounts` ([]), `important_mounts` (["/", "/var"]) and `min_free_mib` (2048): an absolute free-space floor for those mounts |
+| `network` | `ignore_interfaces` (lo, veth\*, docker\*, br-\*, virbr\*, vnet\*, tap\*, cni\*, flannel\*, cali\*): left out of the baseline comparison |
 | `dmesg-errors`, `journal-errors` | `ignore` ([]): regular expressions for messages to leave out |
 | `systemd-failed`, `systemd-timers` | `ignore_units` ([]): unit name patterns to leave out |
 
@@ -166,13 +167,20 @@ host never looks healthy just because a check couldn't look.
 | `bootloader` | boot | `grub.cfg` references the newest kernel; UEFI boot entries |
 | `dkms` | boot | DKMS modules built for the running kernel |
 | `kernel-running` | boot | Running the newest installed kernel; reboot required |
-| `boot-time` | services | `systemd-analyze` and the slowest units |
+| `boot-time` | services | `systemd-analyze`, the slowest units and the boot critical chain |
+| `cron` | services | Jobs that run programs which no longer exist; crontabs without a running cron daemon; jobs removed since the baseline |
+| `time-sync` | services | A time synchronisation service is running and the clock is synchronised (read from the kernel, no daemon queried); service changes since the baseline |
 | `dmesg-errors` | services | Kernel errors and warnings (root) |
 | `journal-errors` | services | Errors in the journal since boot, grouped |
 | `needrestart` | services | Services still using old libraries (root, needs `needrestart`) |
 | `systemd-failed` | services | Failed units; services active or enabled before the upgrade that aren't now |
 | `systemd-timers` | services | Enabled timers that aren't active |
-| `disk-space` | storage | Free space and inodes on local filesystems (network mounts optional) |
+| `disk-space` | storage | Free space and inodes on local filesystems (network mounts optional); a minimum free-space floor for `/` and `/var` |
+| `network` | network | Default route and DNS servers; interfaces, addresses, routes, DNS and the network manager (ifupdown, netplan, NetworkManager, systemd-networkd) compared with the baseline |
+| `firewall` | network | ufw or nftables enabled but no rules loaded; rules lost since the baseline (root; only queries already-loaded kernel modules) |
+| `apparmor` | security | AppArmor enabled, profiles in complain mode, denials this boot, profiles no longer enforced (root) |
+| `unattended-upgrades` | security | Installed but disabled, or still naming the old release in its allowed origins |
+| `ssh-server` | security | `sshd -t` errors and warnings (an invalid config locks you out on restart); DSA keys in `authorized_keys` (root) |
 | `fstab` | storage | `findmnt --verify`; mounts that went missing since the baseline |
 
 ## Running across a fleet with Ansible
