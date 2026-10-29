@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import pytest
 
+from fakes import FakeSystem
 from pydebuprep import system
-from pydebuprep.system import APT_RO_OPTS, DisallowedCommandError, System, check_allowed
+from pydebuprep.system import (
+    APT_RO_OPTS,
+    SHOW_UNITS,
+    DisallowedCommandError,
+    System,
+    check_allowed,
+)
 
 
 def _allow(monkeypatch: pytest.MonkeyPatch, *argvs: tuple[str, ...]) -> None:
@@ -107,3 +114,29 @@ def test_apt_never_writes_its_solver_log() -> None:
     # Without it, `apt-get -s autoremove` as root replaces /var/log/apt/eipp.log.xz.
     opts = list(zip(APT_RO_OPTS[::2], APT_RO_OPTS[1::2], strict=True))
     assert ("-o", "Dir::Log::Planner=") in opts
+
+
+def test_show_units_allows_unit_names() -> None:
+    check_allowed((*SHOW_UNITS, "ssh.service", "cron.service"))
+    check_allowed((*SHOW_UNITS, "getty@tty1.service"))
+
+
+@pytest.mark.parametrize(
+    "operands",
+    [(), ("-H",), ("a;b",), tuple(f"u{i}.service" for i in range(257))],
+)
+def test_show_units_rejects_bad_operands(operands: tuple[str, ...]) -> None:
+    with pytest.raises(DisallowedCommandError):
+        check_allowed((*SHOW_UNITS, *operands))
+
+
+def test_show_units_requires_the_separator() -> None:
+    with pytest.raises(DisallowedCommandError):
+        check_allowed((*SHOW_UNITS[:-1], "ssh.service"))
+
+
+def test_fake_readlink_and_glob() -> None:
+    fake = FakeSystem(links={"/proc/1/fd/3": "socket:[42]"})
+    assert fake.readlink("/proc/1/fd/3") == "socket:[42]"
+    assert fake.readlink("/proc/1/fd/4") is None
+    assert fake.glob("/proc/1/fd/*") == ["/proc/1/fd/3"]

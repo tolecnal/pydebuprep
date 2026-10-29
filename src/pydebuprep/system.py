@@ -105,6 +105,17 @@ UNIT_QUERIES: set[tuple[str, ...]] = {
 }
 UNIT_NAME = re.compile(r"^[A-Za-z0-9@_.:\\-]+$")
 
+# `systemctl show` with these properties for one or more units, each operand a plain
+# unit name (validated like UNIT_QUERIES' operand).
+SHOW_UNITS: tuple[str, ...] = (
+    "systemctl",
+    "show",
+    "--property=Id,Names,LoadState,ActiveState,SubState,UnitFileState,ConditionResult,"
+    "ConditionTimestamp,TriggeredBy,Requires,BindsTo,ControlGroup",
+    "--",
+)
+MAX_UNITS = 256
+
 DEFAULT_TIMEOUT = 30.0
 TIME_ERROR = 5  # adjtimex(): the clock is not synchronised
 
@@ -129,8 +140,15 @@ def _is_allowed(argv: tuple[str, ...]) -> bool:
         argv = (argv[0], *argv[1 + n :])
     if argv in ALLOWED_COMMANDS:
         return True
+    if argv[: len(SHOW_UNITS)] == SHOW_UNITS:
+        units = argv[len(SHOW_UNITS) :]
+        return 0 < len(units) <= MAX_UNITS and all(_plain_unit(u) for u in units)
     head, operand = argv[:-1], argv[-1] if argv else ""
-    return head in UNIT_QUERIES and not operand.startswith("-") and bool(UNIT_NAME.match(operand))
+    return head in UNIT_QUERIES and _plain_unit(operand)
+
+
+def _plain_unit(name: str) -> bool:
+    return not name.startswith("-") and bool(UNIT_NAME.match(name))
 
 
 def check_allowed(argv: Sequence[str]) -> None:
@@ -206,6 +224,12 @@ class System:
 
     def exists(self, path: str) -> bool:
         return os.path.exists(path)
+
+    def readlink(self, path: str) -> str | None:
+        try:
+            return os.readlink(path)
+        except OSError:
+            return None
 
     def glob(self, pattern: str) -> list[str]:
         return sorted(_glob.glob(pattern))

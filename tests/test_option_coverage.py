@@ -66,6 +66,22 @@ OPTION_TESTS: dict[tuple[str, str], str] = {
     ("disk-space", "exclude_mounts"): "checks.test_storage::test_disk_space_exclude_mounts",
     ("dmesg-errors", "ignore"): "checks.test_services::test_dmesg_ignore_patterns",
     ("journal-errors", "ignore"): "checks.test_services::test_journal_ignore_patterns",
+    (
+        "systemd-critical-services",
+        "required_active",
+    ): "checks.test_systemd_critical::test_configured_lists_are_separate",
+    (
+        "systemd-critical-services",
+        "required_enabled",
+    ): "checks.test_systemd_critical::test_configured_lists_are_separate",
+    (
+        "systemd-critical-services",
+        "builtin",
+    ): "checks.test_systemd_critical::test_builtin_false_and_ignore_units",
+    (
+        "systemd-critical-services",
+        "ignore_units",
+    ): "checks.test_systemd_critical::test_builtin_false_and_ignore_units",
     ("systemd-failed", "ignore_units"): "checks.test_services::test_systemd_failed_ignore_units",
     ("systemd-timers", "ignore_units"): "checks.test_services::test_systemd_timers_ignore_units",
 }

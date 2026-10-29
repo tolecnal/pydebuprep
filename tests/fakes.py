@@ -27,9 +27,11 @@ class FakeSystem(System):
         clock_synced: bool | None = True,
         python: str = "3.13",
         strict: bool = True,
+        links: dict[str, str] | None = None,
     ) -> None:
         self.commands = commands or {}
         self.files = files or {}
+        self.links = links or {}
         self.mtimes = mtimes or {}
         self.disks = disks or {}
         self.root = root
@@ -72,8 +74,11 @@ class FakeSystem(System):
             or any(f.startswith(prefix) for f in self.files)
         )
 
+    def readlink(self, path: str) -> str | None:
+        return self.links.get(path)
+
     def glob(self, pattern: str) -> list[str]:
-        return sorted(f for f in self.files if fnmatch.fnmatch(f, pattern))
+        return sorted(f for f in (*self.files, *self.links) if fnmatch.fnmatch(f, pattern))
 
     def mtime(self, path: str) -> float | None:
         return self.mtimes.get(path)

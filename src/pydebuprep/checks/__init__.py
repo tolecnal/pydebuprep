@@ -38,6 +38,7 @@ from pydebuprep.checks.postfix import PostfixCheck
 from pydebuprep.checks.postgresql import PostgresqlCheck
 from pydebuprep.checks.python_venvs import PythonVenvsCheck
 from pydebuprep.checks.ssh_server import SshServerCheck
+from pydebuprep.checks.systemd_critical import SystemdCriticalCheck
 from pydebuprep.checks.systemd_failed import SystemdFailedCheck
 from pydebuprep.checks.systemd_timers import SystemdTimersCheck
 from pydebuprep.checks.time_sync import TimeSyncCheck
@@ -61,6 +62,7 @@ ALL_CHECKS: list[type[Check]] = [
     BootloaderCheck,
     BootSpaceCheck,
     SystemdFailedCheck,
+    SystemdCriticalCheck,
     SystemdTimersCheck,
     JournalErrorsCheck,
     DmesgErrorsCheck,

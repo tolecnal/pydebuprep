@@ -46,8 +46,9 @@ if [ -d /run/systemd/system ]; then
     if [ -z "${AUDIT_TOOLS_ONLY:-}" ]; then
         AUDIT_EXPECT="$AUDIT_EXPECT sshd pg_lsclusters mariadbd postconf named-checkconf"
     else
-        # CI runner VMs: other agents keep PID 1 busy; D-Bus attribution still applies.
-        export AUDIT_PID1="${AUDIT_PID1:-report}"
+        # CI runner VMs: their own agents (Azure's, snapd, ...) keep writing and starting
+        # things, so only what is traced to the run fails; the containers stay strict.
+        export AUDIT_UNATTRIBUTED="${AUDIT_UNATTRIBUTED:-report}"
     fi
     [ ! -d /sys/firmware/efi/efivars ] || AUDIT_EXPECT="$AUDIT_EXPECT efibootmgr"
     if grep -q '^nameserver 127\.0\.0\.5[34]' /etc/resolv.conf; then

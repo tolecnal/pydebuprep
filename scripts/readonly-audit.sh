@@ -6,7 +6,7 @@
 # its snapshot file.
 #
 # With systemd as PID 1 it also fails if a process of the run made D-Bus start a
-# service, or (AUDIT_PID1=strict) if the service manager started, stopped or reloaded
+# service, or (AUDIT_UNATTRIBUTED=fail) if the service manager started, stopped or reloaded
 # anything during the run: those happen outside the traced processes, where strace
 # can't see them.
 #
@@ -16,16 +16,20 @@
 #                 audit. strace still covers every write by pydebuprep itself.
 #   AUDIT_EXPECT  space-separated programs `report` must have run, so a check that
 #                 silently skipped its command can't pass the audit unexercised.
-#   AUDIT_PID1    "strict" (default): PID 1 starting, stopping or reloading anything
-#                 during the run fails the audit. "report": listed only, for shared
-#                 machines whose other agents keep PID 1 busy. D-Bus activations are
-#                 attributed by PID either way: one requested by the run always fails.
+#   AUDIT_UNATTRIBUTED
+#                 "fail" (default): changed files and PID 1 starting, stopping or
+#                 reloading anything during the run fail the audit, whoever caused
+#                 them. "report": they are listed only, for shared machines whose
+#                 other agents keep writing and starting things. What can be traced
+#                 to the run always fails: strace on its processes, D-Bus activations
+#                 it requested, and AUDIT_EXPECT.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 out=${1:-$(mktemp -d)}
 mkdir -p "$out"
 syscalls=execve,open,openat,openat2,creat,unlink,unlinkat,rename,renameat,renameat2,mkdir,mkdirat,rmdir,link,linkat,symlink,symlinkat,chmod,fchmod,fchmodat,chown,fchown,fchownat,lchown,truncate,ftruncate,utime,utimes,utimensat,futimesat,mknod,mknodat,mount,umount2,setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr,kill,tkill,tgkill,reboot,init_module,finit_module,delete_module,sethostname,setdomainname,settimeofday,clock_settime,adjtimex,clock_adjtime,swapon,swapoff,pivot_root,chroot,acct,quotactl,syslog,fallocate
 status=0
+unattributed=${AUDIT_UNATTRIBUTED:-fail}
 systemd=
 [ -d /run/systemd/system ] && systemd=1
 
@@ -83,7 +87,10 @@ audit() {  # NAME ALLOWED_PREFIX COMMAND...
     if [ -n "$noise" ]; then
         echo "Changed by background services (AUDIT_IGNORE), not counted:"; echo "$noise"
     fi
-    if [ -n "$real" ]; then
+    if [ -n "$real" ] && [ "$unattributed" = report ]; then
+        echo "Changed files after '$*' (AUDIT_UNATTRIBUTED=report, not counted):"
+        echo "$real"
+    elif [ -n "$real" ]; then
         echo "CHANGED FILES after '$*':"; echo "$real"; status=1
     fi
     if [ -n "$systemd" ]; then
@@ -95,13 +102,13 @@ audit() {  # NAME ALLOWED_PREFIX COMMAND...
         # permissions) aren't actions: those are listed only.
         acted=$(printf '%s\n' "$pid1" | grep -vE '\.(mount|scope)[: ]' \
             | grep -E "\]: (Start|Stopp|Reload|Reexecut|Finished|Deactivated)" || true)
-        if [ -n "$acted" ] && [ "${AUDIT_PID1:-strict}" = report ]; then
-            echo "PID 1 started, stopped or reloaded during '$*' (AUDIT_PID1=report," \
-                "not counted):"
+        if [ -n "$acted" ] && [ "$unattributed" = report ]; then
+            echo "PID 1 started, stopped or reloaded during '$*'" \
+                "(AUDIT_UNATTRIBUTED=report, not counted):"
             echo "$acted"
         elif [ -n "$acted" ]; then
             echo "PID 1 STARTED, STOPPED OR RELOADED during '$*':"; echo "$acted"; status=1
-        elif [ "$jobs" -gt 0 ] && [ -z "$pid1" ] && [ "${AUDIT_PID1:-strict}" = strict ]; then
+        elif [ "$jobs" -gt 0 ] && [ -z "$pid1" ] && [ "$unattributed" = fail ]; then
             # A job PID 1 didn't log about can't be told apart from one we caused.
             echo "SYSTEMD JOBS: PID 1 queued $jobs job(s) during '$*' and logged nothing"
             status=1
