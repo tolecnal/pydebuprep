@@ -101,7 +101,8 @@ def test_fstab_non_root_permission_noise_filtered() -> None:
         "/data\n   [W] target specified more than once\n"
     )
     res = CommandResult(FINDMNT_VERIFY, 0, out, "")
-    fs = FstabCheck().run(make_ctx(commands={FINDMNT_VERIFY: res}, root=False))
+    fstab = {"/etc/fstab": "/swap.img none swap sw 0 0\n"}
+    fs = FstabCheck().run(make_ctx(commands={FINDMNT_VERIFY: res}, root=False, files=fstab))
     assert [(f.severity, f.title) for f in fs] == [
         (Severity.WARNING, "/etc/fstab has 1 warning"),
         (Severity.INFO, "Some fstab entries could not be fully verified without root"),
@@ -163,3 +164,32 @@ def test_disk_space_exclude_mounts() -> None:
 def test_disk_space_threshold_validation() -> None:
     with pytest.raises(ValueError, match="critical_pct must be lower than warning_pct"):
         DiskSpaceCheck({"critical_pct": 30})
+
+
+SWAPFILE_NOTE = "   [W] non-bind mount source {src} is a directory or regular file\n"
+
+
+@pytest.mark.parametrize(
+    ("fstab", "target"),
+    [
+        ("/swapfile swap swap defaults 0 0\n", "swap"),  # Debian's usual entry
+        ("/swap.img\tnone\tswap\tsw\t0\t0\n", "none"),  # Ubuntu's installer
+        ("# comment\nUUID=x / ext4 defaults 0 1\n/var/swap  swap  swap  pri=5  0  0\n", "swap"),
+    ],
+)
+def test_fstab_swap_files_not_reported(fstab: str, target: str) -> None:
+    src = fstab.split("\n")[-2].split(maxsplit=1)[0]
+    out = f"{target}\n" + SWAPFILE_NOTE.format(src=src)
+    ctx = make_ctx(commands={FINDMNT_VERIFY: out}, files={"/etc/fstab": fstab})
+    assert FstabCheck().run(ctx) == []
+
+
+def test_fstab_regular_file_that_is_not_swap_still_reported() -> None:
+    out = "/mnt/disk\n" + SWAPFILE_NOTE.format(src="/srv/disk.img")
+    ctx = make_ctx(
+        commands={FINDMNT_VERIFY: out},
+        files={
+            "/etc/fstab": "/swapfile swap swap defaults 0 0\n/srv/disk.img /mnt/disk ext4 defaults 0 2\n"
+        },
+    )
+    assert titles(FstabCheck().run(ctx)) == ["/etc/fstab has 1 warning"]

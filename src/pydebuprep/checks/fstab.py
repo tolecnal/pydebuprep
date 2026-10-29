@@ -15,12 +15,23 @@ VIRTUAL_FS = {
 }  # fmt: skip
 MARKER = re.compile(r"^\s+\[([EW])\]\s*(.*)$")
 PERMISSION_NOISE = "(Permission denied)"
-SWAPFILE_NOTE = "is a directory or regular file"
+# findmnt notes any regular-file source; for a swap file that's expected.
+FILE_SOURCE = re.compile(r"non-bind mount source (\S+) is a directory or regular file")
 ESCAPE = re.compile(r"\\x([0-9a-fA-F]{2})")
 
 
 def _unescape(text: str) -> str:
     return ESCAPE.sub(lambda m: chr(int(m.group(1), 16)), text)
+
+
+def swap_sources(ctx: Context) -> set[str]:
+    """Sources of swap entries in /etc/fstab (devices or swap files)."""
+    sources = set()
+    for line in (ctx.system.read_text("/etc/fstab") or "").splitlines():
+        fields = line.split("#", 1)[0].split()
+        if len(fields) >= 3 and fields[2] == "swap":
+            sources.add(_unescape(fields[0].replace("\\040", " ")))
+    return sources
 
 
 def _mounted(ctx: Context) -> list[str]:
@@ -43,14 +54,15 @@ class FstabCheck(Check):
         problems: dict[str, list[str]] = {"E": [], "W": []}
         target = ""
         unverified = False
+        swap = swap_sources(ctx)
         for line in res.stdout.splitlines():
             match = MARKER.match(line)
             if match:
                 message = match.group(2)
                 if PERMISSION_NOISE in message and not ctx.is_root:
                     unverified = True
-                elif target == "none" and SWAPFILE_NOTE in message:
-                    continue  # swap files are listed with source=file; findmnt notes it
+                elif (note := FILE_SOURCE.search(message)) and note.group(1) in swap:
+                    continue  # a swap file, which is meant to be a regular file
                 else:
                     problems[match.group(1)].append(f"{target}: {message}")
             elif line.strip() and not line[0].isspace():
