@@ -39,6 +39,15 @@ display never makes a host look healthier than it is.
 
 pydebuprep never overwrites an existing file.
 
+## A checklist of what to fix
+
+```sh
+sudo pydebuprep report --todo
+```
+
+Ends the report with a TODO list: the critical and warning findings with their fix
+steps as checkboxes. See [A TODO list to track the fixes](output-formats.md#a-todo-list-to-track-the-fixes).
+
 ## Setting check options for one run
 
 ```sh

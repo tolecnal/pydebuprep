@@ -91,6 +91,11 @@ returned. Findings hidden with `--min-severity` are still counted.
 **Findings**: `severity` (`critical`, `warning`, `info`), `title`, `detail`, and
 the lists `evidence`, `remediation` and `references`.
 
+**`todo`** (only with `--todo`): the [TODO list](../guide/output-formats.md#a-todo-list-to-track-the-fixes),
+an array of `{"severity", "check", "title", "steps"}`. `severity` and `check` are
+`null` for the items that aren't findings (a check that failed to run, running as
+root, the confirmation run). `convert` accepts reports with or without it.
+
 ## Examples
 
 ```sh

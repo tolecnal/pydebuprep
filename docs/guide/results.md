@@ -63,6 +63,13 @@ The exit code summarises the report for scripts and automation:
 `--min-severity` hides findings from the display only; the exit code still counts
 them. See [Exit codes](../reference/exit-codes.md).
 
+## Working through the findings
+
+Fix critical findings first, then warnings. `--todo` turns the report into a
+checklist for exactly that order, with each finding's remediation steps to tick off;
+see [A TODO list to track the fixes](output-formats.md#a-todo-list-to-track-the-fixes).
+Re-run pydebuprep when you're done: a fix can uncover the next problem.
+
 ## Silencing expected findings
 
 If a finding is expected on your systems, tell pydebuprep instead of learning to

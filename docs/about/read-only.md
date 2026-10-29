@@ -28,6 +28,7 @@ Some commands that look read-only aren't, and pydebuprep uses alternatives:
 | `docker …` with only `docker.socket` active | would start the daemon | the check is skipped unless `docker.service` runs |
 | `nft list ruleset` without `nf_tables` loaded | would make the kernel load the module | rules are listed only for loaded modules |
 | `needrestart` | can restart services | only its list mode (`-r l`) |
+| `sqv --output -` | creates a file named `-` in the working directory | its output goes into pydebuprep's scratch directory |
 
 Clock synchronisation is read from the kernel with a call that requests no changes,
 rather than asking a daemon.

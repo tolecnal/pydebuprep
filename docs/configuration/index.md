@@ -42,7 +42,8 @@ checks:                       # one section per check, by its ID
 ```
 
 - **`report`** holds defaults for `report` and `snapshot`: format, output
-  directory, minimum severity, colour, baseline and snapshot directory.
+  directory, minimum severity, colour, the [TODO list](../guide/output-formats.md#a-todo-list-to-track-the-fixes),
+  baseline and snapshot directory.
 - **`logs`** holds `ignore`, regular expressions for log messages to leave out of
   both [`journal-errors`](../checks/journal-errors.md) and
   [`dmesg-errors`](../checks/dmesg-errors.md). Kernel messages appear in both, so

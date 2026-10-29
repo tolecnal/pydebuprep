@@ -6,7 +6,7 @@
 [![CodeQL](https://github.com/tolecnal/pydebuprep/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/tolecnal/pydebuprep/actions/workflows/codeql.yml)
 [![Release build](https://github.com/tolecnal/pydebuprep/actions/workflows/release.yml/badge.svg?event=push)](https://github.com/tolecnal/pydebuprep/actions/workflows/release.yml)
 [![Downloads](https://img.shields.io/github/downloads/tolecnal/pydebuprep/total)](https://github.com/tolecnal/pydebuprep/releases)
-[![Documentation](https://img.shields.io/badge/docs-tolecnal.github.io-526CFE?logo=materialformkdocs&logoColor=white)](https://tolecnal.github.io/pydebuprep/)
+[![Documentation](https://img.shields.io/badge/docs-pydebuprep.app-526CFE?logo=materialformkdocs&logoColor=white)](https://pydebuprep.app/)
 
 [![Coverage: 100% (enforced)](https://img.shields.io/badge/coverage-100%25%20(enforced)-brightgreen)](pyproject.toml)
 [![Python 3.10–3.14](https://img.shields.io/badge/python-3.10%20%E2%80%93%203.14-3776AB?logo=python&logoColor=white)](setup.cfg)
@@ -19,7 +19,7 @@
 A read-only health report for Debian and Ubuntu systems after a release upgrade
 (Debian 12 → 13, Ubuntu 22.04 → 24.04 → 26.04, and minor upgrades too).
 
-**Documentation: <https://tolecnal.github.io/pydebuprep/>** — a page per check
+**Documentation: <https://pydebuprep.app/>** — a page per check
 (what it looks at, what it reports, its limits), the configuration reference, and
 guides.
 
