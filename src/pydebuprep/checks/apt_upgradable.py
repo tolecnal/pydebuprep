@@ -48,7 +48,9 @@ class AptUpgradableCheck(Check):
             rows[name] = (f"{name} {version} ({suites})", suites.split(","))
         if not rows:
             return []
-        sections = _simulated_sections(run_checked(ctx, apt_command(*SIMULATE_UPGRADE)).stdout)
+        # apt-get stops with exit 100 on broken dependencies: the groups are just unknown.
+        simulation = run_checked(ctx, apt_command(*SIMULATE_UPGRADE), ok_codes=(0, 100))
+        sections = _simulated_sections(simulation.stdout)
         security = sorted(
             n for n, (_, suites) in rows.items() if any(s.endswith("-security") for s in suites)
         )

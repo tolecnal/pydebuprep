@@ -8,7 +8,7 @@ from pydebuprep.system import apt_command
 # dpkg's status letters (second character of ${db:Status-Abbrev}), by what fixes them.
 NOT_CONFIGURED = {"U": "unpacked", "F": "half-configured"}
 REINSTALL = {"H": "half-installed"}
-TRIGGERS = {"W": "triggers awaited", "T": "triggers pending"}
+TRIGGERS = {"W": "triggers awaited", "t": "triggers pending"}
 
 
 def _states(ctx: Context) -> dict[str, list[str]]:

@@ -170,3 +170,16 @@ def test_read_bytes(tmp_path: Path) -> None:
     (tmp_path / "k.gpg").write_bytes(b"\x99\x00")
     assert System().read_bytes(str(tmp_path / "k.gpg")) == b"\x99\x00"
     assert System().read_bytes(str(tmp_path / "missing")) is None
+
+
+def test_lines_streams_plain_and_gzip_files(tmp_path: Path) -> None:
+    import gzip
+
+    (tmp_path / "plain").write_text("a\nb\n")
+    (tmp_path / "packed.gz").write_bytes(gzip.compress(b"c\nd\n"))
+    (tmp_path / "broken.gz").write_bytes(b"not gzip at all")
+    system = System()
+    assert list(system.lines(str(tmp_path / "plain"))) == ["a\n", "b\n"]
+    assert list(system.lines(str(tmp_path / "packed.gz"))) == ["c\n", "d\n"]
+    assert list(system.lines(str(tmp_path / "broken.gz"))) == []
+    assert list(system.lines(str(tmp_path / "missing"))) == []

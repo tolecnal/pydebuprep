@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import gzip
-import zlib
 from typing import Any
 from urllib.parse import unquote
 
@@ -12,8 +10,8 @@ from pydebuprep.model import Finding, Severity, truncate_evidence
 from pydebuprep.system import apt_command
 
 PKG_VERSIONS_ARGV = ("dpkg-query", "-W", "-f=${Package}\t${Version}\n")
-# Origin names of the distributions' own archives (from their Release files).
-DISTRO_ORIGINS = {"Debian", "Debian Backports", "Ubuntu"}
+# Hosts that serve the distributions' own archives (mirrors too: deb.debian.org, ...).
+DISTRO_HOSTS = ("debian.org", "ubuntu.com", "canonical.com")
 NAMES_SHOWN = 10
 
 
@@ -27,15 +25,18 @@ def installed_versions(ctx: Context) -> dict[str, str]:
     return versions
 
 
-def _read_list(ctx: Context, path: str) -> str | None:
-    """A Packages index, plain or gzip (other compressions aren't read)."""
-    if not path.endswith(".gz"):
-        return ctx.system.read_text(path)
-    data = ctx.system.read_bytes(path)
-    try:
-        return None if data is None else gzip.decompress(data).decode("utf-8", "replace")
-    except (OSError, EOFError, zlib.error):
-        return None
+def _distro(label: str) -> bool:
+    """The distributions' own archives, Ubuntu Pro (UbuntuESM, UbuntuESMApps, ...) and
+    Debian Backports included. Vendor labels carry their host: "Docker (download.docker.com)"."""
+    return label.startswith(("Debian", "Ubuntu")) and not label.endswith(")")
+
+
+def _origin_key(label: str) -> str:
+    """What identifies an origin across a release upgrade: a vendor's host (their Origin
+    often names the release, like "ubuntu icinga-noble"), or the distribution's name."""
+    if label.endswith(")") and " (" in label:
+        return label[label.rindex(" (") + 2 : -1]
+    return label
 
 
 def _origin_name(ctx: Context, path: str, inreleases: list[str]) -> str:
@@ -47,7 +48,7 @@ def _origin_name(ctx: Context, path: str, inreleases: list[str]) -> str:
     fields = parse_release(ctx.system.read_text(max(dists, key=len)) or "") if dists else {}
     host = unquote(path.rsplit("/", 1)[-1].split("_", 1)[0])
     origin = fields.get("Origin") or fields.get("Label") or ""
-    if origin in DISTRO_ORIGINS:
+    if origin.startswith(("Debian", "Ubuntu")) and host.endswith(DISTRO_HOSTS):
         return origin
     return f"{origin} ({host})" if origin and origin != host else host
 
@@ -61,18 +62,17 @@ def package_origins(ctx: Context, installed: dict[str, str]) -> dict[str, str]:
         f"{LISTS_DIR}/*_Packages.gz"
     )
     for path in indexes:
-        text = _read_list(ctx, path)
-        if text is None:
-            continue
         origin = _origin_name(ctx, path, inreleases)
         name = ""
-        for line in text.splitlines():
+        for line in ctx.system.lines(path):  # streamed: indexes can be tens of megabytes
             if line.startswith("Package:"):
                 name = line[8:].strip()
             elif line.startswith("Version:") and installed.get(name) == line[8:].strip():
                 found.setdefault(name, set()).add(origin)
     return {
-        name: min(origins & DISTRO_ORIGINS) if origins & DISTRO_ORIGINS else min(origins)
+        name: min(o for o in origins if _distro(o))
+        if any(_distro(o) for o in origins)
+        else min(origins)
         for name, origins in found.items()
     }
 
@@ -91,7 +91,7 @@ class ObsoletePackagesCheck(Check):
         origins = package_origins(ctx, installed_versions(ctx))
         vendors: dict[str, list[str]] = {}
         for name, origin in origins.items():
-            if origin not in DISTRO_ORIGINS:
+            if not _distro(origin):
                 vendors.setdefault(origin, []).append(name)
         if not vendors:
             return []
@@ -170,7 +170,7 @@ class ObsoletePackagesCheck(Check):
             moved = sorted(
                 f"{name}: {old} → {origins_now[name]}"
                 for name, old in origins_before.items()
-                if name in origins_now and origins_now[name] != old
+                if name in origins_now and _origin_key(origins_now[name]) != _origin_key(old)
             )
             if moved:
                 findings.append(

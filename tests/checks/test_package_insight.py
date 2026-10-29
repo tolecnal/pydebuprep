@@ -86,7 +86,7 @@ def audit(states: str, dpkg_audit: str = "") -> list[Any]:
 
 
 def test_package_states_are_separate_findings() -> None:
-    states = "ii  bash\niU  libfoo1\niF  foo\niH  bar\niiR baz\niW  qux\niT  quux\nrc  old\n"
+    states = "ii  bash\niU  libfoo1\niF  foo\niH  bar\niiR baz\niW  qux\nit  quux\nrc  old\n"
     fs = audit(states, DPKG_AUDIT_OUT)
     assert [(f.severity, f.title, f.evidence, f.remediation[0]) for f in fs] == [
         (Severity.CRITICAL, "2 packages are unpacked but not configured",
@@ -203,3 +203,42 @@ def test_unchanged_origins_report_nothing() -> None:
     check = ObsoletePackagesCheck()
     before = check.collect_baseline(obsolete())
     assert check.compare(obsolete(), before) == []
+
+
+# --- final review fixes --------------------------------------------------------------
+
+from pydebuprep.system import CommandResult  # noqa: E402
+
+
+def test_broken_dependencies_dont_stop_the_upgrade_groups() -> None:
+    broken = CommandResult(
+        SIMULATE_UPGRADE, 100, "", "E: Unmet dependencies. Try 'apt --fix-broken install'\n"
+    )
+    commands = {UPGRADABLE: LIST, SIMULATE_UPGRADE: broken}
+    fs = AptUpgradableCheck().run(make_ctx(commands=commands))
+    assert fs[0].title == "2 security updates are pending"
+
+
+def test_vendor_origin_renamed_with_the_release_is_not_a_change() -> None:
+    files = dict(LIST_FILES)
+    docker = f"{LISTS}/download.docker.com_linux_debian_dists_trixie_InRelease"
+    files[docker] = release("Docker bookworm")
+    before = ObsoletePackagesCheck().collect_baseline(obsolete(files))
+    files[docker] = release("Docker trixie")
+    assert ObsoletePackagesCheck().compare(obsolete(files), before) == []
+
+
+def test_ubuntu_pro_origins_are_the_distribution() -> None:
+    files = dict(LIST_FILES)
+    esm = f"{LISTS}/esm.ubuntu.com_apps_ubuntu_dists_noble-apps-security"
+    files[f"{esm}_InRelease"] = release("UbuntuESMApps")
+    files[f"{esm}_main_binary-amd64_Packages"] = packages(("mytool", "0.1"))
+    (f,) = ObsoletePackagesCheck().run(obsolete(files))
+    assert all("mytool" not in e for e in f.evidence)
+
+
+def test_package_indexes_are_streamed() -> None:
+    # Never read whole: Ubuntu's indexes are tens of megabytes each.
+    ctx = obsolete()
+    ObsoletePackagesCheck().run(ctx)
+    assert not any("_Packages" in p for p in ctx.system.whole_reads)  # type: ignore[attr-defined]
