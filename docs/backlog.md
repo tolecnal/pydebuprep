@@ -36,6 +36,8 @@ with `SHA256SUMS`, and the SLSA provenance attestation verified with
       - new checks: network, firewall, time-sync, apparmor, unattended-upgrades, cron,
         ssh-server; boot critical chain; a free-space floor for `/` and `/var`;
       - application checks: postgresql, mariadb, postfix, bind, docker, python-venvs;
+      - README badges; README, man page (new CHECKS section) and package description
+        brought up to date, with tests that keep the check lists in sync;
       - 100% line and branch coverage, enforced.
 - [ ] Decide whether to publish an APT repository as well, for example signed and
       served from GitHub Pages, so hosts can `apt install pydebuprep` and get
