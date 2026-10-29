@@ -238,3 +238,18 @@ def test_tcp_connect_accepts_a_greeting() -> None:
         assert System().tcp_connect("127.0.0.1", port, 3.0) is None
     finally:
         listener.close()
+
+
+def test_client_environment_is_not_passed_to_commands(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(system, "ALLOWED_COMMANDS", system.ALLOWED_COMMANDS | {("env",)})
+    monkeypatch.setenv("PGSSLKEYLOGFILE", "/tmp/keys")
+    monkeypatch.setenv("MYSQL_PWD", "secret")
+    monkeypatch.setenv("KEEP_ME", "1")
+    out = System().run(["env"]).stdout
+    assert "KEEP_ME=1" in out
+    assert "PGSSLKEYLOGFILE" not in out and "MYSQL_PWD" not in out
+
+
+def test_http_get_with_a_bad_port_is_an_error() -> None:
+    status, error = System().http_get("http://localhost:99999/", 1.0)
+    assert status is None and error

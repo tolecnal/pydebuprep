@@ -13,11 +13,19 @@ from pydebuprep.checks._probes import (
 )
 from pydebuprep.checks.base import Check, Context, count, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
-from pydebuprep.system import AS_POSTGRES, PG_SOCKET_DIR, PSQL_FLAGS
+from pydebuprep.system import AS_POSTGRES, PG_SOCKET_DIR, PG_USER, PSQL_FLAGS
 
 PG_LSCLUSTERS = ("pg_lsclusters", "--no-header")
 SERVER_BINARIES = "/usr/lib/postgresql/*/bin/postgres"
-LOGIN_ERRORS = ("authentication failed", "no password supplied", "password authentication")
+# The server refused the probe itself (its login, its access rules, or the role or
+# database it asks for): a setup question, not a broken server.
+LOGIN_ERRORS = (
+    "authentication failed",
+    "no password supplied",
+    "password authentication",
+    "no pg_hba.conf entry",
+    "does not exist",
+)
 NOT_READY = {1: "rejecting connections (starting or shutting down)", 2: "not responding"}
 
 
@@ -39,8 +47,10 @@ def _cluster_rows(ctx: Context) -> list[tuple[str, str, str, str]]:
 def _pgpass_user(text: str | None) -> str | None:
     """The user of the first entry of a .pgpass file (host:port:database:user:password)."""
     for line in (text or "").splitlines():
+        if not line.strip() or line.startswith("#") or "\\" in line:
+            continue  # escaped ':' or '\\' fields aren't split here
         fields = line.split(":")
-        if line.strip() and not line.startswith("#") and len(fields) >= 5 and fields[3] != "*":
+        if len(fields) >= 5 and PG_USER.fullmatch(fields[3]):
             return fields[3]
     return None
 
@@ -80,7 +90,13 @@ class PostgresqlCheck(Check):
 
     def _probe(self, ctx: Context) -> list[Finding]:
         """Each online cluster: does it accept connections, and does it answer a query?"""
-        online = [(v, n, port) for v, n, port, status in _cluster_rows(ctx) if status == "online"]
+        # Standbys are "online,recovery". Clusters whose socket isn't in the standard
+        # directory can't be reached by the probe, so they aren't asked.
+        online = [
+            (v, n, port)
+            for v, n, port, status in _cluster_rows(ctx)
+            if status.startswith("online") and ctx.system.exists(f"{PG_SOCKET_DIR}/.s.PGSQL.{port}")
+        ]
         if not online:
             return []
         if not ctx.is_root:
@@ -182,7 +198,7 @@ class PostgresqlCheck(Check):
                         ],
                     )
                 )
-            elif status != "online" and _starts_automatically(ctx, version, name):
+            elif not status.startswith("online") and _starts_automatically(ctx, version, name):
                 findings.append(
                     Finding(
                         Severity.WARNING,

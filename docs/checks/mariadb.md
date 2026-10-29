@@ -12,9 +12,12 @@ Optionally, it also asks the server — MariaDB or Oracle MySQL — whether it a
   directory was last upgraded for (`/var/lib/mysql/mariadb_upgrade_info`, or
   `mysql_upgrade_info`).
 - **MySQL** (`mysqld`) is recognised too. It upgrades its system tables itself at
-  startup, so it only takes part in the probe.
+  startup, so it only takes part in the probe; without `probe: true` the check is
+  skipped on MySQL hosts.
 
-**Readiness probe** (`probe: true`, off by default), two separate questions:
+**Readiness probe** (`probe: true`, off by default) — only when `mariadb`, `mysql`
+or `mysqld` runs as a service, so a server you stopped on purpose isn't reported. Two
+separate questions:
 
 1. **Is the server alive?** `mariadb-admin ping` (or `mysqladmin ping`).
 2. **Does it run a query?** `SELECT 1` against `information_schema`.
@@ -52,6 +55,11 @@ The allowlist accepts only these forms; the query is always `SELECT 1`.
 
 - **The probe connects to the server**, which may log it; pydebuprep itself writes
   nothing. That's why it's off by default.
+- The clients read your MySQL option files (`/etc/mysql/my.cnf`, `/root/.my.cnf`, and
+  `credentials_file`) like any client would. An `init-command` there runs on every
+  connection, the probe's included — keep such files to connection settings.
+- `PG*` and `MYSQL*` environment variables are never passed to the probes, so they
+  can't redirect them.
 - It doesn't check that the service is enabled or running beyond the probe; see
   [`systemd-failed`](systemd-failed.md) and
   [`systemd-critical-services`](systemd-critical-services.md).

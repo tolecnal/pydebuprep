@@ -18,7 +18,7 @@ from .helpers import make_ctx, titles
 # --- postgresql ----------------------------------------------------------------------
 
 SOCK = "/var/run/postgresql"
-SERVER = {"/usr/lib/postgresql/17/bin/postgres": ""}
+SERVER = {"/usr/lib/postgresql/17/bin/postgres": "", "/var/run/postgresql/.s.PGSQL.5432": ""}
 
 
 def cluster(name: str, port: str, status: str = "online") -> str:
@@ -148,12 +148,16 @@ MARIADB_VERSION = (
 PING = ("mariadb-admin", "ping")
 SELECT = ("mariadb", "-N", "-B", "-e", "SELECT 1", "information_schema")
 MARIADB = {"mariadbd", "mariadb-admin", "mariadb"}
+MYSQL_UP = "mysql.service loaded active running x\n"
 
 
 def db(commands: dict[tuple[str, ...], Any], available: set[str] = MARIADB, **kw: Any) -> list[Any]:
     opts = kw.pop("opts", {"probe": True})
+    running = {ACTIVE_SERVICES: "mariadb.service loaded active running x\n"}
     ctx = make_ctx(
-        commands={MARIADBD_VERSION: MARIADB_VERSION, **commands}, available=available, **kw
+        commands={MARIADBD_VERSION: MARIADB_VERSION, **running, **commands},
+        available=available,
+        **kw,
     )
     return MariaDbCheck(opts).run(ctx)
 
@@ -213,12 +217,15 @@ def test_mysql_is_probed_with_its_own_tools() -> None:
     ping = ("mysqladmin", "ping")
     select = ("mysql", *SELECT[1:])
     ctx = make_ctx(
-        commands={ping: "mysqld is alive\n", select: "1\n"},
+        commands={ping: "mysqld is alive\n", select: "1\n", ACTIVE_SERVICES: MYSQL_UP},
         available={"mysqld", "mysqladmin", "mysql"},
     )
     assert MariaDbCheck({"probe": True}).run(ctx) == []  # no MariaDB upgrade check for MySQL
     down = CommandResult(ping, 1, "", "error: 'Can't connect to local MySQL server'\n")
-    ctx = make_ctx(commands={ping: down}, available={"mysqld", "mysqladmin", "mysql"})
+    ctx = make_ctx(
+        commands={ping: down, ACTIVE_SERVICES: MYSQL_UP},
+        available={"mysqld", "mysqladmin", "mysql"},
+    )
     assert titles(MariaDbCheck({"probe": True}).run(ctx)) == ["The MySQL server doesn't answer"]
 
 
@@ -359,3 +366,69 @@ def test_docker_ignore_containers() -> None:
 def test_pg_probe_without_online_clusters_does_nothing() -> None:
     files = {"/etc/postgresql/17/main/start.conf": "manual\n"}
     assert pg({}, cluster("main", "5432", "down"), files=files) == []
+
+
+# --- final review fixes --------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "probe", ["web=http://localhost:99999/", "web=http://localhost:abc/", "web=http://localhost/é"]
+)
+def test_http_probe_urls_that_cannot_be_requested_are_config_errors(probe: str) -> None:
+    with pytest.raises(ValueError, match="http_probes"):
+        DockerCheck({"http_probes": [probe]})
+
+
+def test_pgpass_user_outside_the_safe_set_is_not_used() -> None:
+    opts = {"probe": True, "credentials_file": "/etc/pydebuprep/pgpass"}
+    for entry in ("*:*:*:john@corp:pw\n", "*:*:*:a\\:b:pw\n"):
+        (f,) = pg({isready("5432"): "ok\n"}, opts=opts, files={"/etc/pydebuprep/pgpass": entry})
+        assert f.title == "Can't use the PostgreSQL credentials file /etc/pydebuprep/pgpass"
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        'FATAL:  no pg_hba.conf entry for host "[local]", user "postgres", database "postgres"',
+        'FATAL:  role "postgres" does not exist',
+        'FATAL:  database "postgres" does not exist',
+    ],
+)
+def test_pg_login_and_setup_refusals_are_info(error: str) -> None:
+    denied = CommandResult(query("5432"), 2, "", f"psql: error: {error}\n")
+    (f,) = pg({isready("5432"): "ok\n", query("5432"): denied})
+    assert f.severity is Severity.INFO
+
+
+def test_pg_cluster_without_the_standard_socket_is_not_probed() -> None:
+    files = {"/var/run/postgresql/.s.PGSQL.5432": ""}
+    clusters = cluster("main", "5432") + cluster("other", "5433")
+    commands = {isready("5432"): "ok\n", query("5432"): "1\n"}
+    assert pg(commands, clusters, files=files) == []  # 5433 has no socket there: not asked
+
+
+def test_pg_standby_is_probed() -> None:
+    commands = {isready("5432"): "ok\n", query("5432"): "1\n"}
+    assert pg(commands, cluster("main", "5432", "online,recovery")) == []
+
+
+def test_db_not_running_is_not_probed() -> None:
+    ctx = make_ctx(
+        commands={
+            MARIADBD_VERSION: MARIADB_VERSION,
+            ACTIVE_SERVICES: "ssh.service loaded active running x\n",
+        },
+        available=MARIADB,
+    )
+    assert MariaDbCheck({"probe": True}).run(ctx) == []
+
+
+def test_mysql_without_probe_is_skipped() -> None:
+    result = run_check(MariaDbCheck(), make_ctx(available={"mysqld"}))
+    assert result.status is Status.SKIPPED
+    assert "probe" in (result.skipped_reason or "")
+
+
+def test_ignored_container_with_an_http_probe_is_skipped() -> None:
+    opts = {"probe": True, "http_probes": ["ci=http://127.0.0.1:1/"], "ignore_containers": ["ci"]}
+    assert dk(container("ci"), opts) == []

@@ -109,6 +109,11 @@ class DockerCheck(Check):
                 raise ValueError(f"http_probes: expected CONTAINER=http(s)://... , got {item!r}")
             if parts.hostname not in LOCAL_HOSTS:
                 raise ValueError(f"http_probes: only localhost URLs are probed, got {url!r}")
+            try:
+                _ = parts.port
+                url.encode("ascii")
+            except ValueError:
+                raise ValueError(f"http_probes: not a URL that can be requested: {url!r}") from None
 
     def _containers(self, ctx: Context) -> list[dict[str, Any]]:
         return [
@@ -167,8 +172,11 @@ class DockerCheck(Check):
     def _probe_http(self, ctx: Context, containers: list[dict[str, Any]]) -> list[Finding]:
         running = {str(c.get("Names")) for c in containers if c.get("State") == "running"}
         failed = []
+        ignore = self.opt("ignore_containers")
         for item in sorted(self.opt("http_probes")):
             name, _, url = item.partition("=")
+            if any(fnmatch.fnmatchcase(name, p) for p in ignore):
+                continue
             if name not in running:
                 failed.append(f"{name}: not running")
                 continue

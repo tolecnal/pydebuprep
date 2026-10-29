@@ -17,8 +17,8 @@ From `pg_lsclusters` and the installed server versions:
 - clusters that are down although their `start.conf` says they should start
   automatically.
 
-**Readiness probe** (`probe: true`, off by default). For each **online** cluster, two
-separate questions:
+**Readiness probe** (`probe: true`, off by default). For each **online** cluster
+(standbys included) whose socket is in `/var/run/postgresql`, two separate questions:
 
 1. **Does it accept connections?** `pg_isready` on the cluster's port, over the
    local socket. No login needed.
@@ -39,8 +39,8 @@ database, extension or application query does.
 | warning | PostgreSQL cluster *V/name* is down | `sudo systemctl status postgresql@V-NAME`; read its log under `/var/log/postgresql/`. |
 | warning | PostgreSQL cluster *V/name* doesn't accept connections | (probe) It's listed as online but `pg_isready` gets no answer, or it's starting or shutting down. Check its service and log. |
 | warning | PostgreSQL cluster *V/name* accepts connections but doesn't answer queries | (probe) The evidence shows psql's error. Check the log. |
-| info | Couldn't log in to PostgreSQL cluster *V/name* to probe it | (probe) The server refused the probe's login; set `credentials_file`. |
-| info | Can't use the PostgreSQL credentials file *path* | (probe) It's missing, unreadable, or has no entry with a user name. |
+| info | Couldn't log in to PostgreSQL cluster *V/name* to probe it | (probe) The server refused the probe itself — its login, a `pg_hba.conf` rule, or a role or database it asks for doesn't exist. Set `credentials_file`. |
+| info | Can't use the PostgreSQL credentials file *path* | (probe) It's missing, unreadable, or has no usable entry: the user name must be plain (letters, digits, `_ . -`, no escapes). |
 | info | Readiness probes need root; not run | (probe) Run as root. |
 | warning | PostgreSQL clusters online before the upgrade aren't now | `pg_lsclusters`; a migrated cluster may have a new version. |
 
@@ -74,6 +74,7 @@ forms, with the port, user and file validated; the query is always `SELECT 1`.
   count it in its statistics — pydebuprep itself writes nothing. That's why it's off
   by default.
 - Clusters listening only on TCP, or with a socket directory other than
-  `/var/run/postgresql`, can't be probed.
+  `/var/run/postgresql`, can't be probed; they're left out.
+- Clusters owned by a user other than `postgres` need `credentials_file`.
 
 <!-- options: postgresql -->

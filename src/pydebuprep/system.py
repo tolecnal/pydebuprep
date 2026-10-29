@@ -142,6 +142,8 @@ APT_LISTS_DIR = "/var/lib/apt/lists/"
 PG_SOCKET_DIR = "/var/run/postgresql"
 PSQL_FLAGS = ("psql", "-X", "-A", "-t", "-w")
 AS_POSTGRES = ("setpriv", "--reuid=postgres", "--regid=postgres", "--init-groups", "--")
+CLIENT_ENV = ("PG", "MYSQL")
+PG_USER = re.compile(r"[A-Za-z0-9_.-]+")
 CONNINFO = re.compile(
     rf"host={PG_SOCKET_DIR} port=([0-9]{{1,5}}) dbname=postgres "
     r"user=[A-Za-z0-9_.-]+ passfile=(/\S+)"
@@ -300,7 +302,10 @@ class System:
     def run(self, argv: Sequence[str], timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
         check_allowed(argv)
         args = tuple(argv)
-        env = {**os.environ, "LC_ALL": "C", "LANG": "C"}
+        # Client settings for PostgreSQL and MySQL (PGHOST, PGSSLKEYLOGFILE, MYSQL_PWD, ...)
+        # could redirect a probe or make a client write a file: never pass them on.
+        env = {k: v for k, v in os.environ.items() if not k.startswith(CLIENT_ENV)}
+        env.update(LC_ALL="C", LANG="C")
         try:
             # Fixed, allowlisted argv; never a shell.
             proc = subprocess.run(  # nosec B603
@@ -383,9 +388,12 @@ class System:
 
     def http_get(self, url: str, timeout: float) -> tuple[int | None, str | None]:
         """GET URL without following redirects or proxies: (status, None) or (None, error)."""
-        parts = urlsplit(url)
-        host, port = parts.hostname or "", parts.port
-        target = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
+        try:
+            parts = urlsplit(url)
+            host, port = parts.hostname or "", parts.port
+            target = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
+        except ValueError as exc:
+            return None, str(exc)
         conn: http.client.HTTPConnection
         if parts.scheme == "https":
             # Probes only reach localhost, whose certificate rarely names "localhost":
@@ -397,7 +405,7 @@ class System:
         try:
             conn.request("GET", target)
             return conn.getresponse().status, None
-        except (OSError, http.client.HTTPException) as exc:
+        except (OSError, ValueError, http.client.HTTPException) as exc:
             return None, str(exc) or type(exc).__name__
         finally:
             conn.close()
