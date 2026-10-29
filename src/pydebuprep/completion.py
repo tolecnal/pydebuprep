@@ -42,6 +42,7 @@ class CommandSpec:
     help: str
     options: list[OptionSpec]
     positional_choices: list[str] = field(default_factory=list)
+    positional_file: bool = False  # one positional argument naming a file
 
 
 @dataclass
@@ -119,7 +120,7 @@ def completion_spec() -> CompletionSpec:
         if isinstance(action, argparse._SubParsersAction):
             helps = {a.dest: a.help or "" for a in action._choices_actions}
             for name, sub in action.choices.items():
-                options, positional = [], []
+                options, positional, positional_file = [], [], False
                 excluded = _exclusions(sub)
                 for sub_action in sub._actions:
                     if sub_action.option_strings:
@@ -128,7 +129,11 @@ def completion_spec() -> CompletionSpec:
                         )
                     elif sub_action.choices:
                         positional = [_safe(str(c)) for c in sub_action.choices]
-                commands[_safe(name)] = CommandSpec(name, helps.get(name, ""), options, positional)
+                    elif sub_action.metavar == "FILE":
+                        positional_file = True
+                commands[_safe(name)] = CommandSpec(
+                    name, helps.get(name, ""), options, positional, positional_file
+                )
         elif action.option_strings:
             global_flags.append(_option(action, parser.prog, []))
     return CompletionSpec(
@@ -179,9 +184,12 @@ def bash_completion() -> str:
         for c in spec.commands.values()
     )
     positional = "\n".join(
-        f'        {c.name}) words_for_cmd="{_words(c.positional_choices)}" ;;'
-        for c in spec.commands.values()
-        if c.positional_choices
+        [
+            f'        {c.name}) words_for_cmd="{_words(c.positional_choices)}" ;;'
+            for c in spec.commands.values()
+            if c.positional_choices
+        ]
+        + [f"        {c.name}) file_arg=1 ;;" for c in spec.commands.values() if c.positional_file]
     )
     global_flags = _words(sorted(f for o in spec.global_flags for f in o.flags))
     option_values = "\n".join(
@@ -267,7 +275,7 @@ _pydebuprep() {{
 {cases}
     esac
 
-    local opts words_for_cmd=""
+    local opts words_for_cmd="" file_arg=""
     case ${{cmd:-report}} in
 {per_command}
     esac
@@ -282,6 +290,8 @@ _pydebuprep() {{
         mapfile -t COMPREPLY < <(compgen -W "$commands" -- "$cur")
     elif [[ -n $words_for_cmd ]]; then
         mapfile -t COMPREPLY < <(compgen -W "$words_for_cmd" -- "$cur")
+    elif [[ -n $file_arg ]]; then
+        _pydebuprep_files
     fi
 }}
 
@@ -350,6 +360,8 @@ def zsh_completion() -> str:
         specs = _zsh_specs(c.options)
         if c.positional_choices:
             specs.append(f"'1:{c.name}:({' '.join(c.positional_choices)})'")
+        if c.positional_file:
+            specs.append("'1:file:_files'")
         body = " \\\n        ".join(specs) if specs else ""
         functions.append(
             f"_pydebuprep_{c.name.replace('-', '_')}() {{\n"
