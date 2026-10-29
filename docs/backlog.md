@@ -14,7 +14,6 @@ an advanced setup), and these rulesets next to the owner's `protet-main-branch`
 - `release tags: admins only, immutable`: only admins create `v*` tags, and they can't
   be moved or deleted.
 
-- [ ] Optional: `SECURITY.md` pointing to private vulnerability reporting.
 - [ ] Optional: secret scanning for non-provider patterns and validity checks.
 
 ## Release
@@ -25,7 +24,15 @@ with `SHA256SUMS`, and the SLSA provenance attestation verified with
 
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't
-      match both.
+      match both. Changes waiting for the next changelog entry:
+      - without a baseline, the report says so once instead of in every check;
+      - fstab: swap files no longer warned about when the fstab target is `swap`
+        (Debian); swap sources are read from `/etc/fstab`;
+      - config-conflicts: `ignore_paths` option for files a tool like Ansible manages;
+      - shared `logs: ignore:` regex list for journal-errors and dmesg-errors;
+        dmesg-errors reports how many messages were ignored;
+      - runs without PyYAML when YAML isn't needed, with an install hint otherwise;
+      - `SECURITY.md`.
 - [ ] Decide whether to publish an APT repository as well, for example signed and
       served from GitHub Pages, so hosts can `apt install pydebuprep` and get
       updates. Today the package is published only as a release asset.

@@ -275,6 +275,9 @@ without publishing it.
 
 ## Security checks
 
+To report a vulnerability, see [SECURITY.md](SECURITY.md). Please use GitHub's private
+reporting, not a public issue.
+
 | Workflow | What it covers |
 |---|---|
 | CodeQL | Python code and the workflow files (`security-extended` queries); results in the Security tab |
