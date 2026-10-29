@@ -14,6 +14,7 @@ from pydebuprep.render._common import (
     baseline_line,
     baseline_state,
     by_category,
+    has_baseline_section,
     host_line,
 )
 
@@ -94,11 +95,12 @@ def render_wiki(
                 out.append(f"*Error:* {esc(r.error)}")
             for f in r.findings:
                 out += ["", *finding(f)]
-            state = baseline_state(report, r)
-            if state is not None:
-                out += ["", f"_Changes since baseline: {state}_"]
-            else:
-                out += ["", "*Changes since baseline:*"]
-                for f in r.baseline_diff or []:
-                    out += ["", *finding(f)]
+            if has_baseline_section(report):
+                state = baseline_state(report, r)
+                if state is not None:
+                    out += ["", f"_Changes since baseline: {state}_"]
+                else:
+                    out += ["", "*Changes since baseline:*"]
+                    for f in r.baseline_diff or []:
+                        out += ["", *finding(f)]
     return "\n".join(out) + "\n"

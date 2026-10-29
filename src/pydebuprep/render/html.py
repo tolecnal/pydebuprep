@@ -7,6 +7,7 @@ from pydebuprep.render._common import (
     baseline_line,
     baseline_state,
     by_category,
+    has_baseline_section,
     host_line,
     summary_line,
 )
@@ -87,13 +88,14 @@ def render(report: Report) -> str:
                 out.append(f'<p class="critical">Error: {escape(r.error)}</p>')
             for f in r.findings:
                 out += _finding(f)
-            state = baseline_state(report, r)
-            if state is not None:
-                out.append(f'<p class="muted">Changes since baseline: {state}</p>')
-            else:
-                out.append("<p>Changes since baseline:</p>")
-                for f in r.baseline_diff or []:
-                    out += _finding(f)
+            if has_baseline_section(report):
+                state = baseline_state(report, r)
+                if state is not None:
+                    out.append(f'<p class="muted">Changes since baseline: {state}</p>')
+                else:
+                    out.append("<p>Changes since baseline:</p>")
+                    for f in r.baseline_diff or []:
+                        out += _finding(f)
             out.append("</section>")
     out.append("</body></html>")
     return "\n".join(out) + "\n"

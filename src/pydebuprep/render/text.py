@@ -5,6 +5,7 @@ from pydebuprep.render._common import (
     baseline_line,
     baseline_state,
     by_category,
+    has_baseline_section,
     host_line,
     summary_line,
 )
@@ -58,11 +59,12 @@ def render(report: Report, *, color: bool = False) -> str:
                 out.append(f"  Error: {r.error}")
             for f in r.findings:
                 out += _finding(f, "  ", color)
-            state = baseline_state(report, r)
-            if state is not None:
-                out.append(f"  Changes since baseline: {state}")
-            else:
-                out.append("  Changes since baseline:")
-                for f in r.baseline_diff or []:
-                    out += _finding(f, "    ", color)
+            if has_baseline_section(report):
+                state = baseline_state(report, r)
+                if state is not None:
+                    out.append(f"  Changes since baseline: {state}")
+                else:
+                    out.append("  Changes since baseline:")
+                    for f in r.baseline_diff or []:
+                        out += _finding(f, "    ", color)
     return "\n".join(out) + "\n"

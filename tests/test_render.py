@@ -67,13 +67,16 @@ def test_all_formats_contain_same_items_in_same_order(fmt: str) -> None:
 
 
 @pytest.mark.parametrize("fmt", HUMAN_FORMATS)
-def test_no_baseline_wording(fmt: str) -> None:
+def test_no_baseline_mentioned_once(fmt: str) -> None:
+    """Without a baseline, say so once in the header instead of in every check."""
     r = make_sample_report()
     r.baseline = None
     for res in r.results:
         res.baseline_diff = None
     out = render(r, fmt)
-    assert out.count("no baseline") >= len(r.results)
+    assert out.lower().count("baseline") == 1
+    assert "Baseline: none" in out
+    assert "Changes since baseline" not in out
 
 
 def test_html_escapes_and_has_no_script() -> None:
