@@ -5,9 +5,10 @@
 # Exits non-zero if `report` changed anything, or `snapshot` changed anything besides
 # its snapshot file.
 #
-# With systemd as PID 1 it also fails if the service manager queued a job, or logged
-# starting, stopping or reloading anything during the run: those happen inside PID 1,
-# where strace on the run can't see them.
+# With systemd as PID 1 it also fails if a process of the run made D-Bus start a
+# service, or (AUDIT_PID1=strict) if the service manager started, stopped or reloaded
+# anything during the run: those happen outside the traced processes, where strace
+# can't see them.
 #
 # Environment:
 #   AUDIT_IGNORE  space-separated path prefixes that background services write to
@@ -15,6 +16,10 @@
 #                 audit. strace still covers every write by pydebuprep itself.
 #   AUDIT_EXPECT  space-separated programs `report` must have run, so a check that
 #                 silently skipped its command can't pass the audit unexercised.
+#   AUDIT_PID1    "strict" (default): PID 1 starting, stopping or reloading anything
+#                 during the run fails the audit. "report": listed only, for shared
+#                 machines whose other agents keep PID 1 busy. D-Bus activations are
+#                 attributed by PID either way: one requested by the run always fails.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 out=${1:-$(mktemp -d)}
@@ -37,6 +42,22 @@ ignored() {  # 1|0: print the stdin paths that are (1) or aren't (0) under AUDIT
         NF { hit = 0
              for (i = 1; i <= n; i++) if (index($0, p[i]) == 1 || $0 "/" == p[i]) hit = 1
              if (hit == want) print }'
+}
+
+dbus_activations() {  # CURSOR STRACE_LOG COMMAND: services D-Bus started on request
+    # dbus-daemon logs who asked ("requested by ... pid=N"); a PID of the traced run
+    # means pydebuprep made a service start, however indirectly.
+    journalctl -q --no-pager -o cat --after-cursor="$1" \
+        | grep 'Activating via systemd' | while IFS= read -r line; do
+        pid=$(printf '%s\n' "$line" | sed -n 's/.*requested by .*pid=\([0-9]*\).*/\1/p')
+        if [ -n "$pid" ] && grep -q "^$pid " "$2"; then
+            echo "D-BUS ACTIVATION by '$3' (pid $pid): $line"; echo violation
+        else
+            echo "D-Bus activation by another process, not counted: $line"
+        fi
+    done > "$out/dbus.txt"
+    grep -v '^violation$' "$out/dbus.txt" || true
+    ! grep -qx violation "$out/dbus.txt" || status=1
 }
 
 jobs_queued() {  # jobs PID 1 has queued since boot
@@ -74,9 +95,13 @@ audit() {  # NAME ALLOWED_PREFIX COMMAND...
         # permissions) aren't actions: those are listed only.
         acted=$(printf '%s\n' "$pid1" | grep -vE '\.(mount|scope)[: ]' \
             | grep -E "\]: (Start|Stopp|Reload|Reexecut|Finished|Deactivated)" || true)
-        if [ -n "$acted" ]; then
+        if [ -n "$acted" ] && [ "${AUDIT_PID1:-strict}" = report ]; then
+            echo "PID 1 started, stopped or reloaded during '$*' (AUDIT_PID1=report," \
+                "not counted):"
+            echo "$acted"
+        elif [ -n "$acted" ]; then
             echo "PID 1 STARTED, STOPPED OR RELOADED during '$*':"; echo "$acted"; status=1
-        elif [ "$jobs" -gt 0 ] && [ -z "$pid1" ]; then
+        elif [ "$jobs" -gt 0 ] && [ -z "$pid1" ] && [ "${AUDIT_PID1:-strict}" = strict ]; then
             # A job PID 1 didn't log about can't be told apart from one we caused.
             echo "SYSTEMD JOBS: PID 1 queued $jobs job(s) during '$*' and logged nothing"
             status=1
@@ -85,6 +110,9 @@ audit() {  # NAME ALLOWED_PREFIX COMMAND...
                 "not counted):"
             echo "$pid1"
         fi
+    fi
+    if [ -n "$systemd" ]; then
+        dbus_activations "$cursor" "$out/$name.strace" "$*"
     fi
     set -- --strict /sys/firmware/efi/efivars
     [ -z "$allow" ] || set -- "$@" --allow "$allow"

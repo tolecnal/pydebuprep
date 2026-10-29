@@ -45,6 +45,9 @@ if [ -d /run/systemd/system ]; then
     AUDIT_EXPECT="systemctl journalctl systemd-analyze"
     if [ -z "${AUDIT_TOOLS_ONLY:-}" ]; then
         AUDIT_EXPECT="$AUDIT_EXPECT sshd pg_lsclusters mariadbd postconf named-checkconf"
+    else
+        # CI runner VMs: other agents keep PID 1 busy; D-Bus attribution still applies.
+        export AUDIT_PID1="${AUDIT_PID1:-report}"
     fi
     [ ! -d /sys/firmware/efi/efivars ] || AUDIT_EXPECT="$AUDIT_EXPECT efibootmgr"
     if grep -q '^nameserver 127\.0\.0\.5[34]' /etc/resolv.conf; then
