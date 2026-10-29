@@ -19,8 +19,13 @@ an advanced setup), and these rulesets next to the owner's `protet-main-branch`
 
 ## Release
 
-- [ ] Tag the first release, `v0.2.0`, and check the Release workflow end to end:
-      GitHub Release, `SHA256SUMS`, and `gh attestation verify`.
+Released `v0.2.0` on 2026-10-29: built and audited on all five releases, published
+with `SHA256SUMS`, and the SLSA provenance attestation verified with
+`gh attestation verify`.
+
+- [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
+      `__version__` together. The Release workflow refuses a tag that doesn't
+      match both.
 - [ ] Decide whether to publish an APT repository as well, for example signed and
       served from GitHub Pages, so hosts can `apt install pydebuprep` and get
       updates. Today the package is published only as a release asset.
