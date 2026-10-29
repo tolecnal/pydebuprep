@@ -12,9 +12,13 @@ rm -f /etc/apt/apt.conf.d/docker-clean
 [ ! -d /run/systemd/system ] || rm -f /usr/sbin/policy-rc.d
 echo "postfix postfix/main_mailer_type select Local only" | debconf-set-selections
 echo "postfix postfix/mailname string audit.example" | debconf-set-selections
-apt-get install -y --no-install-recommends strace debsums dkms needrestart efibootmgr \
-    nftables iptables ufw openssh-server cron unattended-upgrades apparmor iproute2 \
-    postgresql mariadb-server postfix bind9 python3-venv
+tools="strace debsums dkms needrestart efibootmgr nftables iptables ufw iproute2 python3-venv"
+services="openssh-server cron unattended-upgrades apparmor postgresql mariadb-server postfix bind9"
+# AUDIT_TOOLS_ONLY=1 leaves the services out: CI runner VMs ship their own, conflicting
+# MySQL and PostgreSQL, and the containers cover the services anyway.
+[ -n "${AUDIT_TOOLS_ONLY:-}" ] || tools="$tools $services"
+# shellcheck disable=SC2086 # word splitting intended: one package per word
+apt-get install -y --no-install-recommends $tools
 # A broken virtualenv for python-venvs to find.
 python3 -m venv /opt/audit-venv && rm -f /opt/audit-venv/bin/python
 rm -f /var/cache/apt/*.bin
@@ -29,8 +33,10 @@ if [ -d /run/systemd/system ]; then
     AUDIT_IGNORE="/var/log/ /var/lib/postgresql/ /var/lib/mysql/ /var/cache/bind/ \
 /var/spool/postfix/ /var/lib/systemd/ /var/lib/docker/ /var/lib/containerd/ \
 /home/runner/ /tmp/ ${AUDIT_IGNORE:-}"
-    AUDIT_EXPECT="systemctl journalctl systemd-analyze nft sshd pg_lsclusters mariadbd \
-postconf named-checkconf"
+    AUDIT_EXPECT="systemctl journalctl systemd-analyze"
+    if [ -z "${AUDIT_TOOLS_ONLY:-}" ]; then
+        AUDIT_EXPECT="$AUDIT_EXPECT sshd pg_lsclusters mariadbd postconf named-checkconf"
+    fi
     [ ! -d /sys/firmware/efi/efivars ] || AUDIT_EXPECT="$AUDIT_EXPECT efibootmgr"
     if grep -q '^nameserver 127\.0\.0\.5[34]' /etc/resolv.conf; then
         AUDIT_EXPECT="$AUDIT_EXPECT resolvectl"
