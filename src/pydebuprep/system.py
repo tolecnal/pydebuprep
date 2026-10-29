@@ -20,7 +20,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 # Stop apt from taking locks or regenerating its binary caches (which it does
-# even for read-only queries when run as root).
+# even for read-only queries when run as root), and from writing its solver log
+# (/var/log/apt/eipp.log.xz), which `apt-get -s autoremove` replaces whenever there is
+# something to remove.
 APT_RO_OPTS: tuple[str, ...] = (
     "-o",
     "Debug::NoLocking=1",
@@ -28,6 +30,8 @@ APT_RO_OPTS: tuple[str, ...] = (
     "Dir::Cache::pkgcache=",
     "-o",
     "Dir::Cache::srcpkgcache=",
+    "-o",
+    "Dir::Log::Planner=",
 )
 
 APT_PROGRAMS = ("apt", "apt-get", "apt-cache", "apt-mark")

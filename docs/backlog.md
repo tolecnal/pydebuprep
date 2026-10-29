@@ -22,8 +22,8 @@ Released `v0.2.0` on 2026-10-29: built and audited on all five releases, publish
 with `SHA256SUMS`, and the SLSA provenance attestation verified with
 `gh attestation verify`.
 
-`v0.3.0`: tagged after this backlog entry merged; what it contains is in
-`debian/changelog`.
+`v0.3.0` released on 2026-10-29. `v0.3.1`: tagged after this backlog entry merged
+(the apt solver log fix); what it contains is in `debian/changelog`.
 
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't
@@ -55,19 +55,19 @@ passes `scripts/readonly-audit.sh` with the service installed.
 
 ## Verification gaps
 
-- [ ] Packages are built and audited only by the Release workflow (a release tag, or a
-      manual run), not on every push; run it manually on a branch that touches
-      commands or packaging before tagging.
-- [ ] The read-only audit runs in containers without systemd, so `systemctl`,
-      `journalctl` and `systemd-analyze` are audited only by manual runs on a real
-      host. Consider a VM-based job, or a container booted with systemd as PID 1.
-- [ ] `efibootmgr -v` has never been exercised by the audit (no EFI firmware in CI
-      containers). It is read-only by design and by the exact-argv allowlist.
+Closed on 2026-10-29: CI builds the package on every pull request and audits it in
+containers booted with systemd (services running, the runner's UEFI variables mounted)
+and on the Ubuntu runner VMs, so `systemctl`, `journalctl`, `systemd-analyze`,
+`resolvectl`, `docker` and `efibootmgr` are now exercised; `AUDIT_EXPECT` fails the
+audit if one of them stops running.
+
+- [ ] Still only on real hosts: `docker` on Debian (no runner VM), and the checks'
+      behaviour on real hardware (RAID, multiple disks, physical NICs).
 
 ## Decisions to revisit
 
 - Container images in workflows track tags (`debian:bookworm`, `ubuntu:24.04`, ...)
   rather than digests, so builds get current security updates; Dependabot cannot
-  update digests inside workflow files.
+  update digests inside workflow files. CI's weekly run audits against them.
 - The Release workflow builds the `.deb` once on Debian 12 and installs that same
   file everywhere. Revisit if a dependency ever needs a per-release build.

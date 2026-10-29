@@ -110,6 +110,12 @@ def test_walk_files_collects_errors(tmp_path) -> None:  # type: ignore[no-untype
     assert errors == []
 
 
+def test_apt_never_writes_its_solver_log() -> None:
+    # Without it, `apt-get -s autoremove` as root replaces /var/log/apt/eipp.log.xz.
+    opts = list(zip(APT_RO_OPTS[::2], APT_RO_OPTS[1::2], strict=True))
+    assert ("-o", "Dir::Log::Planner=") in opts
+
+
 def test_show_units_allows_unit_names() -> None:
     check_allowed((*SHOW_UNITS, "ssh.service", "cron.service"))
     check_allowed((*SHOW_UNITS, "getty@tty1.service"))

@@ -12,10 +12,11 @@ SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "readonly-audit.py
 EXEC = '100 execve("/usr/bin/apt-mark", ["apt-mark", "showhold"], 0x7ffd /* 3 vars */) = 0\n'
 
 
-def audit(tmp_path: Path, trace: str, *allow: str) -> tuple[int, str]:
+def audit(tmp_path: Path, trace: str, *allow: str, strict: str = "") -> tuple[int, str]:
     log = tmp_path / "t.strace"
     log.write_text(EXEC + trace)
     args = [a for p in allow for a in ("--allow", p)]
+    args += ["--strict", strict] if strict else []
     res = subprocess.run(
         [sys.executable, str(SCRIPT), str(log), *args], capture_output=True, text=True, check=False
     )
@@ -33,6 +34,8 @@ def audit(tmp_path: Path, trace: str, *allow: str) -> tuple[int, str]:
         "100 kill(1234, SIGTERM) = 0\n",
         '100 mkdir("/var/lib/x", 0755) = 0\n',
         '100 openat(AT_FDCWD, "/tmp/leftover", O_RDWR|O_CREAT|O_EXCL, 0600) = 3\n',
+        '100 mkdir("/tmp/leftover.d", 0700) = 0\n',
+        '100 rmdir("/tmp/not-ours") = 0\n',
         '100 mount("/dev/sda1", "/mnt", "ext4", 0, NULL) = 0\n',
         '100 openat(AT_FDCWD, "/var/lib/pydebuprep/snapshots/x.json", O_WRONLY|O_CREAT, 0666) = 3\n',
     ],
@@ -48,6 +51,7 @@ def test_changes_are_violations(tmp_path: Path, trace: str) -> None:
     "trace",
     [
         '100 openat(AT_FDCWD, "/tmp/x", O_RDWR|O_CREAT|O_EXCL, 0600) = 3\n100 unlink("/tmp/x") = 0\n',
+        '100 mkdir("/tmp/YENoEJqPuA", 0700) = 0\n100 rmdir("/tmp/YENoEJqPuA") = 0\n',
         '100 openat(AT_FDCWD, "/tmp", O_RDWR|O_EXCL|O_TMPFILE, 0600) = 4\n',
         '100 openat(AT_FDCWD, "/dev/null", O_RDWR) = 3\n',
         "100 kill(1234, 0) = 0\n",
@@ -100,3 +104,19 @@ def test_signals_to_other_processes_are_flagged(tmp_path: Path) -> None:
     rc, out = audit(tmp_path, "100 tgkill(4242, 4242, SIGURG) = 0\n")
     assert rc == 1
     assert "tgkill(4242" in out
+
+
+def test_failed_write_attempts_count_under_strict_prefixes(tmp_path: Path) -> None:
+    efivar = "/sys/firmware/efi/efivars/BootOrder-8be4df61-93ca-11d2-aa0d-00e098032b8c"
+    write = f'100 openat(AT_FDCWD, "{efivar}", O_WRONLY) = -1 EPERM (Operation not permitted)\n'
+    unlink = f'100 unlink("{efivar}") = -1 EPERM (Operation not permitted)\n'
+    read = f'100 openat(AT_FDCWD, "{efivar}", O_RDONLY) = -1 ENOENT (No such file or directory)\n'
+    strict = "/sys/firmware/efi/efivars"
+    assert audit(tmp_path, write)[0] == 0
+    rc, out = audit(tmp_path, write, strict=strict)
+    assert rc == 1
+    assert "(failed attempt)" in out
+    assert audit(tmp_path, unlink, strict=strict)[0] == 1
+    assert audit(tmp_path, read, strict=strict)[0] == 0
+    elsewhere = '100 openat(AT_FDCWD, "/etc/x", O_WRONLY) = -1 EACCES (Permission denied)\n'
+    assert audit(tmp_path, elsewhere, strict=strict)[0] == 0
