@@ -1,11 +1,11 @@
 PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
-.PHONY: lint test coverage deb clean generated audit
+.PHONY: lint test coverage deb clean generated audit docs docs-serve
 
 lint:
-	$(PYTHON) -m ruff check src tests scripts
-	$(PYTHON) -m ruff format --check src tests scripts
-	$(PYTHON) -m flake8 src tests scripts
+	$(PYTHON) -m ruff check src tests scripts tools
+	$(PYTHON) -m ruff format --check src tests scripts tools
+	$(PYTHON) -m flake8 src tests scripts tools
 	$(PYTHON) -m mypy
 
 test:
@@ -30,4 +30,13 @@ deb:
 	dpkg-buildpackage -us -uc -b
 
 clean:
-	rm -rf build .pybuild .pytest_cache .mypy_cache .ruff_cache src/*.egg-info
+	rm -rf build site .pybuild .pytest_cache .mypy_cache .ruff_cache src/*.egg-info
+
+# The documentation site; needs: pip install -r requirements-docs.txt (e.g. in .venv-docs)
+DOCS_PYTHON ?= $(if $(wildcard .venv-docs/bin/python),.venv-docs/bin/python,python3)
+
+docs:
+	NO_MKDOCS_2_WARNING=1 $(DOCS_PYTHON) -m mkdocs build
+
+docs-serve:
+	NO_MKDOCS_2_WARNING=1 $(DOCS_PYTHON) -m mkdocs serve

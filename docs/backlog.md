@@ -67,6 +67,10 @@ audit if one of them stops running.
 
 ## Decisions to revisit
 
+- The documentation site uses Material for MkDocs, which reaches end of life on
+  2027-05-05 (security fixes until then). Its successor, Zensical, reads the same
+  `mkdocs.yml`; evaluate moving before then.
+
 - Container images in workflows track tags (`debian:bookworm`, `ubuntu:24.04`, ...)
   rather than digests, so builds get current security updates; Dependabot cannot
   update digests inside workflow files. CI's weekly run audits against them.

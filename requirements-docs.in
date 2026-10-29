@@ -1,0 +1,3 @@
+# Documentation site tools (MkDocs). Pinned versions live in requirements-docs.txt:
+#   uv pip compile --python-version 3.12 requirements-docs.in -o requirements-docs.txt
+mkdocs-material

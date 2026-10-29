@@ -1,0 +1,146 @@
+site_name: pydebuprep
+site_description: >-
+  Read-only health report for Debian and Ubuntu systems after a release upgrade.
+site_url: https://tolecnal.github.io/pydebuprep/
+repo_url: https://github.com/tolecnal/pydebuprep
+repo_name: tolecnal/pydebuprep
+edit_uri: edit/main/docs/
+copyright: MIT licensed
+
+# Fill generated sections (check facts, config and CLI reference) from the code.
+hooks:
+  - tools/docs_hooks.py
+
+# Not part of the site: the project backlog and local planning notes.
+exclude_docs: |
+  backlog.md
+  superpowers/
+
+strict: true
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: warn
+    unrecognized_links: warn
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - def_list
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - getting-started/index.md
+      - Install: getting-started/install.md
+      - Before and after an upgrade: getting-started/upgrade-workflow.md
+  - User guide:
+      - guide/index.md
+      - Running reports: guide/reports.md
+      - Snapshots and baselines: guide/snapshots.md
+      - Output formats: guide/output-formats.md
+      - Reading the results: guide/results.md
+      - Running across a fleet: guide/fleet.md
+  - Configuration:
+      - configuration/index.md
+      - Reference: configuration/reference.md
+  - Checks:
+      - checks/index.md
+      - Release:
+          - apt-lists-age: checks/apt-lists-age.md
+          - apt-sources: checks/apt-sources.md
+          - os-release: checks/os-release.md
+      - Packages:
+          - apt-autoremove: checks/apt-autoremove.md
+          - apt-held: checks/apt-held.md
+          - apt-upgradable: checks/apt-upgradable.md
+          - config-conflicts: checks/config-conflicts.md
+          - debsums: checks/debsums.md
+          - dpkg-audit: checks/dpkg-audit.md
+          - dpkg-rc: checks/dpkg-rc.md
+          - obsolete-packages: checks/obsolete-packages.md
+      - Boot:
+          - boot-space: checks/boot-space.md
+          - bootloader: checks/bootloader.md
+          - dkms: checks/dkms.md
+          - kernel-running: checks/kernel-running.md
+      - Services:
+          - boot-time: checks/boot-time.md
+          - cron: checks/cron.md
+          - dmesg-errors: checks/dmesg-errors.md
+          - journal-errors: checks/journal-errors.md
+          - needrestart: checks/needrestart.md
+          - systemd-critical-services: checks/systemd-critical-services.md
+          - systemd-failed: checks/systemd-failed.md
+          - systemd-timers: checks/systemd-timers.md
+          - time-sync: checks/time-sync.md
+      - Applications:
+          - bind: checks/bind.md
+          - docker: checks/docker.md
+          - mariadb: checks/mariadb.md
+          - postfix: checks/postfix.md
+          - postgresql: checks/postgresql.md
+          - python-venvs: checks/python-venvs.md
+      - Network:
+          - firewall: checks/firewall.md
+          - network: checks/network.md
+      - Security:
+          - apparmor: checks/apparmor.md
+          - ssh-server: checks/ssh-server.md
+          - unattended-upgrades: checks/unattended-upgrades.md
+      - Storage:
+          - disk-space: checks/disk-space.md
+          - fstab: checks/fstab.md
+  - Reference:
+      - reference/index.md
+      - Command line: reference/cli.md
+      - Report format: reference/report-format.md
+      - Exit codes: reference/exit-codes.md
+  - About:
+      - about/index.md
+      - Read-only by design: about/read-only.md
+      - Limitations: about/limitations.md
+      - Security and releases: about/security.md
+      - Development: about/development.md
