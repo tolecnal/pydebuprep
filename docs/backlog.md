@@ -22,25 +22,12 @@ Released `v0.2.0` on 2026-10-29: built and audited on all five releases, publish
 with `SHA256SUMS`, and the SLSA provenance attestation verified with
 `gh attestation verify`.
 
+`v0.3.0`: tagged after this backlog entry merged; what it contains is in
+`debian/changelog`.
+
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't
-      match both. Changes waiting for the next changelog entry:
-      - without a baseline, the report says so once instead of in every check;
-      - fstab: swap files no longer warned about when the fstab target is `swap`
-        (Debian); swap sources are read from `/etc/fstab`;
-      - config-conflicts: `ignore_paths` option for files a tool like Ansible manages;
-      - shared `logs: ignore:` regex list for journal-errors and dmesg-errors;
-        dmesg-errors reports how many messages were ignored;
-      - runs without PyYAML when YAML isn't needed, with an install hint otherwise;
-      - `SECURITY.md`;
-      - snapshots are private: directory 0700 and files 0600 (CodeQL
-        py/overly-permissive-file); upgrading the package tightens existing directories;
-      - new checks: network, firewall, time-sync, apparmor, unattended-upgrades, cron,
-        ssh-server; boot critical chain; a free-space floor for `/` and `/var`;
-      - application checks: postgresql, mariadb, postfix, bind, docker, python-venvs;
-      - README badges; README, man page (new CHECKS section) and package description
-        brought up to date, with tests that keep the check lists in sync;
-      - 100% line and branch coverage, enforced.
+      match both. Changes waiting for the next changelog entry: none yet.
 - [ ] Decide whether to publish an APT repository as well, for example signed and
       served from GitHub Pages, so hosts can `apt install pydebuprep` and get
       updates. Today the package is published only as a release asset.

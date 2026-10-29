@@ -68,7 +68,7 @@ sudo apt install ./pydebuprep_*_all.deb
 Without the GitHub CLI, download a specific version and skip the attestation check:
 
 ```sh
-VERSION=0.2.0
+VERSION=0.3.0
 wget https://github.com/tolecnal/pydebuprep/releases/download/v$VERSION/pydebuprep_${VERSION}_all.deb \
      https://github.com/tolecnal/pydebuprep/releases/download/v$VERSION/SHA256SUMS
 sha256sum -c SHA256SUMS && sudo apt install ./pydebuprep_${VERSION}_all.deb
@@ -353,7 +353,7 @@ build-provenance attestation. To check a download:
 
 ```sh
 sha256sum -c SHA256SUMS
-gh attestation verify pydebuprep_0.2.0_all.deb --repo tolecnal/pydebuprep
+gh attestation verify pydebuprep_0.3.0_all.deb --repo tolecnal/pydebuprep
 ```
 
 Running the workflow by hand (workflow_dispatch) builds and verifies the package
