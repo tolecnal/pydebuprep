@@ -57,7 +57,10 @@ In scope, for example:
   `report`: writing, deleting or rewriting files, changing packages, services or
   firmware settings, or starting commands outside its read-only allowlist. The read-only
   promise is the most important property of this tool. `snapshot` writing its snapshot
-  file, and a report file you asked for, are expected;
+  file, a report file you asked for, and temporary files in pydebuprep's own private
+  scratch directory (created under `/tmp` with mode 0700 and removed before it exits)
+  are expected. A scratch file that outlives the run, or one written anywhere else, is
+  in scope;
 - command or argument injection, for example through config values, file names, or
   output of the commands it runs;
 - unsafe file handling, such as following symlinks to overwrite files when writing

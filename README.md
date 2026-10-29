@@ -233,7 +233,7 @@ host never looks healthy just because a check couldn't look.
 | ID | Category | What it looks at |
 |---|---|---|
 | `apt-lists-age` | release | How stale the downloaded package lists are |
-| `apt-sources` | release | Sources still on the old codename, repos disabled by the upgrade, missing distro archive, duplicates |
+| `apt-sources` | release | Sources still on the old codename, repos disabled by the upgrade, missing distro archive or security archive, duplicates; missing signing keyrings, keys in the legacy trusted.gpg; repositories without downloaded metadata, serving another release than configured (from the last apt update; never runs it) |
 | `os-release` | release | Supported release; upgrade path vs. the baseline |
 | `apt-autoremove` | packages | Packages `apt autoremove` would remove (simulated) |
 | `apt-held` | packages | Held packages |

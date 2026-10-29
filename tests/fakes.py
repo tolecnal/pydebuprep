@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fnmatch
 from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from datetime import datetime, timezone
 
 from pydebuprep.system import CommandResult, DiskUsage, System, _strip_apt_opts, check_allowed
@@ -32,6 +33,7 @@ class FakeSystem(System):
         self.commands = commands or {}
         self.files = files or {}
         self.links = links or {}
+        self.scratch_files: dict[str, bytes] = {}
         self.mtimes = mtimes or {}
         self.disks = disks or {}
         self.root = root
@@ -66,6 +68,10 @@ class FakeSystem(System):
     def read_text(self, path: str) -> str | None:
         return self.files.get(path)
 
+    def read_bytes(self, path: str) -> bytes | None:
+        text = self.files.get(path)
+        return None if text is None else text.encode("utf-8")
+
     def exists(self, path: str) -> bool:
         prefix = path.rstrip("/") + "/"
         return (
@@ -76,6 +82,15 @@ class FakeSystem(System):
 
     def readlink(self, path: str) -> str | None:
         return self.links.get(path)
+
+    @contextmanager
+    def scratch_dir(self) -> Iterator[str]:
+        yield "/tmp/pydebuprep-test"
+
+    def write_scratch(self, directory: str, name: str, data: bytes) -> str:
+        path = f"{directory}/{name}"
+        self.scratch_files[path] = data
+        return path
 
     def glob(self, pattern: str) -> list[str]:
         return sorted(f for f in (*self.files, *self.links) if fnmatch.fnmatch(f, pattern))

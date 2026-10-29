@@ -6,6 +6,13 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlparse
 
+from pydebuprep.checks._apt_metadata import (
+    keyring_findings,
+    legacy_keyring_finding,
+    metadata_findings,
+    security_finding,
+    signature_findings,
+)
 from pydebuprep.checks.base import Check, Context
 from pydebuprep.model import Finding, Severity, truncate_evidence
 from pydebuprep.osinfo import known_codenames
@@ -32,6 +39,7 @@ class SourceEntry:
     enabled: bool
     disabled_reason: str | None
     line: str = ""
+    signed_by: str = ""
 
     @property
     def suite_base(self) -> str:
@@ -67,8 +75,12 @@ def _parse_one_line(path: str, text: str, renamed: str | None) -> list[SourceEnt
         content = line.split(" #", 1)[0].strip()
         if not content:
             continue
+        options: dict[str, str] = {}
         if "[" in content and "]" in content:
             start, end = content.index("["), content.index("]")
+            for item in content[start + 1 : end].split():
+                key, _, value = item.partition("=")
+                options[key.lower()] = value
             content = content[:start] + content[end + 1 :]
         tokens = content.split()
         if len(tokens) < 3 or tokens[0] not in ("deb", "deb-src"):
@@ -83,6 +95,7 @@ def _parse_one_line(path: str, text: str, renamed: str | None) -> list[SourceEnt
                 enabled and renamed is None,
                 reason,
                 raw.strip(),
+                options.get("signed-by", ""),
             )
         )
     return entries
@@ -122,6 +135,7 @@ def _parse_deb822(path: str, text: str, renamed: str | None) -> list[SourceEntry
                             tuple(st.get("components", "").split()),
                             enabled and renamed is None,
                             reason,
+                            signed_by=st.get("signed-by", ""),
                         )
                     )
     return entries
@@ -264,6 +278,13 @@ class AptSourcesCheck(Check):
                     ],
                 )
             )
+
+        findings += keyring_findings(ctx.system, enabled)
+        findings += legacy_keyring_finding(ctx.system)
+        findings += metadata_findings(ctx.system, enabled)
+        findings += signature_findings(ctx.system, enabled)
+        distro = [e for e in enabled if is_distro(e, codename) and e.type == "deb"]
+        findings += security_finding(codename, distro)
 
         groups: dict[tuple[str, str, str, str], list[SourceEntry]] = defaultdict(list)
         for e in enabled:

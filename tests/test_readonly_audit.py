@@ -120,3 +120,27 @@ def test_failed_write_attempts_count_under_strict_prefixes(tmp_path: Path) -> No
     assert audit(tmp_path, read, strict=strict)[0] == 0
     elsewhere = '100 openat(AT_FDCWD, "/etc/x", O_WRONLY) = -1 EACCES (Permission denied)\n'
     assert audit(tmp_path, elsewhere, strict=strict)[0] == 0
+
+
+def test_scratch_files_removed_through_a_directory_fd_are_cleaned_up(tmp_path: Path) -> None:
+    # shutil.rmtree opens the directory and unlinks entries relative to its descriptor.
+    trace = (
+        '100 mkdir("/tmp/pydebuprep-x1", 0700) = 0\n'
+        '100 openat(AT_FDCWD, "/tmp/pydebuprep-x1/key-0.gpg", O_WRONLY|O_CREAT|O_EXCL, 0600) = 4\n'
+        '100 openat(AT_FDCWD, "/tmp/pydebuprep-x1", O_RDONLY|O_NONBLOCK|O_CLOEXEC|O_DIRECTORY) = 3\n'
+        '100 unlinkat(3, "key-0.gpg", 0) = 0\n'
+        '100 rmdir("/tmp/pydebuprep-x1") = 0\n'
+    )
+    rc, out = audit(tmp_path, trace)
+    assert rc == 0, out
+
+
+def test_relative_unlink_outside_tmp_is_still_a_violation(tmp_path: Path) -> None:
+    trace = (
+        '100 openat(AT_FDCWD, "/etc", O_RDONLY|O_DIRECTORY) = 3\n'
+        '100 unlinkat(3, "passwd", 0) = 0\n'
+        '100 unlinkat(9, "unknown-fd", 0) = 0\n'
+    )
+    rc, out = audit(tmp_path, trace)
+    assert rc == 1
+    assert out.count("VIOLATION") == 2

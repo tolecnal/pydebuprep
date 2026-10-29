@@ -140,3 +140,58 @@ def test_fake_readlink_and_glob() -> None:
     assert fake.readlink("/proc/1/fd/3") == "socket:[42]"
     assert fake.readlink("/proc/1/fd/4") is None
     assert fake.glob("/proc/1/fd/*") == ["/proc/1/fd/3"]
+
+
+INRELEASE = "/var/lib/apt/lists/deb.debian.org_debian_dists_trixie_InRelease"
+KEY = "/usr/share/keyrings/debian-archive-keyring.gpg"
+SCRATCH = "/tmp/pydebuprep-abc123"
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ("sqv", "--keyring", KEY, "--cleartext", "--output", f"{SCRATCH}/out-1", INRELEASE),
+        (
+            "sqv", "--keyring", KEY, "--keyring", "/etc/apt/trusted.gpg.d/x.asc",
+            "--keyring", f"{SCRATCH}/inline-1.asc", "--cleartext", "--output",
+            f"{SCRATCH}/out-2", INRELEASE,
+        ),
+        ("gpgv", "--keyring", KEY, INRELEASE),
+        ("gpgv", "--keyring", "/etc/apt/keyrings/v.gpg", "--keyring", f"{SCRATCH}/k-1.gpg", INRELEASE),
+    ],
+)  # fmt: skip
+def test_signature_checks_allowed(argv: tuple[str, ...]) -> None:
+    check_allowed(argv)
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ("gpgv", INRELEASE),  # no keyring
+        ("gpgv", "--keyring", KEY),  # no file to verify
+        ("gpgv", "--keyring", "/home/u/k.gpg", INRELEASE),  # keyring elsewhere
+        ("gpgv", "--keyring", "/etc/apt/../shadow", INRELEASE),
+        ("gpgv", "--keyring", KEY, "/etc/passwd"),
+        ("gpgv", "--keyring", KEY, "/var/lib/apt/lists/x_Release"),
+        ("gpgv", "--keyring", KEY, "/var/lib/apt/lists/sub/x_InRelease"),
+        ("gpgv", "--keyring", KEY, "--homedir", "/tmp", INRELEASE),
+        ("gpgv", "--keyring", "/tmp/pydebuprep-x/../../etc/k", INRELEASE),
+        ("gpgv", "--keyring", "/tmp/elsewhere/k.gpg", INRELEASE),
+        ("sqv", "--keyring", KEY, "--cleartext", "--output", "/etc/apt/out", INRELEASE),
+        ("sqv", "--keyring", KEY, "--cleartext", "--output", "-", INRELEASE),
+        ("sqv", "--keyring", KEY, "--cleartext", "--output", f"{SCRATCH}/a/b", INRELEASE),
+        ("sqv", "--keyring", KEY, "--output", f"{SCRATCH}/out", INRELEASE),  # no --cleartext
+        ("sqv", "--keyring", KEY, "--cleartext", INRELEASE),
+    ],
+)
+def test_signature_checks_rejected(argv: tuple[str, ...]) -> None:
+    with pytest.raises(DisallowedCommandError):
+        check_allowed(argv)
+
+
+def test_fake_scratch_dir() -> None:
+    fake = FakeSystem()
+    with fake.scratch_dir() as scratch:
+        path = fake.write_scratch(scratch, "k.gpg", b"\x99")
+        assert fake.scratch_files == {path: b"\x99"}
+    assert scratch == "/tmp/pydebuprep-test"
