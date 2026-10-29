@@ -13,8 +13,21 @@ PROC_NET = {
 }
 
 
+def ephemeral_ports(system: System) -> range:
+    """The kernel's range for random local ports (ip_local_port_range); empty if unknown."""
+    fields = (system.read_text("/proc/sys/net/ipv4/ip_local_port_range") or "").split()
+    if len(fields) == 2 and all(f.isdigit() for f in fields):
+        return range(int(fields[0]), int(fields[1]) + 1)
+    return range(0)
+
+
 def listening_sockets(system: System) -> dict[str, str]:
-    """Socket inode -> "tcp/PORT" or "udp/PORT" for every listening socket."""
+    """Socket inode -> "tcp/PORT" or "udp/PORT" for every listening socket.
+
+    UDP sockets on random ports (rpc.statd, resolvers) are left out: they get a new
+    port on every restart, so they aren't listeners anyone relies on.
+    """
+    ephemeral = ephemeral_ports(system)
     sockets: dict[str, str] = {}
     for name, (proto, listen) in PROC_NET.items():
         for line in (system.read_text(f"/proc/net/{name}") or "").splitlines()[1:]:
@@ -22,6 +35,8 @@ def listening_sockets(system: System) -> dict[str, str]:
             if len(fields) < 10 or fields[3] != listen:
                 continue
             port = int(fields[1].rsplit(":", 1)[1], 16)
+            if proto == "udp" and port in ephemeral:
+                continue
             sockets[fields[9]] = f"{proto}/{port}"
     return sockets
 

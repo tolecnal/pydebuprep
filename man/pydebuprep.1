@@ -295,7 +295,7 @@ for each check's options.
 (services) Services still using old libraries (root, needs \fBneedrestart\fR)
 .TP
 .B systemd\-critical\-services
-(services) Critical units (built\-in ssh, cron, journald and time sync where installed, plus configured ones) not running, masked, missing, disabled, or running without a required unit; units masked or missing since the baseline; listeners lost since the baseline (root)
+(services) Critical units (built\-in ssh, cron and journald where installed, plus configured ones) not running (failed ones are left to \fBsystemd\-failed\fR), masked, missing, disabled, or running without a required unit; units masked or missing since the baseline; listeners lost since the baseline (root)
 .TP
 .B systemd\-failed
 (services) Failed units; services active or enabled before the upgrade that aren't now

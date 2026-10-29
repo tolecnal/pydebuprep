@@ -188,7 +188,7 @@ The package also installs the example as
 | `boot-space` | `warning_pct` (25.0), `critical_pct` (10.0) |
 | `dmesg-errors`, `journal-errors` | `ignore` ([]): regular expressions for messages to leave out (see also `logs: ignore:`) |
 | `systemd-failed`, `systemd-timers` | `ignore_units` ([]): unit name patterns to leave out |
-| `systemd-critical-services` | `required_active` ([]), `required_enabled` ([]): units that must be running / enabled, on top of the built-in list; `builtin` (true): include ssh, cron, journald and time sync where installed; `ignore_units` ([]) |
+| `systemd-critical-services` | `required_active` ([]), `required_enabled` ([]): units that must be running / enabled, on top of the built-in list; `builtin` (true): include ssh, cron and journald where installed; `ignore_units` ([]) |
 | `python-venvs` | `search_paths` (/opt, /srv, /usr/local, /root, /home, /var/www) and `max_depth` (5): where to look for virtualenvs; `exclude_paths` (\*/.cache/\*): ones to leave out |
 | `network` | `ignore_interfaces` (lo, veth\*, docker\*, br-\*, virbr\*, vnet\*, tap\*, cni\*, flannel\*, cali\*): left out of the baseline comparison |
 | `disk-space` | `include_remote` (false), `warning_pct` (25.0), `critical_pct` (10.0), `exclude_mounts` ([]), `important_mounts` (["/", "/var"]) and `min_free_mib` (2048): an absolute free-space floor for those mounts |
@@ -230,7 +230,7 @@ host never looks healthy just because a check couldn't look.
 | `dmesg-errors` | services | Kernel errors and warnings (root) |
 | `journal-errors` | services | Errors in the journal since boot, grouped |
 | `needrestart` | services | Services still using old libraries (root, needs `needrestart`) |
-| `systemd-critical-services` | services | Critical units (built-in ssh, cron, journald and time sync where installed, plus configured ones) not running, masked, missing, disabled, or running without a required unit; units masked or missing since the baseline; listeners lost since the baseline (root) |
+| `systemd-critical-services` | services | Critical units (built-in ssh, cron and journald where installed, plus configured ones) not running (failed ones are left to `systemd-failed`), masked, missing, disabled, or running without a required unit; units masked or missing since the baseline; listeners lost since the baseline (root) |
 | `systemd-failed` | services | Failed units; services active or enabled before the upgrade that aren't now |
 | `systemd-timers` | services | Enabled timers that aren't active |
 | `time-sync` | services | A time synchronisation service is running and the clock is synchronised (read from the kernel, no daemon queried); service changes since the baseline |

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fnmatch
+import re
 from collections.abc import Sequence
 from typing import Any
 
@@ -11,7 +12,6 @@ from pydebuprep.model import Finding, Severity
 from pydebuprep.system import MAX_UNITS, SHOW_UNITS, UNIT_NAME
 
 BUILTIN = ("ssh.service", "cron.service", "systemd-journald.service")
-TIME_SYNC = ("systemd-timesyncd.service", "chrony.service", "ntpsec.service")
 # Unit file states that satisfy "enabled": static, generated and alias units can't be
 # enabled, and indirect ones are enabled through another unit.
 ENABLED_STATES = {"enabled", "enabled-runtime", "static", "indirect", "generated", "alias"}
@@ -23,6 +23,17 @@ UnitState = dict[str, str]
 
 def plain_unit(name: str) -> bool:
     return not name.startswith("-") and bool(UNIT_NAME.match(name))
+
+
+# NAME[@INSTANCE].TYPE, as systemd accepts it (max 255 characters).
+UNIT_FORMAT = re.compile(
+    r"[A-Za-z0-9_.:\\-]+(@[A-Za-z0-9_.:\\-]*)?"
+    r"\.(service|socket|target|mount|automount|swap|timer|path|slice|scope|device)"
+)
+
+
+def well_formed(name: str) -> bool:
+    return len(name) <= 255 and not name.startswith("-") and bool(UNIT_FORMAT.fullmatch(name))
 
 
 def template(name: str) -> bool:
@@ -81,15 +92,17 @@ class SystemdCriticalCheck(Check):
     options = (
         Option("required_active", [], "Units that must be running (or socket-activated)"),
         Option("required_enabled", [], "Units that must be enabled"),
-        Option("builtin", True, "Also require ssh, cron, journald and time sync where installed"),
+        Option("builtin", True, "Also require ssh, cron and journald where installed"),
         Option("ignore_units", [], "Units to leave out (shell-style patterns)"),
     )
 
     def validate(self) -> None:
         for name in ("required_active", "required_enabled"):
-            bad = [u for u in self.opt(name) if not plain_unit(u)]
+            bad = [u for u in self.opt(name) if not well_formed(u)]
             if bad:
-                raise ValueError(f"{name}: not a unit name: {', '.join(bad)}")
+                raise ValueError(
+                    f"{name}: not a unit name (NAME.service, NAME.socket, ...): {', '.join(bad)}"
+                )
             templates = [u for u in self.opt(name) if template(u)]
             if templates:
                 raise ValueError(
@@ -101,7 +114,7 @@ class SystemdCriticalCheck(Check):
         return any(fnmatch.fnmatchcase(unit, p) for p in self.opt("ignore_units"))
 
     def effective_units(self) -> list[str]:
-        builtin = (*BUILTIN, *TIME_SYNC) if self.opt("builtin") else ()
+        builtin = BUILTIN if self.opt("builtin") else ()
         units = (*builtin, *self.opt("required_active"), *self.opt("required_enabled"))
         return [u for u in dict.fromkeys(units) if not self._ignored(u)]
 
@@ -122,8 +135,7 @@ class SystemdCriticalCheck(Check):
             if (u in configured or u in builtin)
             and (u in configured or states[u].get("LoadState") != "not-found")
         ]
-        time_sync = [u for u in TIME_SYNC if u in states and states[u].get("LoadState") == "loaded"]
-        related = self._related(ctx, [states[u] for u in (*checked, *time_sync)])
+        related = self._related(ctx, [states[u] for u in checked])
         findings: list[Finding] = []
         for u in checked:
             st = states[u]
@@ -155,7 +167,6 @@ class SystemdCriticalCheck(Check):
                     findings.extend(self._active(u, st, related))
                 if u in need_enabled:
                     findings.extend(self._enabled(u, st, related))
-        findings.extend(self._time_sync(time_sync, states, related))
         return findings
 
     def _related(self, ctx: Context, states: list[UnitState]) -> dict[str, UnitState]:
@@ -173,13 +184,7 @@ class SystemdCriticalCheck(Check):
     def _active(u: str, st: UnitState, related: dict[str, UnitState]) -> list[Finding]:
         active = st.get("ActiveState", "")
         if active == "failed":
-            return [
-                _finding(
-                    Severity.CRITICAL,
-                    f"{u} failed",
-                    [f"systemctl status {u}", f"journalctl -u {u} -b"],
-                )
-            ]
+            return []  # systemd-failed reports every failed unit
         if active == "active":
             deps = [
                 d
@@ -233,21 +238,6 @@ class SystemdCriticalCheck(Check):
             )
         ]
 
-    def _time_sync(
-        self, loaded: list[str], states: dict[str, UnitState], related: dict[str, UnitState]
-    ) -> list[Finding]:
-        if not loaded or any(not self._active(u, states[u], related) for u in loaded):
-            return []
-        return [
-            Finding(
-                Severity.CRITICAL,
-                "No time synchronisation service is running",
-                detail=f"Installed: {', '.join(loaded)}.",
-                evidence=[f"{u}: {states[u].get('ActiveState', '')}" for u in sorted(loaded)],
-                remediation=[f"sudo systemctl start {loaded[0]}", "timedatectl status"],
-            )
-        ]
-
     # --- snapshot comparison -------------------------------------------------------------
     # Enablement and active state changes are systemd-failed's; this adds units that were
     # masked or removed, and ports a critical unit stopped listening on.
@@ -283,9 +273,22 @@ class SystemdCriticalCheck(Check):
     def compare(self, ctx: Context, before: Any) -> list[Finding]:
         if not isinstance(before, dict):
             return []
-        was = {u: v for u, v in before.get("units", {}).items() if not self._ignored(u)}
-        loaded = [u for u, v in was.items() if v.get("load") == "loaded" and queryable(u)]
-        heard = {u: v for u, v in before.get("listeners", {}).items() if not self._ignored(u)}
+        units, listeners = before.get("units"), before.get("listeners")
+        units = units if isinstance(units, dict) else {}
+        listeners = listeners if isinstance(listeners, dict) else {}
+        loaded = [
+            u
+            for u, v in units.items()
+            if isinstance(v, dict)
+            and v.get("load") == "loaded"
+            and queryable(u)
+            and not self._ignored(u)
+        ]
+        heard = {
+            u: [p for p in v if isinstance(p, str)]
+            for u, v in listeners.items()
+            if isinstance(v, list) and queryable(u) and not self._ignored(u)
+        }
         now = unit_states(ctx, list(dict.fromkeys((*loaded, *heard))))
         findings: list[Finding] = []
         for u in loaded:

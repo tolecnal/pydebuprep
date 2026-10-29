@@ -124,12 +124,6 @@ def test_unit_that_fails_to_load_is_critical() -> None:
     )
 
 
-def test_failed_unit_is_critical() -> None:
-    (f,) = findings({"cron.service": unit(ActiveState="failed", SubState="failed")})
-    assert (f.severity, f.title) == (Severity.CRITICAL, "cron.service failed")
-    assert f.remediation == ["systemctl status cron.service", "journalctl -u cron.service -b"]
-
-
 def test_inactive_required_unit_is_critical() -> None:
     (f,) = findings({"cron.service": unit(ActiveState="inactive", SubState="dead")})
     assert (f.severity, f.title) == (Severity.CRITICAL, "cron.service is not running")
@@ -201,38 +195,14 @@ def test_configured_lists_are_separate() -> None:
     ]
 
 
-def test_time_sync_one_active_is_enough() -> None:
-    units = {
-        "systemd-timesyncd.service": unit(ActiveState="inactive", SubState="dead"),
-        "chrony.service": unit(),
-    }
-    assert findings(units) == []
-
-
-def test_time_sync_none_active_is_one_finding() -> None:
-    units = {
-        "systemd-timesyncd.service": unit(ActiveState="inactive", SubState="dead"),
-        "chrony.service": unit(ActiveState="failed", SubState="failed"),
-    }
-    (f,) = findings(units)
-    assert (f.severity, f.title) == (
-        Severity.CRITICAL,
-        "No time synchronisation service is running",
-    )
-    assert f.evidence == ["chrony.service: failed", "systemd-timesyncd.service: inactive"]
-
-
-def test_time_sync_not_installed_is_fine() -> None:
-    assert findings({"systemd-timesyncd.service": NOT_FOUND}) == []
-
-
 def test_condition_skipped_unit_is_not_a_finding() -> None:
+    # e.g. systemd-timesyncd in a container (ConditionVirtualization=!container)
     units = {
         "systemd-timesyncd.service": unit(
             ActiveState="inactive", SubState="dead", ConditionResult="no"
         )
     }
-    assert findings(units) == []
+    assert findings(units, required_active=["systemd-timesyncd.service"]) == []
 
 
 def test_duplicate_units_reported_once() -> None:
@@ -267,12 +237,15 @@ def test_without_systemd_is_skipped() -> None:
 
 
 def test_builtin_false_and_ignore_units() -> None:
-    broken = {"cron.service": unit(ActiveState="failed"), "ssh.service": unit(ActiveState="failed")}
-    assert titles(findings(broken)) == ["ssh.service failed", "cron.service failed"]
-    assert titles(findings(broken, ignore_units=["ssh.*"])) == ["cron.service failed"]
+    broken = {
+        "cron.service": unit(ActiveState="inactive", SubState="dead"),
+        "ssh.service": unit(ActiveState="inactive", SubState="dead"),
+    }
+    assert titles(findings(broken)) == ["ssh.service is not running", "cron.service is not running"]
+    assert titles(findings(broken, ignore_units=["ssh.*"])) == ["cron.service is not running"]
     assert findings(broken, builtin=False) == []
     assert titles(findings(broken, builtin=False, required_active=["cron.service"])) == [
-        "cron.service failed"
+        "cron.service is not running"
     ]
 
 
@@ -385,13 +358,12 @@ def test_baseline_records_units_and_listeners() -> None:
         "active": "active",
         "file": "enabled",
     }
-    assert base["units"]["chrony.service"]["load"] == "not-found"
+    assert "chrony.service" not in base["units"]  # time sync is the time-sync check's
     assert base["listeners"] == {
         "cron.service": [],
         "nginx.service": ["tcp/443"],
         "ssh.service": ["tcp/22"],
         "systemd-journald.service": [],
-        "systemd-timesyncd.service": [],
     }
 
 
@@ -472,3 +444,56 @@ def test_template_units_are_never_queried() -> None:
     with pytest.raises(ValueError, match="template"):
         SystemdCriticalCheck({"required_active": ["getty@.service"]})
     SystemdCriticalCheck({"required_active": ["getty@tty1.service"]})
+
+
+# --- final review fixes --------------------------------------------------------------
+
+
+def test_running_time_sync_with_a_dependency_warning_is_running() -> None:
+    units = {
+        "systemd-timesyncd.service": unit(Requires="oneshot.service"),
+        "oneshot.service": unit(ActiveState="inactive", SubState="dead"),
+    }
+    assert "No time synchronisation service is running" not in titles(findings(units))
+
+
+def test_failed_and_no_time_sync_are_left_to_other_checks() -> None:
+    # systemd-failed reports every failed unit; time-sync reports a missing time service.
+    units = {
+        "cron.service": unit(ActiveState="failed", SubState="failed"),
+        "systemd-timesyncd.service": unit(ActiveState="inactive", SubState="dead"),
+    }
+    assert findings(units) == []
+
+
+@pytest.mark.parametrize("name", ["@foo.service", "foo@bar", "nosuffix", "a" * 300 + ".service"])
+def test_malformed_unit_names_rejected(name: str) -> None:
+    with pytest.raises(ValueError, match="required_active"):
+        SystemdCriticalCheck({"required_active": [name]})
+
+
+@pytest.mark.parametrize(
+    "before",
+    [
+        {"units": ["x"], "listeners": {}},
+        {"units": {"x.service": "loaded"}, "listeners": []},
+        {"units": {}, "listeners": {"getty@.service": ["tcp/1"], "-x": ["tcp/2"]}},
+        {"units": {}, "listeners": {"nginx.service": "tcp/443"}},
+    ],
+)
+def test_compare_tolerates_odd_baselines(before: Any) -> None:
+    assert SystemdCriticalCheck().compare(listener_ctx(), before) == []
+
+
+def test_ephemeral_udp_ports_are_not_listeners() -> None:
+    udp = TCP_HEAD + (
+        "   3: 00000000:B021 00000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 777 2 0 0\n"
+    )
+    files = {
+        **PROC_NET,
+        "/proc/net/udp": udp,
+        "/proc/sys/net/ipv4/ip_local_port_range": "32768\t60999\n",
+    }
+    sockets = listening_sockets(FakeSystem(files=files))
+    assert "777" not in sockets  # udp/45089: a random port, new on every restart
+    assert sockets["444"] == "udp/123"
