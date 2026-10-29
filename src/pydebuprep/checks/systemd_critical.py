@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import fnmatch
 from collections.abc import Sequence
+from typing import Any
 
-from pydebuprep.checks._systemd import run_systemctl
+from pydebuprep.checks._listeners import listening_sockets, unit_listeners
+from pydebuprep.checks._systemd import ENABLED_SERVICES, run_systemctl, unit_rows
 from pydebuprep.checks.base import Check, CommandFailed, Context, Option
 from pydebuprep.model import Finding, Severity
 from pydebuprep.system import MAX_UNITS, SHOW_UNITS, UNIT_NAME
@@ -229,3 +231,77 @@ class SystemdCriticalCheck(Check):
                 remediation=[f"sudo systemctl start {loaded[0]}", "timedatectl status"],
             )
         ]
+
+    # --- snapshot comparison -------------------------------------------------------------
+    # Enablement and active state changes are systemd-failed's; this adds units that were
+    # masked or removed, and ports a critical unit stopped listening on.
+
+    def collect_baseline(self, ctx: Context) -> Any:
+        enabled = [r[0] for r in unit_rows(run_systemctl(ctx, ENABLED_SERVICES).stdout)]
+        critical = self.effective_units()
+        units = [u for u in dict.fromkeys((*critical, *enabled)) if plain_unit(u)]
+        states = unit_states(ctx, units)
+        return {
+            "units": {
+                u: {
+                    "load": st.get("LoadState", ""),
+                    "active": st.get("ActiveState", ""),
+                    "file": st.get("UnitFileState", ""),
+                }
+                for u, st in states.items()
+            },
+            "listeners": self._listeners(ctx, {u: states[u] for u in critical if u in states}),
+        }
+
+    @staticmethod
+    def _listeners(ctx: Context, states: dict[str, UnitState]) -> dict[str, list[str]]:
+        if not ctx.is_root:
+            return {}  # other users' /proc/<pid>/fd links can't be read
+        sockets = listening_sockets(ctx.system)
+        return {
+            u: unit_listeners(ctx.system, st.get("ControlGroup", ""), sockets)
+            for u, st in states.items()
+            if st.get("ActiveState") == "active"
+        }
+
+    def compare(self, ctx: Context, before: Any) -> list[Finding]:
+        if not isinstance(before, dict):
+            return []
+        was = {u: v for u, v in before.get("units", {}).items() if not self._ignored(u)}
+        loaded = [u for u, v in was.items() if v.get("load") == "loaded" and plain_unit(u)]
+        heard = {u: v for u, v in before.get("listeners", {}).items() if not self._ignored(u)}
+        now = unit_states(ctx, list(dict.fromkeys((*loaded, *heard))))
+        findings: list[Finding] = []
+        for u in loaded:
+            load = now.get(u, {}).get("LoadState")
+            if load == "masked":
+                findings.append(
+                    Finding(
+                        Severity.CRITICAL,
+                        f"{u} was loaded before the upgrade and is now masked",
+                        remediation=[f"sudo systemctl unmask {u}"],
+                    )
+                )
+            elif load == "not-found":
+                findings.append(
+                    Finding(
+                        Severity.WARNING,
+                        f"{u} existed before the upgrade and is gone",
+                        detail="The upgrade may have renamed or removed it.",
+                        remediation=[f"systemctl list-unit-files '{u.rsplit('.', 1)[0]}*'"],
+                    )
+                )
+        listening = self._listeners(ctx, {u: now[u] for u in heard if u in now})
+        if ctx.is_root:
+            for u, ports in heard.items():
+                lost = sorted(set(ports) - set(listening.get(u, [])))
+                if lost:
+                    findings.append(
+                        Finding(
+                            Severity.WARNING,
+                            f"{u} listened on {', '.join(lost)} before the upgrade, not now",
+                            detail=PROCESS_NOTE,
+                            remediation=[f"systemctl status {u}", "ss -tulpn"],
+                        )
+                    )
+        return findings

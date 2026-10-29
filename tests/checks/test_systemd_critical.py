@@ -6,6 +6,8 @@ from typing import Any
 import pytest
 
 from fakes import FakeSystem
+from pydebuprep.checks._listeners import listening_sockets, unit_listeners
+from pydebuprep.checks._systemd import ENABLED_SERVICES
 from pydebuprep.checks.base import Context
 from pydebuprep.checks.systemd_critical import SystemdCriticalCheck, parse_show
 from pydebuprep.model import Severity, Status
@@ -297,3 +299,140 @@ def test_empty_show_output_means_nothing_known() -> None:
 
     system = Empty(HEALTHY, files={"/etc/os-release": OS_RELEASES["trixie"]})
     assert SystemdCriticalCheck().run(Context(system, detect_os(system))) == []
+
+
+# --- snapshot: listeners, masked and missing units ------------------------------------
+
+TCP_HEAD = "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n"
+TCP = TCP_HEAD + (
+    "   0: 0100007F:0016 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12345 1 0 100 0 0 10 0\n"
+    "   1: 0100007F:01BB 0100007F:D431 01 00000000:00000000 00:00000000 00000000     0        0 222 1 0 100 0 0 10 0\n"
+)
+TCP6 = TCP_HEAD + (
+    "   0: 00000000000000000000000000000000:01BB 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 333 1 0 100 0 0 10 0\n"
+)
+UDP6 = TCP_HEAD + (
+    "  10: 00000000000000000000000000000000:007B 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000     0        0 444 2 0 0\n"
+    # A connected UDP socket is ESTABLISHED (01), so it isn't counted.
+    "  11: 00000000000000000000FFFF0100007F:A001 00000000000000000000FFFF0100007F:0035 01 00000000:00000000 00:00000000 00000000     0        0 555 2 0 0\n"
+)
+PROC_NET = {
+    "/proc/net/tcp": TCP,
+    "/proc/net/tcp6": TCP6,
+    "/proc/net/udp": TCP_HEAD,
+    "/proc/net/udp6": UDP6,
+}
+
+
+def listener_ctx(units: dict[str, dict[str, str]] | None = None, **kw: Any) -> Context:
+    files = {
+        **PROC_NET,
+        "/sys/fs/cgroup/system.slice/ssh.service/cgroup.procs": "100\n",
+        "/sys/fs/cgroup/system.slice/nginx.service/cgroup.procs": "200\n201\n",
+        **kw.pop("files", {}),
+    }
+    links = {
+        "/proc/100/fd/3": "socket:[12345]",
+        "/proc/100/fd/4": "/dev/null",
+        "/proc/200/fd/6": "socket:[333]",
+        "/proc/201/fd/7": "socket:[999]",  # a connection, not a listener
+        **kw.pop("links", {}),
+    }
+    enabled = kw.pop("enabled", "ssh.service enabled enabled\nnginx.service enabled enabled\n")
+    return ctx(
+        {"nginx.service": unit(), **(units or {})},
+        files=files,
+        links=links,
+        commands={ENABLED_SERVICES: enabled},
+        **kw,
+    )
+
+
+def test_listening_sockets_parses_proc_net() -> None:
+    system = FakeSystem(files=PROC_NET)
+    assert listening_sockets(system) == {"12345": "tcp/22", "333": "tcp/443", "444": "udp/123"}
+
+
+def test_unit_listeners_follow_cgroup_pids() -> None:
+    c = listener_ctx()
+    sockets = listening_sockets(c.system)
+    assert unit_listeners(c.system, "/system.slice/nginx.service", sockets) == ["tcp/443"]
+    assert unit_listeners(c.system, "/system.slice/ssh.service", sockets) == ["tcp/22"]
+
+
+def test_unit_listeners_cgroup_v1_fallback() -> None:
+    files = {"/sys/fs/cgroup/systemd/system.slice/x.service/cgroup.procs": "100\n", **PROC_NET}
+    system = FakeSystem(files=files, links={"/proc/100/fd/3": "socket:[12345]"})
+    assert unit_listeners(system, "/system.slice/x.service", listening_sockets(system)) == [
+        "tcp/22"
+    ]
+
+
+def test_baseline_records_units_and_listeners() -> None:
+    check = SystemdCriticalCheck({"required_active": ["nginx.service"]})
+    base = check.collect_baseline(listener_ctx())
+    assert base["units"]["nginx.service"] == {
+        "load": "loaded",
+        "active": "active",
+        "file": "enabled",
+    }
+    assert base["units"]["chrony.service"]["load"] == "not-found"
+    assert base["listeners"] == {
+        "cron.service": [],
+        "nginx.service": ["tcp/443"],
+        "ssh.service": ["tcp/22"],
+        "systemd-journald.service": [],
+        "systemd-timesyncd.service": [],
+    }
+
+
+def test_compare_reports_newly_masked_and_missing_units() -> None:
+    before = SystemdCriticalCheck().collect_baseline(listener_ctx())
+    now = listener_ctx(
+        {
+            "nginx.service": NOT_FOUND,
+            "cron.service": unit(LoadState="masked", ActiveState="inactive"),
+        }
+    )
+    fs = SystemdCriticalCheck().compare(now, before)
+    assert [(f.severity, f.title) for f in fs] == [
+        (Severity.CRITICAL, "cron.service was loaded before the upgrade and is now masked"),
+        (Severity.WARNING, "nginx.service existed before the upgrade and is gone"),
+    ]
+
+
+def test_compare_reports_lost_listeners() -> None:
+    check = SystemdCriticalCheck({"required_active": ["nginx.service"]})
+    before = check.collect_baseline(listener_ctx())
+    after = listener_ctx(links={"/proc/200/fd/6": "/dev/null"})
+    (f,) = check.compare(after, before)
+    assert (f.severity, f.title) == (
+        Severity.WARNING,
+        "nginx.service listened on tcp/443 before the upgrade, not now",
+    )
+
+
+def test_compare_leaves_enablement_to_systemd_failed() -> None:
+    before = SystemdCriticalCheck().collect_baseline(listener_ctx())
+    now = listener_ctx({"nginx.service": unit(UnitFileState="disabled")})
+    assert SystemdCriticalCheck().compare(now, before) == []
+
+
+def test_listeners_need_root() -> None:
+    check = SystemdCriticalCheck({"required_active": ["nginx.service"]})
+    assert check.collect_baseline(listener_ctx(root=False))["listeners"] == {}
+    before = check.collect_baseline(listener_ctx())
+    assert check.compare(listener_ctx(root=False), before) == []
+
+
+def test_vanished_process_is_ignored() -> None:
+    files = {"/sys/fs/cgroup/system.slice/nginx.service/cgroup.procs": "200\nnot-a-pid\n"}
+    c = listener_ctx(files=files, links={"/proc/200/fd/6": "/dev/null"})
+    sockets = listening_sockets(c.system)
+    assert unit_listeners(c.system, "/system.slice/nginx.service", sockets) == []
+    assert unit_listeners(c.system, "/system.slice/gone.service", sockets) == []
+    assert unit_listeners(c.system, "", sockets) == []
+
+
+def test_compare_ignores_other_baselines() -> None:
+    assert SystemdCriticalCheck().compare(listener_ctx(), ["old", "format"]) == []
