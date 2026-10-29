@@ -133,6 +133,23 @@ sudo pydebuprep report --format html --output-dir /var/tmp
 | `--check-option CHECK.OPTION=VALUE` | Set a check option; repeat it to add items to a list option. See `pydebuprep list-checks --verbose`. |
 | `--config FILE` / `--no-config` | Use another config file, or none. |
 
+### Converting a saved report
+
+Keep a JSON (or YAML) copy of each report, and render it in any other format
+later, without running the checks again:
+
+```sh
+sudo pydebuprep report --format json --output-dir /var/tmp
+pydebuprep convert /var/tmp/pydebuprep-web1-20261028T120000Z.json --format jira -o -
+pydebuprep convert report.json --format html --output-dir /srv/reports
+```
+
+The output is identical to what `report` would have produced in that format;
+file names carry the original host and time. `-` reads the report from standard
+input. Text, HTML, Markdown, Jira and Confluence output can't be read back, so
+those are rejected. A damaged or hand-edited file is rejected with the field at
+fault (exit code 3); `convert` exits 0 on success whatever the report found.
+
 ### Pasting into Jira or Confluence
 
 `--format jira` produces Jira wiki markup: paste it into an issue or comment

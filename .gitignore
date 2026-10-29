@@ -21,3 +21,7 @@ debian/debhelper-build-stamp
 *.changes
 .coverage
 debian/*.debhelper
+
+# Local planning notes (superpowers skills); not part of the project
+.superpowers/
+docs/superpowers/

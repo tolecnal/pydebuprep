@@ -66,7 +66,7 @@ _pydebuprep() {
     fi
 
     # Like the CLI: a command is only recognised as the first word.
-    local commands="report snapshot list-checks configtest example-config completion"
+    local commands="report convert snapshot list-checks configtest example-config completion"
     local cmd=""
     if ((cword > 1)); then
         case " $commands " in
@@ -101,9 +101,10 @@ _pydebuprep() {
             ;;
     esac
 
-    local opts words_for_cmd=""
+    local opts words_for_cmd="" file_arg=""
     case ${cmd:-report} in
         report) opts="--baseline --check-option --checks --config --format --help --min-severity --no-baseline --no-color --no-config --output --output-dir --skip --snapshot-dir -c -f -h -o" ;;
+        convert) opts="--format --help --no-color --output --output-dir -f -h -o" ;;
         snapshot) opts="--check-option --config --help --no-config --snapshot-dir -c -h" ;;
         list-checks) opts="--help --verbose -h -v" ;;
         configtest) opts="--config --help --no-config -c -h" ;;
@@ -112,6 +113,7 @@ _pydebuprep() {
     esac
     case $cmd in
         completion) words_for_cmd="bash zsh" ;;
+        convert) file_arg=1 ;;
     esac
 
     if [[ $cur == -* ]]; then
@@ -121,6 +123,8 @@ _pydebuprep() {
         mapfile -t COMPREPLY < <(compgen -W "$commands" -- "$cur")
     elif [[ -n $words_for_cmd ]]; then
         mapfile -t COMPREPLY < <(compgen -W "$words_for_cmd" -- "$cur")
+    elif [[ -n $file_arg ]]; then
+        _pydebuprep_files
     fi
 }
 

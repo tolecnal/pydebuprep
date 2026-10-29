@@ -24,6 +24,7 @@ def test_spec_covers_every_command_and_option() -> None:
     spec = completion_spec()
     assert set(spec.commands) == {
         "report",
+        "convert",
         "snapshot",
         "list-checks",
         "configtest",
@@ -37,6 +38,8 @@ def test_spec_covers_every_command_and_option() -> None:
     assert report["--config"].kind == "file"
     assert report["--output-dir"].kind == "dir"
     assert report["--check-option"].repeatable
+    assert spec.commands["convert"].positional_file
+    assert not spec.commands["report"].positional_file
     assert spec.check_ids == sorted(cls.id for cls in checks.ALL_CHECKS)
     expected = sorted(f"{cls.id}.{o.name}=" for cls in checks.ALL_CHECKS for o in cls.options)
     assert spec.check_options == expected
@@ -182,7 +185,9 @@ def pty_complete(shell: str, setup: str, line: str) -> str:
     return found[-1].rstrip() if found else ""
 
 
-def zsh_complete(tmp_path: Path, line: str, *, sourced: bool = False) -> str:
+def zsh_complete(
+    tmp_path: Path, line: str, *, sourced: bool = False, cwd: Path | None = None
+) -> str:
     compdir = tmp_path / "zfunc"
     compdir.mkdir(exist_ok=True)
     script = compdir / "_pydebuprep"
@@ -191,6 +196,8 @@ def zsh_complete(tmp_path: Path, line: str, *, sourced: bool = False) -> str:
         fpath="" if sourced else f"fpath=({compdir} $fpath); ",
         source=f"source {script}; " if sourced else "",
     )
+    if cwd is not None:
+        setup = f"cd {cwd}; {setup}"
     return pty_complete("zsh -f -i", setup, line)
 
 
@@ -356,3 +363,15 @@ def test_bash_file_names_with_spaces(tmp_path: Path, with_bash_completion: bool)
         tmp_path, "--config my", with_bash_completion=with_bash_completion, cwd=work
     )
     assert got == r"pydebuprep --config my\ report.conf"
+
+
+@needs_zsh
+def test_convert_completes_file_names(tmp_path: Path) -> None:
+    work = tmp_path / "work"
+    work.mkdir()
+    (work / "saved-report.json").write_text("{}")
+    expected = "pydebuprep convert saved-report.json"
+    assert zsh_complete(tmp_path, "convert sav", cwd=work) == expected
+    assert bash_pty_complete(tmp_path, "convert sav", with_bash_completion=False, cwd=work) == (
+        expected
+    )
