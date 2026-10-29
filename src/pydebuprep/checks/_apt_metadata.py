@@ -7,8 +7,6 @@ so whether a repository is reachable right now can't be known; the findings say 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime
-from email.utils import parsedate_to_datetime
 from typing import TYPE_CHECKING
 
 from pydebuprep.checks.base import count
@@ -24,6 +22,7 @@ LEGACY_KEYRING = "/etc/apt/trusted.gpg"
 # non-ASCII bytes; '/' then becomes '_'.
 QUOTED = set('\\|{}[]<>"^~_=!@#$%&*')
 NETWORK_SCHEMES = ("http", "https", "ftp")
+NO_SECURITY_ARCHIVE = {"sid", "unstable", "experimental"}
 NOT_LIVE = (
     "This is based on the files from the last apt update; pydebuprep never runs it, so "
     "whether the repository works right now isn't known."
@@ -116,17 +115,19 @@ def legacy_keyring_finding(system: System) -> list[Finding]:
     ]
 
 
-def metadata_findings(
-    system: System, entries: Sequence[SourceEntry], now: datetime
-) -> list[Finding]:
-    """Repositories without downloaded metadata, serving another release, or expired.
+def metadata_findings(system: System, entries: Sequence[SourceEntry]) -> list[Finding]:
+    """Repositories without downloaded metadata, or serving another release.
+
+    Valid-Until isn't checked: a local Release past it only means apt update hasn't run
+    lately (apt rejects expired files and keeps the old one), which apt-lists-age reports.
 
     Entries whose keyring is missing are left out: that is reported on its own, and
     apt can't verify their metadata anyway.
     """
     if not system.glob(f"{LISTS_DIR}/*Release"):
         return []  # apt update never ran: apt-lists-age reports it
-    missing, mismatched, expired = [], [], []
+    missing: list[SourceEntry] = []
+    mismatched: list[str] = []
     seen: set[tuple[str, str]] = set()
     for e in entries:
         key = (e.norm_uri, e.suite)
@@ -147,14 +148,13 @@ def metadata_findings(
             continue
         fields = parse_release(text)
         names = {fields.get("Suite"), fields.get("Codename")} - {None}
-        if names and e.suite not in names:
+        # Like apt's CheckDist: a vendor suite such as jammy/mongodb-org/7.0 also
+        # matches without its last path element.
+        if names and not {e.suite, e.suite.rsplit("/", 1)[0]} & names:
             mismatched.append(
                 f"{e.uri} {e.suite}: the repository says Suite {fields.get('Suite', '?')}, "
                 f"Codename {fields.get('Codename', '?')}"
             )
-        until = _date(fields.get("Valid-Until"))
-        if until is not None and until < now:
-            expired.append(f"{e.uri} {e.suite}: valid until {fields['Valid-Until']}")
     findings = []
     if missing:
         findings.append(
@@ -184,27 +184,7 @@ def metadata_findings(
                 ],
             )
         )
-    if expired:
-        findings.append(
-            Finding(
-                Severity.WARNING,
-                f"Metadata of {count(len(expired), 'repository', 'repositories')} has expired",
-                detail="apt rejects Release files past their Valid-Until date, so these "
-                "repositories deliver no updates until refreshed. " + NOT_LIVE,
-                evidence=truncate_evidence(expired),
-                remediation=["sudo apt update", "Check the system clock: timedatectl"],
-            )
-        )
     return findings
-
-
-def _date(text: str | None) -> datetime | None:
-    if not text:
-        return None
-    try:
-        return parsedate_to_datetime(text)
-    except (TypeError, ValueError):
-        return None
 
 
 def security_finding(codename: str, distro: Sequence[SourceEntry]) -> list[Finding]:
@@ -213,6 +193,8 @@ def security_finding(codename: str, distro: Sequence[SourceEntry]) -> list[Findi
         e.suite.endswith("-security") or e.suite.endswith("/updates") for e in distro
     ):
         return []
+    if all(e.suite_base in NO_SECURITY_ARCHIVE for e in distro):
+        return []  # Debian unstable has no security archive
     return [
         Finding(
             Severity.WARNING,

@@ -280,7 +280,7 @@ class AptSourcesCheck(Check):
 
         findings += keyring_findings(ctx.system, enabled)
         findings += legacy_keyring_finding(ctx.system)
-        findings += metadata_findings(ctx.system, enabled, ctx.system.now())
+        findings += metadata_findings(ctx.system, enabled)
         distro = [e for e in enabled if is_distro(e, codename) and e.type == "deb"]
         findings += security_finding(codename, distro)
 

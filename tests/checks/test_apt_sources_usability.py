@@ -239,25 +239,38 @@ def test_suite_mismatch_warns() -> None:
     ]
 
 
-def test_expired_metadata_warns() -> None:
-    expired = {
-        f"{LISTS}/security.debian.org_debian-security_dists_trixie-security_InRelease": release(
-            "stable-security", "trixie-security", "Sat, 25 Oct 2026 08:00:00 UTC"
-        )
+def test_valid_until_is_left_to_apt_lists_age() -> None:
+    # A local Release past Valid-Until only means apt update hasn't run lately (apt rejects
+    # expired files from the server and keeps the old one): apt-lists-age's business.
+    # Vendor dates without a known time zone must not break the check either.
+    path = f"{LISTS}/security.debian.org_debian-security_dists_trixie-security_InRelease"
+    for until in ("Sat, 25 Oct 2026 08:00:00 UTC", "Sat, 07 Nov 2026 10:00:00 -0000", "soon"):
+        assert findings(files={path: release("stable-security", "trixie-security", until)}) == []
+
+
+def test_vendor_suites_with_a_slash_match_like_apt() -> None:
+    # apt's CheckDist also accepts the suite without its last path element.
+    mongo = (
+        "deb [signed-by=/etc/apt/keyrings/vendor.asc] https://repo.example.org/apt/debian "
+        "trixie/mongodb-org/7.0 main\n"
+    )
+    listed = f"{LISTS}/repo.example.org_apt_debian_dists_trixie_mongodb-org_7.0_InRelease"
+    files = {
+        "/etc/apt/sources.list.d/mongo.list": mongo,
+        "/etc/apt/keyrings/vendor.asc": "k",
+        listed: release("trixie", "trixie/mongodb-org"),
     }
-    (f,) = findings(files=expired)
-    assert (f.severity, f.title) == (Severity.WARNING, "Metadata of 1 repository has expired")
-    assert f.evidence == [
-        "http://security.debian.org/debian-security trixie-security: valid until "
-        "Sat, 25 Oct 2026 08:00:00 UTC"
+    assert findings(files=files) == []
+    files[listed] = release("bookworm", "bookworm/mongodb-org")
+    assert titles(findings(files=files)) == [
+        "1 repository serves a different release than configured"
     ]
-    valid = {
-        k: release("stable-security", "trixie-security", "Sat, 01 Nov 2026 08:00:00 UTC")
-        for k in expired
-    }
-    assert findings(files=valid) == []
-    garbled = {k: release("stable-security", "trixie-security", "soon") for k in expired}
-    assert findings(files=garbled) == []
+
+
+def test_debian_unstable_has_no_security_archive_to_miss() -> None:
+    sid = "deb http://deb.debian.org/debian sid main\n"
+    ctx_ = make_ctx("forky", files={"/etc/apt/sources.list.d/sid.list": sid})
+    assert "No security updates repository for forky" not in titles(AptSourcesCheck().run(ctx_))
 
 
 def test_missing_security_archive_warns() -> None:
