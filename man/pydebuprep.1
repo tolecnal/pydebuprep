@@ -358,8 +358,9 @@ Shell completion for bash (active when the bash\-completion package is
 installed) and zsh.
 .TP
 .I /var/lib/pydebuprep/snapshots/
-Default snapshot directory (mode 0750). Snapshots are JSON files named after
-the UTC time they were taken.
+Default snapshot directory (mode 0700). Snapshots are JSON files (mode 0600)
+named after the UTC time they were taken; they are private because they contain
+cron command lines, network details and package lists.
 .SH ENVIRONMENT
 .TP
 .B PYDEBUPREP_CONFIG

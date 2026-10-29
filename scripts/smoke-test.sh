@@ -9,6 +9,7 @@ pydebuprep report --no-baseline > /dev/null || rc=$?
 test "$rc" -le 2
 pydebuprep configtest
 pydebuprep snapshot
-test "$(stat -c %a /var/lib/pydebuprep/snapshots)" = 750
+test "$(stat -c %a /var/lib/pydebuprep/snapshots)" = 700
+test "$(stat -c %a /var/lib/pydebuprep/snapshots/*.json)" = 600
 test -f /usr/share/bash-completion/completions/pydebuprep
 test -f /usr/share/zsh/vendor-completions/_pydebuprep

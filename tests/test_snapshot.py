@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import stat
 from pathlib import Path
 from typing import Any
@@ -77,7 +78,7 @@ def test_create_and_load_roundtrip(tmp_path: Path) -> None:
     d = tmp_path / "snaps"
     path = create_snapshot(CHECKS, ctx(), str(d))
     assert path.name == "20261028T120000Z.json"
-    assert stat.S_IMODE(d.stat().st_mode) == 0o750
+    assert stat.S_IMODE(d.stat().st_mode) == 0o700
     loaded = load_snapshot(str(path))
     assert loaded["checks"] == {"units": ["ssh.service"]}
 
@@ -148,3 +149,25 @@ def test_baseline_info() -> None:
         "12",
         "h",
     )
+
+
+def test_snapshot_files_are_private_whatever_the_umask(tmp_path: Path) -> None:
+    """Snapshots hold cron command lines, network details and package lists."""
+    old = os.umask(0o002)
+    try:
+        path = create_snapshot(CHECKS, ctx(), str(tmp_path / "snaps"))
+        second = create_snapshot(CHECKS, ctx(), str(tmp_path / "snaps"))
+    finally:
+        os.umask(old)
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert stat.S_IMODE(second.stat().st_mode) == 0o600
+    assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+
+
+def test_existing_snapshot_directory_is_left_alone(tmp_path: Path) -> None:
+    d = tmp_path / "mine"
+    d.mkdir(mode=0o755)
+    d.chmod(0o755)
+    path = create_snapshot(CHECKS, ctx(), str(d))
+    assert stat.S_IMODE(d.stat().st_mode) == 0o755  # the user's own directory
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600

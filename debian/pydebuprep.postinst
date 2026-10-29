@@ -2,8 +2,10 @@
 set -e
 
 if [ "$1" = "configure" ]; then
-    # Snapshots list installed packages and services; keep them private to root.
-    install -d -m 0750 /var/lib/pydebuprep /var/lib/pydebuprep/snapshots
+    # Snapshots hold cron command lines, network details and package lists: keep
+    # them private to root. install -d also tightens directories from older versions,
+    # which hides any older, umask-default snapshot files inside them.
+    install -d -m 0700 /var/lib/pydebuprep /var/lib/pydebuprep/snapshots
 fi
 
 #DEBHELPER#
