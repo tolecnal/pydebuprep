@@ -2,26 +2,20 @@
 
 What is still open, as of 2026-10-29. Remove items as they are done.
 
-## Housekeeping
-
-- [ ] Close Dependabot PR #1 (raises the `setuptools>=59` build floor to 84.2.1), with a
-      note that the floor is a compatibility promise for Ubuntu 22.04's setuptools 59.
-      #2 (merged) stops Dependabot from proposing it again.
-
 ## GitHub repository settings
 
-These need a repository admin. A workflow cannot change them.
+Done on 2026-10-29: Dependabot alerts and security updates, secret scanning with push
+protection, private vulnerability reporting, CodeQL default setup off (the workflow is
+an advanced setup), and these rulesets next to the owner's `protet-main-branch`
+(no deletion or force-push of `main`):
 
-- [ ] **Dependabot alerts** and **Dependabot security updates** (Settings → Code security).
-      Version updates already run from `.github/dependabot.yml`.
-- [ ] **Secret scanning** and **push protection**. These are free on public repositories.
-- [ ] **Private vulnerability reporting**, so people can report issues privately; maybe
-      with a short `SECURITY.md` that points to it.
-- [ ] Keep CodeQL **default setup off**. `.github/workflows/codeql.yml` is an advanced
-      setup, and GitHub refuses advanced-setup uploads while default setup is on.
-- [ ] **Branch ruleset for `main`**: require pull requests and require these checks:
-      CI, Security and CodeQL. Optionally require signed commits.
-- [ ] **Tag ruleset for `v*`**, so only maintainers can create release tags.
+- `main: pull requests and checks`: changes go through a pull request; tests on all
+  Python versions and the Security/CodeQL jobs must pass.
+- `release tags: admins only, immutable`: only admins create `v*` tags, and they can't
+  be moved or deleted.
+
+- [ ] Optional: `SECURITY.md` pointing to private vulnerability reporting.
+- [ ] Optional: secret scanning for non-provider patterns and validity checks.
 
 ## Release
 
@@ -63,7 +57,10 @@ Some of the obvious commands write state: `nginx -t` can create log files, and
 
 ## Verification gaps
 
-- [ ] The read-only audit in CI runs in containers without systemd, so `systemctl`,
+- [ ] Packages are built and audited only by the Release workflow (a release tag, or a
+      manual run), not on every push; run it manually on a branch that touches
+      commands or packaging before tagging.
+- [ ] The read-only audit runs in containers without systemd, so `systemctl`,
       `journalctl` and `systemd-analyze` are audited only by manual runs on a real
       host. Consider a VM-based job, or a container booted with systemd as PID 1.
 - [ ] `efibootmgr -v` has never been exercised by the audit (no EFI firmware in CI

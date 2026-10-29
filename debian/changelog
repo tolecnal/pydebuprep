@@ -7,8 +7,19 @@ pydebuprep (0.2.0) unstable; urgency=medium
   * Snapshots record enabled as well as active services.
   * Output directory is validated before checks run; baseline host and
     release mismatches are warned about even when os-release is skipped.
+  * bash and zsh completion, generated from the command-line parser and
+    installed for both shells.
+  * apt-mark now runs with the same read-only options as apt; as root it
+    could rebuild /var/cache/apt/pkgcache.bin.
+  * Regular-expression options keep commas; '-o -' writes to standard
+    output even when the configuration sets output_dir; stricter config
+    validation.
+  * Jira/Confluence escaping covers list, strikethrough and icon markup.
+  * Relative paths in the configuration file resolve against its directory.
+  * Every release is built once and audited with strace on Debian 12, 13
+    and Ubuntu 22.04, 24.04 and 26.04 to prove a run changes nothing.
 
- -- Jostein Elvaker Haande <jehaande@gmail.com>  Wed, 28 Oct 2026 20:00:00 +0000
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Thu, 29 Oct 2026 07:20:50 +0100
 
 pydebuprep (0.1.0) unstable; urgency=medium
 
