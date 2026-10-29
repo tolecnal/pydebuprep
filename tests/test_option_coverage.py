@@ -18,6 +18,13 @@ from pydebuprep import checks
 ROOT = Path(__file__).resolve().parent.parent
 
 OPTION_TESTS: dict[tuple[str, str], str] = {
+    ("postgresql", "probe"): "checks.test_probes::test_pg_probe_off_by_default_runs_nothing",
+    ("postgresql", "credentials_file"): "checks.test_probes::test_pg_credentials_file",
+    ("mariadb", "probe"): "checks.test_probes::test_db_probe_off_by_default",
+    ("mariadb", "credentials_file"): "checks.test_probes::test_db_credentials_file_comes_first",
+    ("docker", "probe"): "checks.test_probes::test_docker_port_probe",
+    ("docker", "http_probes"): "checks.test_probes::test_docker_http_probes",
+    ("docker", "ignore_containers"): "checks.test_probes::test_docker_ignore_containers",
     ("python-venvs", "exclude_paths"): "checks.test_applications::test_venvs_in_caches_are_skipped",
     (
         "python-venvs",

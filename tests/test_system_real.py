@@ -170,3 +170,71 @@ def test_read_bytes(tmp_path: Path) -> None:
     (tmp_path / "k.gpg").write_bytes(b"\x99\x00")
     assert System().read_bytes(str(tmp_path / "k.gpg")) == b"\x99\x00"
     assert System().read_bytes(str(tmp_path / "missing")) is None
+
+
+def test_tcp_connect_and_http_get() -> None:
+    import http.server
+    import threading
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(204 if self.path == "/ok" else 500)
+            self.end_headers()
+
+        def log_message(self, *args: object) -> None:
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    port = server.server_address[1]
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        system = System()
+        assert system.tcp_connect("127.0.0.1", port, 3.0) is None
+        assert system.http_get(f"http://127.0.0.1:{port}/ok", 3.0) == (204, None)
+        assert system.http_get(f"http://127.0.0.1:{port}/bad", 3.0) == (500, None)
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert system.tcp_connect("127.0.0.1", port, 3.0) is not None  # closed now
+    status, error = system.http_get(f"http://127.0.0.1:{port}/ok", 3.0)
+    assert status is None and error
+    status, error = system.http_get("https://127.0.0.1:1/", 1.0)
+    assert status is None and error
+
+
+def test_tcp_connect_fails_when_the_peer_hangs_up_at_once() -> None:
+    # Docker's userland proxy accepts every connection on a published port and closes it
+    # at once when nothing listens behind it; a working service waits or greets.
+    import threading
+
+    listener = socket.create_server(("127.0.0.1", 0))
+    port = listener.getsockname()[1]
+
+    def hang_up() -> None:
+        conn, _ = listener.accept()
+        conn.close()
+
+    threading.Thread(target=hang_up, daemon=True).start()
+    try:
+        error = System().tcp_connect("127.0.0.1", port, 3.0)
+    finally:
+        listener.close()
+    assert error is not None and "closed" in error
+
+
+def test_tcp_connect_accepts_a_greeting() -> None:
+    import threading
+
+    listener = socket.create_server(("127.0.0.1", 0))
+    port = listener.getsockname()[1]
+
+    def greet() -> None:
+        conn, _ = listener.accept()
+        conn.sendall(b"220 ready\r\n")
+        conn.close()
+
+    threading.Thread(target=greet, daemon=True).start()
+    try:
+        assert System().tcp_connect("127.0.0.1", port, 3.0) is None
+    finally:
+        listener.close()

@@ -195,3 +195,59 @@ def test_fake_scratch_dir() -> None:
         path = fake.write_scratch(scratch, "k.gpg", b"\x99")
         assert fake.scratch_files == {path: b"\x99"}
     assert scratch == "/tmp/pydebuprep-test"
+
+
+SOCK = "/var/run/postgresql"
+PSQL_AS_POSTGRES = (
+    "setpriv", "--reuid=postgres", "--regid=postgres", "--init-groups", "--",
+    "psql", "-X", "-A", "-t", "-w", "-h", SOCK, "-p", "5432", "-d", "postgres", "-c", "SELECT 1",
+)  # fmt: skip
+CONNINFO = f"host={SOCK} port=5433 dbname=postgres user=monitor passfile=/etc/pydebuprep/pgpass"
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ("pg_isready", "-h", SOCK, "-p", "5432"),
+        PSQL_AS_POSTGRES,
+        ("psql", "-X", "-A", "-t", "-w", "-d", CONNINFO, "-c", "SELECT 1"),
+        ("mariadb-admin", "ping"),
+        ("mysqladmin", "--defaults-extra-file=/etc/mysql/debian.cnf", "ping"),
+        ("mariadb", "-N", "-B", "-e", "SELECT 1", "information_schema"),
+        ("mysql", "--defaults-extra-file=/root/.my.cnf", "-N", "-B", "-e", "SELECT 1", "information_schema"),
+    ],
+)  # fmt: skip
+def test_probe_commands_allowed(argv: tuple[str, ...]) -> None:
+    check_allowed(argv)
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ("pg_isready", "-h", SOCK, "-p", "5432; rm"),
+        ("pg_isready", "-h", "/tmp", "-p", "5432"),
+        (*PSQL_AS_POSTGRES[:-1], "DROP TABLE x"),
+        tuple("--reuid=root" if a == "--reuid=postgres" else a for a in PSQL_AS_POSTGRES),
+        tuple("99x" if a == "5432" else a for a in PSQL_AS_POSTGRES),
+        ("psql", "-X", "-A", "-t", "-w", "-d", CONNINFO + " sslmode=disable", "-c", "SELECT 1"),
+        ("psql", "-X", "-A", "-t", "-w", "-d", CONNINFO.replace("monitor", "a b"), "-c", "SELECT 1"),
+        ("psql", "-X", "-A", "-t", "-w", "-d", CONNINFO.replace("/etc/pydebuprep/pgpass", "../x"), "-c", "SELECT 1"),
+        ("mariadb-admin", "shutdown"),
+        ("mariadb-admin", "ping", "--force"),
+        ("mysqladmin", "--defaults-extra-file=relative.cnf", "ping"),
+        ("mysqladmin", "--defaults-file=/etc/x.cnf", "ping"),
+        ("mariadb", "-N", "-B", "-e", "DROP DATABASE x", "information_schema"),
+        ("mariadb", "-N", "-B", "-e", "SELECT 1", "mysql"),
+    ],
+)  # fmt: skip
+def test_probe_commands_rejected(argv: tuple[str, ...]) -> None:
+    with pytest.raises(DisallowedCommandError):
+        check_allowed(argv)
+
+
+def test_fake_network() -> None:
+    fake = FakeSystem(ports={("127.0.0.1", 8080)}, http={"http://127.0.0.1:8080/h": 503})
+    assert fake.tcp_connect("127.0.0.1", 8080, 3.0) is None
+    assert fake.tcp_connect("127.0.0.1", 9090, 3.0) == "Connection refused"
+    assert fake.http_get("http://127.0.0.1:8080/h", 3.0) == (503, None)
+    assert fake.http_get("http://127.0.0.1:9/x", 3.0) == (None, "Connection refused")
