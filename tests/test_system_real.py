@@ -129,3 +129,10 @@ def test_python_version() -> None:
     import sys
 
     assert System().python_version() == f"{sys.version_info.major}.{sys.version_info.minor}"
+
+
+def test_real_readlink(tmp_path: Path) -> None:
+    link = tmp_path / "link"
+    link.symlink_to("target")
+    assert System().readlink(str(link)) == "target"
+    assert System().readlink(str(tmp_path / "missing")) is None
