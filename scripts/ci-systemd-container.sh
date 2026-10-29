@@ -4,6 +4,8 @@
 # UEFI variables, if it has them, are mounted in so efibootmgr runs too.
 # Usage (on a throwaway CI runner with Docker): ci-systemd-container.sh IMAGE FILE.deb
 # Runs a privileged container: never use it on a machine you care about.
+# The console gettys are masked: with no console they restart in a loop, and the audit
+# would rightly report PID 1 starting jobs during the run.
 set -eu
 image=$1
 deb=$(cd "$(dirname "$2")" && pwd)/$(basename "$2")
@@ -16,7 +18,8 @@ FROM $IMAGE
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     systemd systemd-sysv dbus \
- && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/* \
+ && systemctl mask getty.target console-getty.service
 STOPSIGNAL SIGRTMIN+3
 CMD ["/sbin/init"]
 EOF
