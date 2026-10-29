@@ -35,11 +35,11 @@ if [ -d /run/systemd/system ]; then
     # shellcheck disable=SC2086 # one unit per word
     [ -z "$timers" ] || systemctl stop $timers
     sleep 10
-    # Where the running services keep writing on their own; strace still covers
-    # pydebuprep's own processes everywhere.
+    # Where the running services (and on CI VMs, the runner and Azure's agent) keep
+    # writing on their own; strace still covers pydebuprep's own processes everywhere.
     AUDIT_IGNORE="/var/log/ /var/lib/postgresql/ /var/lib/mysql/ /var/cache/bind/ \
 /var/spool/postfix/ /var/lib/systemd/ /var/lib/docker/ /var/lib/containerd/ \
-/home/runner/ /tmp/ ${AUDIT_IGNORE:-}"
+/home/runner/ /var/lib/waagent/ /tmp/ ${AUDIT_IGNORE:-}"
     AUDIT_EXPECT="systemctl journalctl systemd-analyze"
     if [ -z "${AUDIT_TOOLS_ONLY:-}" ]; then
         AUDIT_EXPECT="$AUDIT_EXPECT sshd pg_lsclusters mariadbd postconf named-checkconf"
