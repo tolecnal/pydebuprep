@@ -6,6 +6,7 @@
 [![CodeQL](https://github.com/tolecnal/pydebuprep/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/tolecnal/pydebuprep/actions/workflows/codeql.yml)
 [![Release build](https://github.com/tolecnal/pydebuprep/actions/workflows/release.yml/badge.svg?event=push)](https://github.com/tolecnal/pydebuprep/actions/workflows/release.yml)
 [![Downloads](https://img.shields.io/github/downloads/tolecnal/pydebuprep/total)](https://github.com/tolecnal/pydebuprep/releases)
+[![Documentation](https://img.shields.io/badge/docs-tolecnal.github.io-526CFE?logo=materialformkdocs&logoColor=white)](https://tolecnal.github.io/pydebuprep/)
 
 [![Coverage: 100% (enforced)](https://img.shields.io/badge/coverage-100%25%20(enforced)-brightgreen)](pyproject.toml)
 [![Python 3.10–3.14](https://img.shields.io/badge/python-3.10%20%E2%80%93%203.14-3776AB?logo=python&logoColor=white)](setup.cfg)
@@ -17,6 +18,10 @@
 
 A read-only health report for Debian and Ubuntu systems after a release upgrade
 (Debian 12 → 13, Ubuntu 22.04 → 24.04 → 26.04, and minor upgrades too).
+
+**Documentation: <https://tolecnal.github.io/pydebuprep/>** — a page per check
+(what it looks at, what it reports, its limits), the configuration reference, and
+guides.
 
 `systemctl --failed` and a look at `journalctl` catch some problems. pydebuprep
 runs the rest of the post-upgrade checklist in one go, with [37 checks](#checks):
@@ -315,10 +320,11 @@ host never looks healthy just because a check couldn't look.
 5. Write tests under `tests/checks/` with `FakeSystem` and real command output;
    coverage must stay at 100%. Map each option to the test that proves it in
    `tests/test_option_coverage.py`.
-6. Document it: a row in this README's checks table (and options table, if it has
-   options), and an entry in the man page's CHECKS section, both in report order.
-   `tests/test_docs.py` fails until they match the code. Run `make generated` to
-   update the example config and shell completions.
+6. Document it: a page `docs/checks/<id>.md` and its entry in `mkdocs.yml`'s
+   navigation, a row in this README's checks table (and options table, if it has
+   options), and an entry in the man page's CHECKS section, in report order.
+   `tests/test_docs.py` and `tests/test_docs_site.py` fail until they match the
+   code. Run `make generated` to update the example config and shell completions.
 7. Prove it's read-only: run the new command under `scripts/readonly-audit.sh` (or
    `strace`) as root with the service it inspects installed, and add that package
    to `scripts/ci-readonly-audit.sh` so every pull request is audited with it (and to
@@ -335,6 +341,14 @@ make coverage   # line and branch coverage, enforced at 100% (pyproject.toml)
 make generated  # after changing commands, flags, checks or options
 sudo make audit # with the package installed: strace proves a root run changes nothing
 make deb        # needs: debhelper dh-python python3-all python3-setuptools python3-yaml python3-pytest
+```
+
+The documentation site lives in `docs/` (MkDocs with Material):
+
+```sh
+python3 -m venv .venv-docs && .venv-docs/bin/pip install -r requirements-docs.txt
+make docs-serve   # http://127.0.0.1:8000
+make docs         # strict build into site/
 ```
 
 ## Releases
@@ -376,6 +390,7 @@ reporting, not a public issue.
 | Security / Dependency review | New vulnerable dependencies in pull requests |
 | CI / Package | Builds the `.deb` on every pull request, push to `main` and weekly, installs it on every supported release and proves a root run changes nothing (`scripts/readonly-audit.sh`): in plain containers, in containers booted with systemd (services running, UEFI variables mounted), and on the Ubuntu runner VMs |
 | Release | For a release tag, runs the same packaging and audit jobs, then publishes the `.deb` with checksums and a provenance attestation |
+| Docs | Builds the documentation site on every pull request (strict: broken links fail), publishes it to GitHub Pages from `main` |
 
 Dependabot (`.github/dependabot.yml`) proposes weekly updates for the pinned action
 commits and Python tools. It waits 7 days before suggesting a new release, so a

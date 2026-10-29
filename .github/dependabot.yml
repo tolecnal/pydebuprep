@@ -14,7 +14,7 @@ updates:
     commit-message:
       prefix: ci
 
-  # Pinned tools in requirements-dev.txt and requirements-audit.txt
+  # Pinned tools in requirements-dev.txt, requirements-audit.txt and requirements-docs.txt
   - package-ecosystem: pip
     directory: /
     schedule:
