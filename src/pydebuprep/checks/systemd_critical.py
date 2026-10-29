@@ -25,6 +25,15 @@ def plain_unit(name: str) -> bool:
     return not name.startswith("-") and bool(UNIT_NAME.match(name))
 
 
+def template(name: str) -> bool:
+    """A template such as getty@.service: `systemctl show` rejects it, aborting the call."""
+    return "@." in name
+
+
+def queryable(name: str) -> bool:
+    return plain_unit(name) and not template(name)
+
+
 def parse_show(text: str) -> list[UnitState]:
     """`systemctl show` output for several units: one KEY=VALUE block per unit, in order."""
     blocks: list[UnitState] = []
@@ -57,13 +66,11 @@ def unit_states(ctx: Context, units: Sequence[str]) -> dict[str, UnitState]:
 
 
 def _words(state: UnitState, key: str) -> list[str]:
-    return [u for u in state.get(key, "").split() if plain_unit(u)]
+    return [u for u in state.get(key, "").split() if queryable(u)]
 
 
 def _finding(severity: Severity, title: str, remediation: list[str], detail: str = "") -> Finding:
-    return Finding(
-        severity, title, detail=f"{detail} {PROCESS_NOTE}".strip(), remediation=remediation
-    )
+    return Finding(severity, title, detail=detail, remediation=remediation)
 
 
 class SystemdCriticalCheck(Check):
@@ -83,6 +90,12 @@ class SystemdCriticalCheck(Check):
             bad = [u for u in self.opt(name) if not plain_unit(u)]
             if bad:
                 raise ValueError(f"{name}: not a unit name: {', '.join(bad)}")
+            templates = [u for u in self.opt(name) if template(u)]
+            if templates:
+                raise ValueError(
+                    f"{name}: {', '.join(templates)} is a template; name an instance, "
+                    "e.g. getty@tty1.service"
+                )
 
     def _ignored(self, unit: str) -> bool:
         return any(fnmatch.fnmatchcase(unit, p) for p in self.opt("ignore_units"))
@@ -178,13 +191,16 @@ class SystemdCriticalCheck(Check):
                     Severity.WARNING,
                     f"{u} is running but needs {d}, which is {related[d]['ActiveState']}",
                     [f"systemctl list-dependencies {u}", f"systemctl status {d}"],
+                    PROCESS_NOTE,
                 )
                 for d in deps
             ]
         if active in TRANSITIONAL:
             return [_finding(Severity.WARNING, f"{u} is {active}", [f"systemctl status {u}"])]
-        if st.get("ConditionResult") == "no":
-            return []  # skipped by a condition (e.g. not in a container): by design
+        if st.get("ConditionResult") == "no" and st.get("ConditionTimestamp"):
+            # Skipped by a condition (e.g. not in a container): by design. Without a
+            # timestamp the condition was never evaluated: the unit was never started.
+            return []
         triggers = _words(st, "TriggeredBy")
         if any(related.get(t, {}).get("ActiveState") == "active" for t in triggers):
             return []  # socket-activated: starts on the first connection
@@ -226,7 +242,7 @@ class SystemdCriticalCheck(Check):
             Finding(
                 Severity.CRITICAL,
                 "No time synchronisation service is running",
-                detail=f"Installed: {', '.join(loaded)}. {PROCESS_NOTE}",
+                detail=f"Installed: {', '.join(loaded)}.",
                 evidence=[f"{u}: {states[u].get('ActiveState', '')}" for u in sorted(loaded)],
                 remediation=[f"sudo systemctl start {loaded[0]}", "timedatectl status"],
             )
@@ -239,7 +255,7 @@ class SystemdCriticalCheck(Check):
     def collect_baseline(self, ctx: Context) -> Any:
         enabled = [r[0] for r in unit_rows(run_systemctl(ctx, ENABLED_SERVICES).stdout)]
         critical = self.effective_units()
-        units = [u for u in dict.fromkeys((*critical, *enabled)) if plain_unit(u)]
+        units = [u for u in dict.fromkeys((*critical, *enabled)) if queryable(u)]
         states = unit_states(ctx, units)
         return {
             "units": {
@@ -268,7 +284,7 @@ class SystemdCriticalCheck(Check):
         if not isinstance(before, dict):
             return []
         was = {u: v for u, v in before.get("units", {}).items() if not self._ignored(u)}
-        loaded = [u for u, v in was.items() if v.get("load") == "loaded" and plain_unit(u)]
+        loaded = [u for u, v in was.items() if v.get("load") == "loaded" and queryable(u)]
         heard = {u: v for u, v in before.get("listeners", {}).items() if not self._ignored(u)}
         now = unit_states(ctx, list(dict.fromkeys((*loaded, *heard))))
         findings: list[Finding] = []

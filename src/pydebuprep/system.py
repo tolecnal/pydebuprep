@@ -107,7 +107,7 @@ SHOW_UNITS: tuple[str, ...] = (
     "systemctl",
     "show",
     "--property=Id,Names,LoadState,ActiveState,SubState,UnitFileState,ConditionResult,"
-    "TriggeredBy,Requires,BindsTo,ControlGroup",
+    "ConditionTimestamp,TriggeredBy,Requires,BindsTo,ControlGroup",
     "--",
 )
 MAX_UNITS = 256

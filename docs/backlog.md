@@ -27,7 +27,8 @@ with `SHA256SUMS`, and the SLSA provenance attestation verified with
 
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't
-      match both. Changes waiting for the next changelog entry: none yet.
+      match both. Changes waiting for the next changelog entry: new check
+      `systemd-critical-services`.
 - [ ] Decide whether to publish an APT repository as well, for example signed and
       served from GitHub Pages, so hosts can `apt install pydebuprep` and get
       updates. Today the package is published only as a release asset.

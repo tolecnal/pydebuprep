@@ -33,6 +33,7 @@ def unit(**props: str) -> dict[str, str]:
         "SubState": "running",
         "UnitFileState": "enabled",
         "ConditionResult": "yes",
+        "ConditionTimestamp": "Thu 2026-10-29 12:00:00 UTC",
         **props,
     }
 
@@ -276,10 +277,18 @@ def test_builtin_false_and_ignore_units() -> None:
 
 
 def test_active_wording_is_process_state() -> None:
-    (f,) = findings({"cron.service": unit(UnitFileState="disabled")})
-    assert f.detail.endswith(
-        "An active unit shows the process is running, not that the service works."
-    )
+    note = "An active unit shows the process is running, not that the service works."
+    units = {
+        "cron.service": unit(Requires="data.mount"),
+        "data.mount": unit(ActiveState="inactive", SubState="dead"),
+    }
+    (f,) = findings(units)
+    assert f.detail.endswith(note)
+    # Only said about running units: a masked or stopped unit isn't "active".
+    (f,) = findings({"cron.service": unit(LoadState="masked", ActiveState="inactive")})
+    assert note not in f.detail
+    (f,) = findings({"cron.service": unit(ActiveState="inactive", SubState="dead")})
+    assert note not in f.detail
 
 
 def test_unexpected_show_output_is_an_error() -> None:
@@ -436,3 +445,30 @@ def test_vanished_process_is_ignored() -> None:
 
 def test_compare_ignores_other_baselines() -> None:
     assert SystemdCriticalCheck().compare(listener_ctx(), ["old", "format"]) == []
+
+
+def test_never_started_unit_is_not_condition_skipped() -> None:
+    # systemd reports ConditionResult=no for units whose conditions were never evaluated.
+    units = {
+        "ssh.service": unit(
+            ActiveState="inactive",
+            SubState="dead",
+            ConditionResult="no",
+            ConditionTimestamp="",
+            TriggeredBy="ssh.socket",
+        ),
+        "ssh.socket": unit(ActiveState="inactive", SubState="dead"),
+    }
+    assert titles(findings(units)) == [
+        "ssh.service is socket-activated but ssh.socket isn't listening"
+    ]
+
+
+def test_template_units_are_never_queried() -> None:
+    c = listener_ctx(enabled="getty@.service enabled enabled\nssh.service enabled enabled\n")
+    base = SystemdCriticalCheck().collect_baseline(c)
+    assert "getty@.service" not in base["units"]
+    assert all("getty@.service" not in call for call in c.system.calls)  # type: ignore[attr-defined]
+    with pytest.raises(ValueError, match="template"):
+        SystemdCriticalCheck({"required_active": ["getty@.service"]})
+    SystemdCriticalCheck({"required_active": ["getty@tty1.service"]})
