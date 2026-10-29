@@ -143,13 +143,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo -E scripts/smoke-test.sh ./dist/pydebuprep_*_all.deb
-      - name: Time each check (temporary diagnostic)
-        run: |
-          for id in $(pydebuprep list-checks | awk '{print $1}'); do
-            start=$(date +%s)
-            sudo timeout 900 pydebuprep report --no-baseline --checks "$id" >/dev/null 2>&1 || true
-            echo "$(( $(date +%s) - start ))s $id"
-          done
       - name: Prove a root run changes nothing (strace, timestamps, systemd jobs)
         env:
           AUDIT_TOOLS_ONLY: "1"

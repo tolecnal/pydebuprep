@@ -5,9 +5,9 @@
 # Exits non-zero if `report` changed anything, or `snapshot` changed anything besides
 # its snapshot file.
 #
-# With systemd as PID 1 it also fails if the service manager queued a job (a start,
-# stop or reload) or logged anything during the run: those happen inside PID 1, where
-# strace on the run can't see them.
+# With systemd as PID 1 it also fails if the service manager queued a job, or logged
+# starting, stopping or reloading anything during the run: those happen inside PID 1,
+# where strace on the run can't see them.
 #
 # Environment:
 #   AUDIT_IGNORE  space-separated path prefixes that background services write to
@@ -24,9 +24,11 @@ status=0
 systemd=
 [ -d /run/systemd/system ] && systemd=1
 
-changed_since() {
+changed_between() {  # START END: changed after START and not after END (some files carry
+    # future mtimes, e.g. bazel's; ctime can't be set, so it can't hide a change)
     find / -xdev \( -path /proc -o -path /sys -o -path /dev -o -path /run -o -path "$out" \) -prune \
-        -o \( -newer "$1" -o -cnewer "$1" \) -print 2>/dev/null | grep -vx "$1" | grep -vx /tmp || true
+        -o \( \( -newer "$1" ! -newer "$2" \) -o \( -cnewer "$1" ! -cnewer "$2" \) \) -print \
+        2>/dev/null | grep -vx "$1" | grep -vx "$2" | grep -vx /tmp || true
 }
 
 ignored() {  # 1|0: print the stdin paths that are (1) or aren't (0) under AUDIT_IGNORE
@@ -52,8 +54,9 @@ audit() {  # NAME ALLOWED_PREFIX COMMAND...
         fi
     fi
     strace -f -qq -s 256 -o "$out/$name.strace" -e trace=$syscalls "$@" >/dev/null 2>&1 || true
-    changed=$(changed_since "$marker" | grep -v "^${allow:-/nonexistent}" || true)
-    rm -f "$marker"
+    sleep 1.1; end=$(mktemp)
+    changed=$(changed_between "$marker" "$end" | grep -v "^${allow:-/nonexistent}" || true)
+    rm -f "$marker" "$end"
     noise=$(printf '%s\n' "$changed" | ignored 1)
     real=$(printf '%s\n' "$changed" | ignored 0)
     if [ -n "$noise" ]; then
@@ -69,8 +72,15 @@ audit() {  # NAME ALLOWED_PREFIX COMMAND...
             status=1
         fi
         pid1=$(journalctl -q --no-pager -o short-iso _PID=1 --after-cursor="$cursor")
-        if [ -n "$pid1" ]; then
-            echo "PID 1 LOGGED during '$*':"; echo "$pid1"; status=1
+        # Starting, stopping and reloading are changes; other messages (a unit file
+        # loaded on demand warning about its permissions, container mounts coming and
+        # going) are listed only.
+        acted=$(printf '%s\n' "$pid1" | grep -v '\.mount: ' \
+            | grep -E "\]: (Start|Stopp|Reload|Reexecut|Finished|Deactivated)" || true)
+        if [ -n "$acted" ]; then
+            echo "PID 1 STARTED, STOPPED OR RELOADED during '$*':"; echo "$acted"; status=1
+        elif [ -n "$pid1" ]; then
+            echo "PID 1 logged during '$*' (no job or reload, not counted):"; echo "$pid1"
         fi
     fi
     set -- --strict /sys/firmware/efi/efivars

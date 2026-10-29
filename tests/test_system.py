@@ -101,3 +101,9 @@ def test_walk_files_collects_errors(tmp_path) -> None:  # type: ignore[no-untype
     files = list(System().walk_files(str(tmp_path), errors))
     assert files == [str(tmp_path / "a" / "f.dpkg-new")]
     assert errors == []
+
+
+def test_apt_never_writes_its_solver_log() -> None:
+    # Without it, `apt-get -s autoremove` as root replaces /var/log/apt/eipp.log.xz.
+    opts = list(zip(APT_RO_OPTS[::2], APT_RO_OPTS[1::2], strict=True))
+    assert ("-o", "Dir::Log::Planner=") in opts

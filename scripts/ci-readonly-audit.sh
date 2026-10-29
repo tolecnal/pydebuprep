@@ -19,6 +19,9 @@ services="openssh-server cron unattended-upgrades apparmor postgresql mariadb-se
 [ -n "${AUDIT_TOOLS_ONLY:-}" ] || tools="$tools $services"
 # shellcheck disable=SC2086 # word splitting intended: one package per word
 apt-get install -y --no-install-recommends $tools
+# Something for `apt-get -s autoremove` to plan: apt writes its solver log then, unless
+# told not to.
+apt-get install -y --no-install-recommends hello && apt-mark auto hello
 # A broken virtualenv for python-venvs to find.
 python3 -m venv /opt/audit-venv && rm -f /opt/audit-venv/bin/python
 rm -f /var/cache/apt/*.bin
@@ -27,6 +30,10 @@ if [ -d /run/systemd/system ]; then
     # Let the services just installed finish starting, so they are running during the
     # audit and their start-up writes are over.
     while [ -n "$(systemctl list-jobs --no-legend)" ]; do sleep 1; done
+    # Timers would start their services mid-audit; nothing the checks inspect needs them.
+    timers=$(systemctl list-units --type=timer --state=active --no-legend --plain | awk '{print $1}')
+    # shellcheck disable=SC2086 # one unit per word
+    [ -z "$timers" ] || systemctl stop $timers
     sleep 10
     # Where the running services keep writing on their own; strace still covers
     # pydebuprep's own processes everywhere.
