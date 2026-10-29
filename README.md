@@ -319,9 +319,9 @@ host never looks healthy just because a check couldn't look.
    update the example config and shell completions.
 7. Prove it's read-only: run the new command under `scripts/readonly-audit.sh` (or
    `strace`) as root with the service it inspects installed, and add that package
-   to `scripts/ci-readonly-audit.sh` so every release is audited with it. Some
-   obvious commands write (`nginx -t`, `postfix check`, `ufw status`); don't use
-   those.
+   to `scripts/ci-readonly-audit.sh` so every pull request is audited with it (and to
+   `AUDIT_EXPECT` there, so the audit fails if the command never runs). Some obvious
+   commands write (`nginx -t`, `postfix check`, `ufw status`); don't use those.
 
 ## Development
 
@@ -372,7 +372,8 @@ reporting, not a public issue.
 | Security / pip-audit | Known vulnerabilities in the pinned tools (`requirements-dev.txt`, `requirements-audit.txt`) |
 | Security / zizmor | GitHub Actions security: pinning, permissions, credentials, injection; results in the Security tab |
 | Security / Dependency review | New vulnerable dependencies in pull requests |
-| Release | Builds the `.deb` only for a release tag (or a manual run), and audits it on every supported release with `scripts/readonly-audit.sh` before publishing |
+| CI / Package | Builds the `.deb` on every pull request, push to `main` and weekly, installs it on every supported release and proves a root run changes nothing (`scripts/readonly-audit.sh`): in plain containers, in containers booted with systemd (services running, UEFI variables mounted), and on the Ubuntu runner VMs |
+| Release | For a release tag, runs the same packaging and audit jobs, then publishes the `.deb` with checksums and a provenance attestation |
 
 Dependabot (`.github/dependabot.yml`) proposes weekly updates for the pinned action
 commits and Python tools. It waits 7 days before suggesting a new release, so a
