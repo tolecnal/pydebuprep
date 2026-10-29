@@ -34,12 +34,14 @@ if [ -d /run/systemd/system ]; then
     timers=$(systemctl list-units --type=timer --state=active --no-legend --plain | awk '{print $1}')
     # shellcheck disable=SC2086 # one unit per word
     [ -z "$timers" ] || systemctl stop $timers
+    # Azure's VM agent (on CI runner VMs) collects logs and writes status mid-run.
+    systemctl stop walinuxagent.service 2>/dev/null || true
     sleep 10
     # Where the running services (and on CI VMs, the runner and Azure's agent) keep
     # writing on their own; strace still covers pydebuprep's own processes everywhere.
     AUDIT_IGNORE="/var/log/ /var/lib/postgresql/ /var/lib/mysql/ /var/cache/bind/ \
 /var/spool/postfix/ /var/lib/systemd/ /var/lib/docker/ /var/lib/containerd/ \
-/home/runner/ /var/lib/waagent/ /tmp/ ${AUDIT_IGNORE:-}"
+/home/runner/ /var/lib/waagent/ /tmp/ /var/tmp/ ${AUDIT_IGNORE:-}"
     AUDIT_EXPECT="systemctl journalctl systemd-analyze"
     if [ -z "${AUDIT_TOOLS_ONLY:-}" ]; then
         AUDIT_EXPECT="$AUDIT_EXPECT sshd pg_lsclusters mariadbd postconf named-checkconf"

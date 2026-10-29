@@ -66,21 +66,24 @@ audit() {  # NAME ALLOWED_PREFIX COMMAND...
         echo "CHANGED FILES after '$*':"; echo "$real"; status=1
     fi
     if [ -n "$systemd" ]; then
-        jobs_after=$(jobs_queued)
-        if [ "$jobs_after" != "$jobs_before" ]; then
-            echo "SYSTEMD JOBS: PID 1 queued $((jobs_after - jobs_before)) job(s) during '$*'"
-            status=1
-        fi
+        jobs=$(( $(jobs_queued) - jobs_before ))
         pid1=$(journalctl -q --no-pager -o short-iso _PID=1 --after-cursor="$cursor")
-        # Starting, stopping and reloading are changes; other messages (a unit file
-        # loaded on demand warning about its permissions, container mounts coming and
-        # going) are listed only.
-        acted=$(printf '%s\n' "$pid1" | grep -v '\.mount: ' \
+        # Starting, stopping and reloading are changes. Mounts and scopes (container
+        # layers, processes other agents start with systemd-run) come and go on their
+        # own, and other messages (a unit file loaded on demand warning about its
+        # permissions) aren't actions: those are listed only.
+        acted=$(printf '%s\n' "$pid1" | grep -vE '\.(mount|scope)[: ]' \
             | grep -E "\]: (Start|Stopp|Reload|Reexecut|Finished|Deactivated)" || true)
         if [ -n "$acted" ]; then
             echo "PID 1 STARTED, STOPPED OR RELOADED during '$*':"; echo "$acted"; status=1
+        elif [ "$jobs" -gt 0 ] && [ -z "$pid1" ]; then
+            # A job PID 1 didn't log about can't be told apart from one we caused.
+            echo "SYSTEMD JOBS: PID 1 queued $jobs job(s) during '$*' and logged nothing"
+            status=1
         elif [ -n "$pid1" ]; then
-            echo "PID 1 logged during '$*' (no job or reload, not counted):"; echo "$pid1"
+            echo "PID 1 logged during '$*' ($jobs job(s); mounts, scopes or no action:" \
+                "not counted):"
+            echo "$pid1"
         fi
     fi
     set -- --strict /sys/firmware/efi/efivars
