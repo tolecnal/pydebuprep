@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from pydebuprep.checks.boot_time import ANALYZE, BLAME, BootTimeCheck
+from pydebuprep.checks.boot_time import ANALYZE, BLAME, CRITICAL_CHAIN, BootTimeCheck
 from pydebuprep.checks.dmesg_errors import DMESG_ERR, DMESG_WARN, DmesgErrorsCheck
 from pydebuprep.checks.journal_errors import JOURNAL, JournalErrorsCheck
 from pydebuprep.checks.systemd_failed import (
@@ -158,7 +158,8 @@ ANALYZE_OUT = (
 
 def test_boot_time_info_with_top10() -> None:
     blame = "".join(f"{i}.000s unit{i}.service\n" for i in range(15, 0, -1))
-    (f,) = BootTimeCheck().run(make_ctx(commands={ANALYZE: ANALYZE_OUT, BLAME: blame}))
+    ctx = make_ctx(commands={ANALYZE: ANALYZE_OUT, BLAME: blame, CRITICAL_CHAIN: ""})
+    (f,) = BootTimeCheck().run(ctx)
     assert (f.severity, f.title) == (Severity.INFO, "Boot took 13.355s")
     assert len(f.evidence) == 10
     assert f.evidence[0] == "15.000s unit15.service"
@@ -323,3 +324,28 @@ def test_shared_and_own_ignore_lists_combine() -> None:
     ctx.log_ignore = ("^one$",)
     (f,) = JournalErrorsCheck({"ignore": ["^b: "]}).run(ctx)
     assert f.evidence == ["1x c: three"]
+
+
+CHAIN = """The time when unit became active or started is printed after the "@" character.
+The time the unit took to start is printed after the "+" character.
+
+graphical.target @9.700s
+`-multi-user.target @9.699s
+  `-postgresql.service @6.103s +3.596s
+    `-network-online.target @6.100s
+"""
+
+
+def test_boot_critical_chain() -> None:
+    ctx = make_ctx(commands={ANALYZE: ANALYZE_OUT, BLAME: "", CRITICAL_CHAIN: CHAIN})
+    fs = BootTimeCheck().run(ctx)
+    assert [(f.severity, f.title) for f in fs] == [
+        (Severity.INFO, "Boot took 13.355s"),
+        (Severity.INFO, "Boot critical chain"),
+    ]
+    assert fs[1].evidence == [
+        "graphical.target @9.700s",
+        "`-multi-user.target @9.699s",
+        "`-postgresql.service @6.103s +3.596s",
+        "`-network-online.target @6.100s",
+    ]

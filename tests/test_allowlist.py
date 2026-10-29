@@ -82,7 +82,7 @@ def test_config_only_reads() -> None:
 
 def test_registry_ids_unique_and_kebab() -> None:
     ids = [cls.id for cls in checks.ALL_CHECKS]
-    assert len(ids) == 23
+    assert len(ids) == 36
     assert len(set(ids)) == len(ids)
     for cls in checks.ALL_CHECKS:
         assert re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", cls.id), cls.id

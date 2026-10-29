@@ -18,6 +18,27 @@ from pydebuprep import checks
 ROOT = Path(__file__).resolve().parent.parent
 
 OPTION_TESTS: dict[tuple[str, str], str] = {
+    ("python-venvs", "exclude_paths"): "checks.test_applications::test_venvs_in_caches_are_skipped",
+    (
+        "python-venvs",
+        "search_paths",
+    ): "checks.test_applications::test_venvs_search_paths_and_depth_options",
+    (
+        "python-venvs",
+        "max_depth",
+    ): "checks.test_applications::test_venvs_search_paths_and_depth_options",
+    (
+        "network",
+        "ignore_interfaces",
+    ): "checks.test_network_time::test_network_ignore_interfaces_option",
+    (
+        "disk-space",
+        "important_mounts",
+    ): "checks.test_storage::test_important_mounts_warning_band_and_options",
+    (
+        "disk-space",
+        "min_free_mib",
+    ): "checks.test_storage::test_important_mounts_warning_band_and_options",
     ("apt-lists-age", "max_age_days"): "checks.test_apt_lists_age::test_max_age_configurable",
     (
         "boot-space",

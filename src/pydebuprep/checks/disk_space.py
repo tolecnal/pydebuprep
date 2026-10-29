@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import fnmatch
 
-from pydebuprep.checks._diskutil import THRESHOLD_OPTIONS, space_findings, validate_thresholds
+from pydebuprep.checks._diskutil import (
+    THRESHOLD_OPTIONS,
+    _human,
+    space_findings,
+    validate_thresholds,
+)
 from pydebuprep.checks.base import Check, Context, Option, run_checked
-from pydebuprep.model import Finding
+from pydebuprep.model import Finding, Severity
 from pydebuprep.system import DiskUsage
 
 EXCLUDE = ("-x", "tmpfs", "-x", "devtmpfs", "-x", "squashfs", "-x", "overlay", "-x", "efivarfs")
@@ -45,10 +50,38 @@ class DiskSpaceCheck(Check):
         ),
         *THRESHOLD_OPTIONS,
         Option("exclude_mounts", [], "Mount points to leave out (shell-style patterns)"),
+        Option(
+            "important_mounts",
+            ["/", "/var"],
+            "Mount points that also need min_free_mib free whatever their size; upgrades "
+            "download and unpack packages here",
+        ),
+        Option(
+            "min_free_mib",
+            2048,
+            "Free space (MiB) the important mounts need: warning below it, critical below "
+            "half of it; 0 turns this off",
+        ),
     )
 
     def validate(self) -> None:
         validate_thresholds(self)
+        if self.opt("min_free_mib") < 0:
+            raise ValueError("min_free_mib must not be negative")
+
+    def _absolute_floor(self, mount: str, usage: DiskUsage) -> list[Finding]:
+        floor = self.opt("min_free_mib") * 1024 * 1024
+        if mount not in self.opt("important_mounts") or not floor or usage.free >= floor:
+            return []
+        return [
+            Finding(
+                Severity.CRITICAL if usage.free < floor / 2 else Severity.WARNING,
+                f"Only {_human(usage.free)} free on {mount}",
+                detail=f"{mount} has less than {_human(floor)} free. Release upgrades and "
+                "later updates download and unpack packages here.",
+                remediation=[r.replace("MOUNT", mount) for r in REMEDIATION],
+            )
+        ]
 
     def _excluded(self, mount: str) -> bool:
         if mount == "/boot" or mount.startswith("/boot/"):
@@ -76,11 +109,15 @@ class DiskSpaceCheck(Check):
         for mount, u in usage.items():
             if self._excluded(mount):
                 continue
-            findings += space_findings(
+            percentage = space_findings(
                 mount,
                 u,
                 [r.replace("MOUNT", mount) for r in REMEDIATION],
                 warning_pct=self.opt("warning_pct"),
                 critical_pct=self.opt("critical_pct"),
+            )
+            space_reported = any(f.title.startswith("Low free space") for f in percentage)
+            findings += (
+                percentage if space_reported else self._absolute_floor(mount, u) + percentage
             )
         return findings

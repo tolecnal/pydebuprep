@@ -5,30 +5,43 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from pydebuprep.checks.apparmor import AppArmorCheck
 from pydebuprep.checks.apt_autoremove import AptAutoremoveCheck
 from pydebuprep.checks.apt_held import AptHeldCheck
 from pydebuprep.checks.apt_lists_age import AptListsAgeCheck
 from pydebuprep.checks.apt_sources import AptSourcesCheck
 from pydebuprep.checks.apt_upgradable import AptUpgradableCheck
 from pydebuprep.checks.base import Check
+from pydebuprep.checks.bind import BindCheck
 from pydebuprep.checks.boot_space import BootSpaceCheck
 from pydebuprep.checks.boot_time import BootTimeCheck
 from pydebuprep.checks.bootloader import BootloaderCheck
 from pydebuprep.checks.config_conflicts import ConfigConflictsCheck
+from pydebuprep.checks.cron import CronCheck
 from pydebuprep.checks.debsums import DebsumsCheck
 from pydebuprep.checks.disk_space import DiskSpaceCheck
 from pydebuprep.checks.dkms import DkmsCheck
 from pydebuprep.checks.dmesg_errors import DmesgErrorsCheck
+from pydebuprep.checks.docker import DockerCheck
 from pydebuprep.checks.dpkg_audit import DpkgAuditCheck
 from pydebuprep.checks.dpkg_rc import DpkgRcCheck
+from pydebuprep.checks.firewall import FirewallCheck
 from pydebuprep.checks.fstab import FstabCheck
 from pydebuprep.checks.journal_errors import JournalErrorsCheck
 from pydebuprep.checks.kernel_running import KernelRunningCheck
+from pydebuprep.checks.mariadb import MariaDbCheck
 from pydebuprep.checks.needrestart import NeedrestartCheck
+from pydebuprep.checks.network import NetworkCheck
 from pydebuprep.checks.obsolete_packages import ObsoletePackagesCheck
 from pydebuprep.checks.os_release import OsReleaseCheck
+from pydebuprep.checks.postfix import PostfixCheck
+from pydebuprep.checks.postgresql import PostgresqlCheck
+from pydebuprep.checks.python_venvs import PythonVenvsCheck
+from pydebuprep.checks.ssh_server import SshServerCheck
 from pydebuprep.checks.systemd_failed import SystemdFailedCheck
 from pydebuprep.checks.systemd_timers import SystemdTimersCheck
+from pydebuprep.checks.time_sync import TimeSyncCheck
+from pydebuprep.checks.unattended_upgrades import UnattendedUpgradesCheck
 
 ALL_CHECKS: list[type[Check]] = [
     OsReleaseCheck,
@@ -54,6 +67,19 @@ ALL_CHECKS: list[type[Check]] = [
     BootTimeCheck,
     FstabCheck,
     DiskSpaceCheck,
+    TimeSyncCheck,
+    CronCheck,
+    NetworkCheck,
+    FirewallCheck,
+    AppArmorCheck,
+    UnattendedUpgradesCheck,
+    SshServerCheck,
+    PostgresqlCheck,
+    MariaDbCheck,
+    PostfixCheck,
+    BindCheck,
+    DockerCheck,
+    PythonVenvsCheck,
 ]
 
 

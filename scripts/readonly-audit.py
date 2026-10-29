@@ -32,6 +32,8 @@ class Auditor:
         self.pending: dict[str, str] = {}
         self.created_tmp: dict[str, str] = {}
         self.violations: list[str] = []
+        self.run_pids: set[str] = set()  # every process and thread in the traced run
+        self.signals: list[tuple[str, str]] = []  # (target pid, where), judged in finish()
 
     def allowed(self, path: str) -> bool:
         return path.startswith(HARMLESS) or path.startswith(self.allow)
@@ -44,6 +46,7 @@ class Auditor:
         if not m:
             return
         pid, rest = m.groups()
+        self.run_pids.add(pid)
         if "<unfinished ...>" in rest:
             self.pending[pid] = rest.split("<unfinished")[0]
             return
@@ -74,9 +77,13 @@ class Auditor:
                 self.violations.append(where)
             elif len(targets) == 2 and targets[0] in self.created_tmp:
                 self.created_tmp[targets[1]] = self.created_tmp.pop(targets[0])
+        elif name in ("adjtimex", "clock_adjtime"):
+            if not re.search(r"\bmodes=0\b", args):  # modes=0 only reads the clock state
+                self.violations.append(where)
         elif name in ("kill", "tkill", "tgkill"):
             if not re.search(r",\s*0\)?$", args):  # signal 0 only probes for existence
-                self.violations.append(where)
+                target = args.split(",", 1)[0].strip().lstrip("-")
+                self.signals.append((target, where))
         elif not (targets and all(self.scratch_or_allowed(t) for t in targets)):
             self.violations.append(where)
 
@@ -95,7 +102,10 @@ class Auditor:
 
     def finish(self) -> list[str]:
         leftovers = [f"left behind {p} ({w})" for p, w in self.created_tmp.items()]
-        return [*self.violations, *leftovers]
+        # Signals between the run's own processes and threads are internal (Go programs
+        # preempt their threads with SIGURG); signalling anything else is a change.
+        signals = [where for target, where in self.signals if target not in self.run_pids]
+        return [*self.violations, *signals, *leftovers]
 
 
 def main() -> int:

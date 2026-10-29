@@ -24,8 +24,9 @@ branch = true
 source = ["pydebuprep"]
 
 [tool.coverage.report]
-# A ratchet: raise it when coverage goes up, never lower it.
-fail_under = 95
+# Every line and branch must be covered; mark genuinely untestable code with
+# "# pragma: no cover" and a reason rather than lowering this.
+fail_under = 100
 show_missing = true
 skip_covered = true
 

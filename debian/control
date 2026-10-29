@@ -20,11 +20,14 @@ Suggests: efibootmgr, dkms
 Description: post-upgrade health report for Debian and Ubuntu
  pydebuprep inspects a Debian or Ubuntu system after a release upgrade
  (for example Debian 12 to 13, or Ubuntu 22.04 to 24.04) and reports on
- package state, APT sources, configuration file conflicts, the running
- kernel, bootloader, systemd units and timers, logs, mounts and disk space.
+ package state and APT sources, configuration file conflicts, the kernel
+ and bootloader, systemd units, timers and cron jobs, logs, time
+ synchronisation, network and firewall, AppArmor and SSH, PostgreSQL,
+ MariaDB, postfix, BIND, Docker and Python virtualenvs, mounts and disk
+ space.
  .
  It is strictly read-only: it never changes the system, and every finding
  comes with the commands to fix it. An optional snapshot taken before the
  upgrade lets the report show what changed. Reports are available as text,
- JSON, YAML, HTML and Markdown, with exit codes suited to automation such
- as Ansible.
+ JSON, YAML, HTML, Markdown, Jira and Confluence markup, with exit codes
+ suited to automation such as Ansible.

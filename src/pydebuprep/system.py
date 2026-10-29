@@ -5,6 +5,7 @@ Every command must match a read-only allowlist entry; nothing here writes.
 
 from __future__ import annotations
 
+import ctypes
 import glob as _glob
 import os
 import re
@@ -13,6 +14,7 @@ import socket
 
 # The only module that starts processes; every argv is checked against ALLOWED_COMMANDS.
 import subprocess  # nosec B404
+import sys
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -63,6 +65,25 @@ ALLOWED_COMMANDS: set[tuple[str, ...]] = {
     ),
     ("systemd-analyze",),
     ("systemd-analyze", "blame", "--no-pager"),
+    ("systemd-analyze", "critical-chain", "--no-pager"),
+    ("ip", "-j", "addr", "show"),
+    ("ip", "-j", "route", "show", "default"),
+    ("ip", "-j", "-6", "route", "show", "default"),
+    ("resolvectl", "dns"),
+    # Only run when the matching kernel module is already loaded: listing rules can
+    # otherwise make the kernel load it. (`ufw status` is not used: it writes a lock file.)
+    ("nft", "-j", "list", "ruleset"),
+    ("iptables-legacy-save",),
+    ("journalctl", "-b", "-k", "--no-pager", "-o", "cat", '--grep=apparmor="DENIED"'),
+    ("apt-config", "dump"),
+    ("sshd", "-t"),
+    ("pg_lsclusters", "--no-header"),
+    ("mariadbd", "--version"),
+    ("postconf", "-n"),
+    ("named-checkconf",),
+    # Only when docker.service is already running: with just docker.socket active, a
+    # client command would start the daemon.
+    ("docker", "ps", "--all", "--no-trunc", "--format", "{{json .}}"),
     ("journalctl", "-p", "err", "-b", "--no-pager", "-o", "json"),
     ("dmesg", "--level=err", "--notime"),
     ("dmesg", "--level=warn", "--notime"),
@@ -81,6 +102,7 @@ UNIT_QUERIES: set[tuple[str, ...]] = {
 UNIT_NAME = re.compile(r"^[A-Za-z0-9@_.:\\-]+$")
 
 DEFAULT_TIMEOUT = 30.0
+TIME_ERROR = 5  # adjtimex(): the clock is not synchronised
 
 
 class DisallowedCommandError(Exception):
@@ -220,6 +242,47 @@ class System:
 
     def now(self) -> datetime:
         return datetime.now(timezone.utc)
+
+    def clock_synchronized(self) -> bool | None:
+        """The kernel's NTP state, as timedatectl's NTPSynchronized reports it.
+
+        adjtimex() with modes=0 only reads; it changes nothing. None if unavailable.
+        """
+        try:
+            libc = ctypes.CDLL(None, use_errno=True)
+            # Zeroed and larger than struct timex, so modes=0 and the kernel's reply fits.
+            state = int(libc.adjtimex(ctypes.create_string_buffer(512)))
+        except (OSError, AttributeError):
+            return None
+        if state < 0:
+            return None
+        return state != TIME_ERROR
+
+    def find_files(self, roots: Sequence[str], name: str, max_depth: int) -> list[str]:
+        """Files called NAME at most MAX_DEPTH directories below each root, sorted.
+
+        Symlinked directories aren't followed, so a tree is never searched twice.
+        """
+        found = []
+        for root in roots:
+            base = root.rstrip("/").count("/")
+            for dirpath, dirnames, filenames in os.walk(root, followlinks=False):
+                if dirpath.rstrip("/").count("/") - base >= max_depth:
+                    dirnames[:] = []
+                if name in filenames:
+                    found.append(os.path.join(dirpath, name))
+        return sorted(found)
+
+    def python_version(self) -> str:
+        """MAJOR.MINOR of the Python running pydebuprep: the system python3 when packaged."""
+        return f"{sys.version_info.major}.{sys.version_info.minor}"
+
+    def loaded_modules(self) -> set[str]:
+        return {
+            line.split()[0]
+            for line in (self.read_text("/proc/modules") or "").splitlines()
+            if line.strip()
+        }
 
 
 def apt_command(program: str, *args: str) -> list[str]:

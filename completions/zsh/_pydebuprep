@@ -5,7 +5,7 @@
 #   source <(pydebuprep completion zsh)
 
 _pydebuprep_checks() {
-    _values -s , 'check' apt-autoremove apt-held apt-lists-age apt-sources apt-upgradable boot-space boot-time bootloader config-conflicts debsums disk-space dkms dmesg-errors dpkg-audit dpkg-rc fstab journal-errors kernel-running needrestart obsolete-packages os-release systemd-failed systemd-timers
+    _values -s , 'check' apparmor apt-autoremove apt-held apt-lists-age apt-sources apt-upgradable bind boot-space boot-time bootloader config-conflicts cron debsums disk-space dkms dmesg-errors docker dpkg-audit dpkg-rc firewall fstab journal-errors kernel-running mariadb needrestart network obsolete-packages os-release postfix postgresql python-venvs ssh-server systemd-failed systemd-timers time-sync unattended-upgrades
 }
 
 _pydebuprep_check_options() {
@@ -19,7 +19,7 @@ _pydebuprep_check_options() {
         return
     fi
     local -a opts
-    opts=(apt-lists-age.max_age_days= boot-space.critical_pct= boot-space.warning_pct= config-conflicts.critical_paths= config-conflicts.ignore_paths= debsums.timeout_seconds= disk-space.critical_pct= disk-space.exclude_mounts= disk-space.include_remote= disk-space.warning_pct= dmesg-errors.ignore= journal-errors.ignore= systemd-failed.ignore_units= systemd-timers.ignore_units=)
+    opts=(apt-lists-age.max_age_days= boot-space.critical_pct= boot-space.warning_pct= config-conflicts.critical_paths= config-conflicts.ignore_paths= debsums.timeout_seconds= disk-space.critical_pct= disk-space.exclude_mounts= disk-space.important_mounts= disk-space.include_remote= disk-space.min_free_mib= disk-space.warning_pct= dmesg-errors.ignore= journal-errors.ignore= network.ignore_interfaces= python-venvs.exclude_paths= python-venvs.max_depth= python-venvs.search_paths= systemd-failed.ignore_units= systemd-timers.ignore_units=)
     compadd -S '' -a opts
 }
 

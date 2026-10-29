@@ -90,7 +90,7 @@ def test_root_full_critical_inodes_low_and_boot_excluded() -> None:
 
 
 def test_disk_space_ok() -> None:
-    out = f"Filesystem Type 1024-blocks Used Available Capacity Mounted on\n/dev/sda1 ext4 {GB_BLOCKS} 0 {GB_BLOCKS} 0% /\n"
+    out = f"Filesystem Type 1024-blocks Used Available Capacity Mounted on\n/dev/sda1 ext4 {10 * GB_BLOCKS} 0 {10 * GB_BLOCKS} 0% /\n"
     assert DiskSpaceCheck().run(make_ctx(commands={DF_SPACE: out, DF_INODES: ""})) == []
 
 
@@ -193,3 +193,41 @@ def test_fstab_regular_file_that_is_not_swap_still_reported() -> None:
         },
     )
     assert titles(FstabCheck().run(ctx)) == ["/etc/fstab has 1 warning"]
+
+
+BIG_DF = f"""Filesystem Type 1024-blocks Used Available Capacity Mounted on
+/dev/sda1 ext4 {200 * GB_BLOCKS} {199 * GB_BLOCKS} {GB_BLOCKS // 2} 99% /
+/dev/sdb1 ext4 {4000 * GB_BLOCKS} {3000 * GB_BLOCKS} {1000 * GB_BLOCKS} 75% /var
+/dev/sdc1 ext4 {10 * GB_BLOCKS} {8 * GB_BLOCKS} {GB_BLOCKS // 2} 95% /srv
+"""
+
+
+def test_important_mounts_absolute_floor() -> None:
+    ctx = make_ctx(commands={DF_SPACE: BIG_DF, DF_INODES: ""})
+    fs = DiskSpaceCheck({"warning_pct": 0.1, "critical_pct": 0.05}).run(ctx)
+    assert [(f.severity, f.title) for f in fs] == [
+        (Severity.CRITICAL, "Only 512.0 MiB free on /"),
+    ]
+
+
+def test_important_mounts_warning_band_and_options() -> None:
+    df = BIG_DF.replace(f"{GB_BLOCKS // 2} 99% /\n", f"{3 * GB_BLOCKS} 98% /\n")
+    ctx = make_ctx(commands={DF_SPACE: df, DF_INODES: ""})
+    check = DiskSpaceCheck({"warning_pct": 0.1, "critical_pct": 0.05, "min_free_mib": 4096})
+    assert [(f.severity, f.title) for f in check.run(ctx)] == [
+        (Severity.WARNING, "Only 3.0 GiB free on /")
+    ]
+    off = DiskSpaceCheck({"warning_pct": 0.1, "critical_pct": 0.05, "min_free_mib": 0})
+    assert off.run(ctx) == []
+    srv = DiskSpaceCheck({"warning_pct": 0.1, "critical_pct": 0.05, "important_mounts": ["/srv"]})
+    assert titles(srv.run(ctx)) == ["Only 512.0 MiB free on /srv"]
+
+
+def test_important_mount_with_percentage_finding_is_not_doubled() -> None:
+    ctx = make_ctx(commands={DF_SPACE: DF_OUT, DF_INODES: ""})
+    assert titles(DiskSpaceCheck().run(ctx)) == ["Low free space on /: 5% free"]
+
+
+def test_min_free_mib_must_not_be_negative() -> None:
+    with pytest.raises(ValueError, match="min_free_mib must not be negative"):
+        DiskSpaceCheck({"min_free_mib": -1})

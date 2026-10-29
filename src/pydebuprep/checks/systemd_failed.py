@@ -3,21 +3,18 @@ from __future__ import annotations
 import fnmatch
 from typing import Any
 
-from pydebuprep.checks._systemd import run_systemctl, unit_rows
+from pydebuprep.checks._systemd import (
+    ACTIVE_SERVICES,
+    ENABLED_SERVICES,
+    LIST,
+    run_systemctl,
+    unit_rows,
+)
 from pydebuprep.checks.base import Check, Context, Option
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
-LIST = ("systemctl", "list-units", "--no-legend", "--plain", "--no-pager")
 FAILED = (*LIST[:2], "--state=failed", *LIST[2:])
-ACTIVE_SERVICES = (*LIST[:2], "--type=service", "--state=active", *LIST[2:])
-ENABLED_SERVICES = (
-    "systemctl",
-    "list-unit-files",
-    "--type=service",
-    "--state=enabled",
-    "--no-legend",
-    "--no-pager",
-)
+__all__ = ["ACTIVE_SERVICES", "ENABLED_SERVICES", "FAILED", "SystemdFailedCheck"]
 GROUP_ABOVE = 5
 
 
