@@ -1,7 +1,7 @@
 site_name: pydebuprep
 site_description: >-
   Read-only health report for Debian and Ubuntu systems after a release upgrade.
-site_url: https://tolecnal.github.io/pydebuprep/
+site_url: https://pydebuprep.app/
 repo_url: https://github.com/tolecnal/pydebuprep
 repo_name: tolecnal/pydebuprep
 edit_uri: edit/main/docs/

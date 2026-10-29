@@ -14,9 +14,9 @@ snapshot are questions, not verdicts. Silence what's expected through the
 
 - An **active** service is a running process, not a working service. A database can
   run and refuse queries; a web server can run and serve errors.
-- A **configured** repository is a configuration, not a working repository:
-  pydebuprep never runs `apt update`, so it can't tell whether a repository is
-  reachable or its key valid.
+- A **configured** repository isn't necessarily a working one. pydebuprep checks
+  keys, signatures and metadata from the last `apt update`, but never runs it, so
+  whether a repository is reachable right now can't be known.
 - A **loaded** firewall ruleset is counted, not judged.
 - It doesn't test connectivity: no pings, no DNS lookups, no TLS handshakes.
 
