@@ -36,5 +36,5 @@ def _finding(f: Finding) -> list[str]:
     ]
 
 
-def render(report: Report) -> str:
-    return render_wiki(report, check_heading=_check_heading, finding=_finding)
+def render(report: Report, *, todo: bool = False) -> str:
+    return render_wiki(report, check_heading=_check_heading, finding=_finding, todo=todo)

@@ -103,8 +103,8 @@ _pydebuprep() {
 
     local opts words_for_cmd="" file_arg=""
     case ${cmd:-report} in
-        report) opts="--baseline --check-option --checks --config --format --help --min-severity --no-baseline --no-color --no-config --output --output-dir --skip --snapshot-dir -c -f -h -o" ;;
-        convert) opts="--format --help --no-color --output --output-dir -f -h -o" ;;
+        report) opts="--baseline --check-option --checks --config --format --help --min-severity --no-baseline --no-color --no-config --no-todo --output --output-dir --skip --snapshot-dir --todo -c -f -h -o" ;;
+        convert) opts="--format --help --no-color --no-todo --output --output-dir --todo -f -h -o" ;;
         snapshot) opts="--check-option --config --help --no-config --snapshot-dir -c -h" ;;
         list-checks) opts="--help --verbose -h -v" ;;
         configtest) opts="--config --help --no-config -c -h" ;;

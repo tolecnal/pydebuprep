@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import dataclasses
 import re
+from dataclasses import dataclass, field
 from itertools import groupby
+from typing import Any
 
-from pydebuprep.model import CheckResult, Finding, Host, Report
+from pydebuprep.model import CheckResult, Finding, Host, Report, Severity, Status
 
 NO_BASELINE = "no baseline"
 NOT_APPLICABLE = "not applicable"
@@ -119,3 +121,69 @@ def summary_line(report: Report) -> str:
         f"{s.critical} critical, {s.warning} warning, {s.info} info | "
         f"checks: {s.ok} ok, {s.skipped} skipped, {s.error} error | exit code {s.exit_code}"
     )
+
+
+# --- the TODO checklist (--todo) -------------------------------------------------------
+
+CONFIRM = "Run pydebuprep again to confirm everything is fixed"
+NOTHING_TO_DO = "Nothing to do."
+
+
+@dataclass
+class TodoItem:
+    title: str
+    severity: str | None = None
+    check: str | None = None
+    steps: list[str] = field(default_factory=list)
+
+    @property
+    def label(self) -> str:
+        """The item as one line of plain text."""
+        if self.severity:
+            return f"{self.severity.upper()} {self.check}: {self.title}"
+        return self.title
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "severity": self.severity,
+            "check": self.check,
+            "title": self.title,
+            "steps": list(self.steps),
+        }
+
+
+def todo_items(report: Report) -> list[TodoItem]:
+    """What needs doing: critical then warning findings (with their remediation as steps),
+    checks that failed to run, a root re-run if root checks were skipped, and a final
+    confirmation run. Info findings are for awareness, not action. Empty if nothing."""
+    items = [
+        TodoItem(f.title, severity.value, r.id, list(f.remediation))
+        for severity in (Severity.CRITICAL, Severity.WARNING)
+        for r in report.results
+        for f in [*r.findings, *(r.baseline_diff or [])]
+        if f.severity == severity
+    ]
+    items += [
+        TodoItem(f"Find out why {r.id} failed to run: {r.error}", check=r.id)
+        for r in report.results
+        if r.status == Status.ERROR
+    ]
+    need_root = [
+        r
+        for r in report.results
+        if r.status == Status.SKIPPED and (r.skipped_reason or "").startswith("requires root")
+    ]
+    if need_root and not report.host.is_root:
+        checks = "1 check was" if len(need_root) == 1 else f"{len(need_root)} checks were"
+        items.append(TodoItem(f"Run pydebuprep as root: {checks} skipped without it"))
+    if items:
+        items.append(TodoItem(CONFIRM))
+    return items
+
+
+def report_data(report: Report, todo: bool) -> dict[str, Any]:
+    """The JSON/YAML form of a report, with the TODO list when asked for."""
+    data = report.to_dict()
+    if todo:
+        data["todo"] = [item.to_dict() for item in todo_items(report)]
+    return data

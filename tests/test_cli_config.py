@@ -371,3 +371,23 @@ def test_logs_ignore_reaches_checks(
     run(["--config", c, "--no-baseline", "--format", "json"])
     data = json.loads(capsys.readouterr().out)
     assert data["results"][0]["findings"][0]["title"] == "log_ignore=['^ACPI', 'x{1,2}']"
+
+
+def test_todo_from_the_command_line_and_the_config(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    run(["--no-baseline", "--format", "markdown"])
+    assert "## TODO" not in capsys.readouterr().out
+    run(["--no-baseline", "--format", "markdown", "--todo"])
+    assert "## TODO" in capsys.readouterr().out
+    c = conf(tmp_path, "report:\n  todo: true\n  baseline: none\n")
+    run(["--config", c, "--format", "markdown"])
+    assert "## TODO" in capsys.readouterr().out
+    run(["--config", c, "--format", "markdown", "--no-todo"])
+    assert "## TODO" not in capsys.readouterr().out
+
+
+def test_todo_config_must_be_a_boolean(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    c = conf(tmp_path, "report:\n  todo: sometimes\n")
+    assert run(["--config", c]) == 3
+    assert "report.todo: expected true or false" in capsys.readouterr().err

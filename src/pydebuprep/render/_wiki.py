@@ -11,11 +11,13 @@ from collections.abc import Callable
 
 from pydebuprep.model import CheckResult, Finding, Report
 from pydebuprep.render._common import (
+    NOTHING_TO_DO,
     baseline_line,
     baseline_state,
     by_category,
     has_baseline_section,
     host_line,
+    todo_items,
 )
 
 _SPECIAL = re.compile(r"([\\{}\[\]|*_!^~+#])")
@@ -26,6 +28,8 @@ _EMOTICON = re.compile(r"\((?=(?:[ynix/?-]|on|off|\\[!+]|\\\*[rgby]?)\))")
 # Block markup that only works at the start of a line.
 _BLOCK_START = re.compile(r"^(?=h[1-6]\.|bq\.)")
 ZERO_WIDTH_SPACE = "\u200b"
+# Wiki markup has no checkbox; an empty ballot box shows in both products.
+BALLOT_BOX = "\u2610"
 
 
 def esc(text: str) -> str:
@@ -73,6 +77,7 @@ def render_wiki(
     *,
     check_heading: Callable[[CheckResult], list[str]],
     finding: Callable[[Finding], list[str]],
+    todo: bool = False,
 ) -> str:
     out = [
         "h1. pydebuprep report",
@@ -103,4 +108,16 @@ def render_wiki(
                     out += ["", "*Changes since baseline:*"]
                     for f in r.baseline_diff or []:
                         out += ["", *finding(f)]
+    if todo:
+        out += ["", "h2. TODO", ""]
+        items = todo_items(report)
+        out += [NOTHING_TO_DO] if not items else []
+        for item in items:
+            label = (
+                f"*{item.severity.upper()}* {esc(item.check or '')}: {esc(item.title)}"
+                if item.severity
+                else esc(item.title)
+            )
+            out.append(f"* {BALLOT_BOX} {label}")
+            out.extend(f"** {BALLOT_BOX} {esc(step)}" for step in item.steps)
     return "\n".join(out) + "\n"

@@ -124,3 +124,8 @@ def test_convert_hostname_cannot_escape_the_output_dir(tmp_path: Path) -> None:
     assert main(["convert", str(saved), "--output-dir", str(outdir)]) == 0
     (written,) = outdir.iterdir()
     assert written.name == "pydebuprep-.._.._evil_name-20261028T120000Z.txt"
+
+
+def test_convert_with_todo(saved: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["convert", str(saved), "-f", "markdown", "--todo"]) == 0
+    assert capsys.readouterr().out == render(make_sample_report(), "markdown", todo=True)
