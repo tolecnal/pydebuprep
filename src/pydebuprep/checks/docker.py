@@ -16,7 +16,8 @@ CONNECT_TIMEOUT = 3.0
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 # "0.0.0.0:8080->80/tcp", "[::]:8000-8002->8000-8002/tcp", "127.0.0.1:9000->9000/tcp"
 PUBLISHED = re.compile(r"^\[?([0-9a-fA-F.:]*?)\]?:(\d+)(?:-(\d+))?->[\d-]+/tcp$")
-WILDCARD = {"0.0.0.0": "127.0.0.1", "::": "::1", "": "127.0.0.1"}
+# Docker's wildcard bindings, probed on localhost (nothing binds here).
+WILDCARD = {"0.0.0.0": "127.0.0.1", "::": "::1", "": "127.0.0.1"}  # nosec B104
 MAX_RANGE = 32
 # Health states worth reporting, each its own finding: (state, severity, one, many, fix).
 # Running without a health check is not a problem, and isn't reported.
