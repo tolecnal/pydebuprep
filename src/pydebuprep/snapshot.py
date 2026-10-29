@@ -15,6 +15,10 @@ from pydebuprep.model import BaselineInfo
 
 DEFAULT_SNAPSHOT_DIR = "/var/lib/pydebuprep/snapshots"
 SCHEMA_VERSION = "1"
+SNAPSHOT_DIR_MODE = 0o700
+SNAPSHOT_FILE_MODE = 0o600
+# Never overwrite an existing file, and never write through a symlink.
+CREATE_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
 
 
 class SnapshotError(Exception):
@@ -66,21 +70,24 @@ def create_snapshot(
     stamp = format_timestamp(ctx.system.now())
     target_dir = Path(directory)
     try:
+        # Snapshots hold cron command lines, network details and package lists, so
+        # they are private to their owner: a new directory is 0700, each file 0600.
         if not target_dir.exists():
-            target_dir.mkdir(parents=True, mode=0o750)
-            # 0750 is stricter than the default: snapshots list packages and services.
-            os.chmod(target_dir, 0o750)  # nosec B103
+            target_dir.mkdir(parents=True, mode=SNAPSHOT_DIR_MODE)
+            os.chmod(target_dir, SNAPSHOT_DIR_MODE)
         payload = json.dumps(snap, indent=2, ensure_ascii=False) + "\n"
         n = 0
         while True:
             name = f"{stamp}.json" if n == 0 else f"{stamp}-{n}.json"
             path = target_dir / name
             try:
-                with open(path, "x", encoding="utf-8") as fh:
-                    fh.write(payload)
-                return path
+                fd = os.open(path, CREATE_FLAGS, SNAPSHOT_FILE_MODE)
             except FileExistsError:
                 n += 1
+                continue
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(payload)
+            return path
     except OSError as exc:
         raise SnapshotError(f"cannot write snapshot in {directory}: {exc.strerror or exc}") from exc
 

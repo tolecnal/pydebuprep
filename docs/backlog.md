@@ -33,6 +33,8 @@ with `SHA256SUMS`, and the SLSA provenance attestation verified with
         dmesg-errors reports how many messages were ignored;
       - runs without PyYAML when YAML isn't needed, with an install hint otherwise;
       - `SECURITY.md`;
+      - snapshots are private: directory 0700 and files 0600 (CodeQL
+        py/overly-permissive-file); upgrading the package tightens existing directories;
       - new checks: network, firewall, time-sync, apparmor, unattended-upgrades, cron,
         ssh-server; boot critical chain; a free-space floor for `/` and `/var`;
       - application checks: postgresql, mariadb, postfix, bind, docker, python-venvs;
