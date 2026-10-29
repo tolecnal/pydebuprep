@@ -149,7 +149,10 @@ def test_third_party_unknown_suite_ignored() -> None:
 
 
 def test_debian_alias_suite_info() -> None:
-    text = "deb http://deb.debian.org/debian stable main\n"
+    text = (
+        "deb http://deb.debian.org/debian stable main\n"
+        "deb http://security.debian.org/debian-security stable-security main\n"
+    )
     fs = AptSourcesCheck().run(make_ctx(files={"/etc/apt/sources.list": text}))
     assert [(f.severity, f.title) for f in fs] == [
         (Severity.INFO, "Debian archive uses suite alias 'stable'")

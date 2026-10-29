@@ -238,7 +238,7 @@ for each check's options.
 (release) How stale the downloaded package lists are
 .TP
 .B apt\-sources
-(release) Sources still on the old codename, repos disabled by the upgrade, missing distro archive, duplicates
+(release) Sources still on the old codename, repos disabled by the upgrade, missing distro archive or security archive, duplicates; missing signing keyrings, keys in the legacy trusted.gpg; repositories without downloaded metadata, serving another release than configured, or with expired metadata (from the last apt update; never runs it)
 .TP
 .B os\-release
 (release) Supported release; upgrade path vs. the baseline

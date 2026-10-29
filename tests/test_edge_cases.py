@@ -117,7 +117,10 @@ def test_deb822_comments_continuations_and_extra_blank_lines() -> None:
     )
     ctx = make_ctx(files={"/etc/apt/sources.list.d/debian.sources": text})
     assert [e.suite for e in parse_sources(ctx.system)] == ["trixie", "trixie-updates"]
-    assert AptSourcesCheck().run(ctx) == []
+    # Nothing spurious from the comments and blank lines; only the missing security archive.
+    assert [f.title for f in AptSourcesCheck().run(ctx)] == [
+        "No security updates repository for trixie"
+    ]
 
 
 def test_files_with_other_extensions_are_ignored() -> None:
