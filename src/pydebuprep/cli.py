@@ -6,8 +6,9 @@ import argparse
 import copy
 import dataclasses
 import os
+import re
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,7 @@ from pydebuprep.deps import MissingDependency
 from pydebuprep.model import CATEGORY_ORDER, CheckResult, Host, Report, Severity, compute_summary
 from pydebuprep.osinfo import detect_os
 from pydebuprep.render import EXTENSIONS, FORMATS, render
+from pydebuprep.reportfile import ReportFileError, load_report
 from pydebuprep.runner import run_checks
 from pydebuprep.snapshot import (
     DEFAULT_SNAPSHOT_DIR,
@@ -32,8 +34,17 @@ from pydebuprep.snapshot import (
 from pydebuprep.system import System
 
 EXIT_TOOL_ERROR = 3
-COMMANDS = ("report", "snapshot", "list-checks", "configtest", "example-config", "completion")
+COMMANDS = (
+    "report",
+    "convert",
+    "snapshot",
+    "list-checks",
+    "configtest",
+    "example-config",
+    "completion",
+)
 CONFIG_ENV = "PYDEBUPREP_CONFIG"
+UNSAFE_IN_FILE_NAME = re.compile(r"[^A-Za-z0-9._-]")
 
 
 class ToolError(Exception):
@@ -65,18 +76,8 @@ def _add_check_option_arg(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="pydebuprep",
-        description="Read-only health report for Debian and Ubuntu systems after a release "
-        "upgrade. Makes no changes; prints remediation steps instead.",
-    )
-    parser.add_argument("--version", action="version", version=f"pydebuprep {__version__}")
-    sub = parser.add_subparsers(dest="command", metavar="COMMAND")
-
-    report = sub.add_parser("report", help="run all checks and print a report (default)")
-    report.add_argument("--format", "-f", choices=FORMATS, help="output format (default: text)")
-    out = report.add_mutually_exclusive_group()
+def _add_output_args(parser: argparse.ArgumentParser) -> None:
+    out = parser.add_mutually_exclusive_group()
     out.add_argument(
         "--output-dir",
         metavar="DIR",
@@ -89,6 +90,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="write the report to FILE (a timestamp is added if FILE exists); "
         "'-' means standard output, overriding a configured output_dir",
     )
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="pydebuprep",
+        description="Read-only health report for Debian and Ubuntu systems after a release "
+        "upgrade. Makes no changes; prints remediation steps instead.",
+    )
+    parser.add_argument("--version", action="version", version=f"pydebuprep {__version__}")
+    sub = parser.add_subparsers(dest="command", metavar="COMMAND")
+
+    report = sub.add_parser("report", help="run all checks and print a report (default)")
+    report.add_argument("--format", "-f", choices=FORMATS, help="output format (default: text)")
+    _add_output_args(report)
     base = report.add_mutually_exclusive_group()
     base.add_argument("--baseline", metavar="FILE", help="compare against this snapshot")
     base.add_argument(
@@ -111,6 +126,16 @@ def build_parser() -> argparse.ArgumentParser:
     report.add_argument("--no-color", action="store_true", help="never colorize text output")
     _add_check_option_arg(report)
     _add_config_args(report)
+
+    conv = sub.add_parser("convert", help="render a saved JSON or YAML report in another format")
+    conv.add_argument(
+        "report",
+        metavar="FILE",
+        help="a report written with --format json or --format yaml; '-' reads standard input",
+    )
+    conv.add_argument("--format", "-f", choices=FORMATS, help="output format (default: text)")
+    _add_output_args(conv)
+    conv.add_argument("--no-color", action="store_true", help="never colorize text output")
 
     snap = sub.add_parser("snapshot", help="record a pre-upgrade baseline")
     snap.add_argument(
@@ -202,7 +227,9 @@ def resolve_output_path(
 ) -> Path | None:
     stamp = format_timestamp(now)
     if output_dir is not None:
-        return Path(output_dir) / f"pydebuprep-{hostname}-{stamp}.{EXTENSIONS[fmt]}"
+        # Reports read back by `convert` may come from other hosts: keep the name plain.
+        host = UNSAFE_IN_FILE_NAME.sub("_", hostname)
+        return Path(output_dir) / f"pydebuprep-{host}-{stamp}.{EXTENSIONS[fmt]}"
     if output is None:
         return None
     path = Path(output)
@@ -304,12 +331,46 @@ def cmd_report(args: argparse.Namespace, system: System) -> int:
         results=_filter_for_display(results, Severity(min_severity)),
     )
     path = resolve_output_path(output, output_dir, host.hostname, fmt, now)
+    _write_or_print(report, fmt, path, use_color(args.no_color, config.report.color))
+    return summary.exit_code
+
+
+def _write_or_print(report: Report, fmt: str, path: Path | None, color: bool) -> None:
     if path is None:
-        _print(render(report, fmt, color=use_color(args.no_color, config.report.color)))
+        _print(render(report, fmt, color=color))
     else:
         _write(render(report, fmt), path)
         print(f"Report written to {path}", file=sys.stderr)
-    return summary.exit_code
+
+
+def cmd_convert(args: argparse.Namespace) -> int:
+    source = args.report
+    try:
+        if source == "-":
+            text = sys.stdin.read()
+        else:
+            with open(source, encoding="utf-8") as fh:
+                text = fh.read()
+    except OSError as exc:
+        raise ToolError(f"cannot read {source}: {exc.strerror or exc}") from exc
+    except UnicodeDecodeError:
+        raise ToolError(f"{source}: not a UTF-8 text file") from None
+    try:
+        report = load_report(text)
+    except ReportFileError as exc:
+        raise ToolError(f"{source}: {exc}") from None
+    fmt = args.format or "text"
+    to_stdout = args.output == "-"
+    output = None if to_stdout else args.output
+    output_dir = None if to_stdout else args.output_dir
+    if output_dir is not None:
+        _ensure_writable_dir(Path(output_dir), "output directory")
+    elif output:
+        _ensure_writable_dir(Path(output).parent, "output directory")
+    when = datetime.fromisoformat(report.generated_at).astimezone(timezone.utc)
+    path = resolve_output_path(output, output_dir, report.host.hostname, fmt, when)
+    _write_or_print(report, fmt, path, use_color(args.no_color))
+    return 0
 
 
 def cmd_snapshot(args: argparse.Namespace, system: System) -> int:
@@ -368,6 +429,8 @@ def main(argv: list[str] | None = None, *, system: System | None = None) -> int:
         return 0 if exc.code in (0, None) else EXIT_TOOL_ERROR
     system = system or System()
     try:
+        if args.command == "convert":
+            return cmd_convert(args)
         if args.command == "snapshot":
             return cmd_snapshot(args, system)
         if args.command == "list-checks":
