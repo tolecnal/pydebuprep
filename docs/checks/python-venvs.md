@@ -16,13 +16,16 @@ under `~/.cache` by default). For each:
 
 For virtualenvs whose Python works:
 
-- **Missing native libraries:** compiled extension modules (`*.so`) that need a shared
-  library the dynamic linker can't find any more — `libssl.so.1.1` after an upgrade to
+- **Missing native libraries:** compiled extension modules (`*.cpython-*.so`,
+  `*.abi3.so`, or a plain `name.so` in a package) that need a shared library the
+  dynamic linker can't find any more — `libssl.so.1.1` after an upgrade to
   OpenSSL 3 is the classic. The libraries a module needs are read from its ELF headers
   (`DT_NEEDED`), and each is looked up the way the linker would: the module's own
   `RUNPATH`/`RPATH` (with `$ORIGIN`, so libraries bundled in wheels count), the linker
   cache, and the default library directories. Modules built for another architecture
-  are skipped.
+  are skipped, and so are libraries a package loads only when asked to — Qt's database
+  and platform plugins, per-CUDA-version builds — which commonly need libraries a
+  healthy host doesn't have.
 - **Broken entry points:** scripts in `bin/` whose `#!` interpreter doesn't exist —
   usually a virtualenv that was moved or copied.
 
@@ -57,7 +60,9 @@ Only when a virtualenv has compiled modules: `-p` prints the linker cache
 - A library the linker finds but whose version or symbols changed (an ABI break) isn't
   detected; only missing libraries are. Libraries loaded at run time with `dlopen()`
   aren't listed in the headers either.
-- Without `ldconfig` in `PATH` (as a normal user on some systems), the library check is
-  skipped.
+- Without `ldconfig` in `PATH` (as a normal user on some systems), or when it can't
+  read its cache, the library check is skipped.
+- Libraries found through `LD_LIBRARY_PATH` (common with CUDA) aren't modelled, since
+  that's set per process; a module relying on it can show up as missing.
 
 <!-- options: python-venvs -->

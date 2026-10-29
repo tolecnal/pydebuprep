@@ -197,3 +197,30 @@ def test_bundled_wheel_libraries_find_their_siblings() -> None:
     files[f"{SITE}/numpy.libs/libgfortran-0400.so.5.0.0"] = build_elf(["libquadmath-9697.so.0.0.0"])
     files[f"{SITE}/numpy.libs/libquadmath-9697.so.0.0.0"] = build_elf([])
     assert all("numpy.libs" not in e for f in venvs(files) for e in f.evidence)
+
+
+# --- final review fixes --------------------------------------------------------------
+
+from pydebuprep.system import CommandResult  # noqa: E402
+
+
+def test_only_python_extension_modules_are_checked() -> None:
+    # Optional plugins and per-backend libraries load only when used: not findings.
+    files = venv_files()
+    files[f"{SITE}/PySide6/Qt/plugins/sqldrivers/libqsqlpsql.so"] = build_elf(["libpq.so.5"])
+    files[f"{SITE}/bitsandbytes/__init__.py"] = ""
+    files[f"{SITE}/bitsandbytes/libbitsandbytes_cuda118.so"] = build_elf(["libcudart.so.11.0"])
+    files[f"{SITE}/pkg/__init__.py"] = ""
+    files[f"{SITE}/pkg/_speedups.so"] = build_elf(["libgone.so.1"])
+    files[f"{SITE}/pkg/data/helper.so"] = build_elf(["libgone2.so.1"])  # not a package dir
+    evidence = [e for f in venvs(files) for e in f.evidence]
+    assert f"{SITE}/pkg/_speedups.so: libgone.so.1" in evidence
+    assert not any(word in e for e in evidence for word in ("libpq", "libcudart", "libgone2"))
+
+
+def test_a_failing_ldconfig_only_skips_the_library_check() -> None:
+    fail = CommandResult(LDCONFIG, 1, "", "ldconfig: Can't open cache file /etc/ld.so.cache\n")
+    ctx = make_ctx(files=venv_files(), python="3.13", commands={LDCONFIG: fail})
+    assert titles(PythonVenvsCheck().run(ctx)) == [
+        "1 virtualenv script starts an interpreter that doesn't exist"
+    ]

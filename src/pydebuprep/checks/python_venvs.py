@@ -5,7 +5,7 @@ import os
 import re
 
 from pydebuprep.checks._elf import elf_dependencies
-from pydebuprep.checks.base import Check, Context, Option, count, run_checked
+from pydebuprep.checks.base import Check, Context, Option, count
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
 SEARCH_PATHS = ["/opt", "/srv", "/usr/local", "/root", "/home", "/var/www"]
@@ -16,9 +16,22 @@ DEFAULT_LIB_DIRS = ("/lib", "/usr/lib", "/lib64", "/usr/lib64")
 HOST_ELF = "/bin/sh"  # its machine type is this system's
 
 
-def _is_shared_object(path: str) -> bool:
+# Python extension modules: name.cpython-313-x86_64-linux-gnu.so, name.abi3.so, name.pypy...
+EXTENSION = re.compile(r"\.(cpython-[^.]+|abi3|pypy[^.]*)\.so$")
+
+
+def _is_extension_module(ctx: Context, path: str) -> bool:
+    """A module Python imports, rather than a library or plugin a package loads only when
+    asked to (Qt's database drivers, CUDA variants, ...), which aren't checked."""
     name = os.path.basename(path)
-    return name.endswith(".so") or ".so." in name
+    if EXTENSION.search(name):
+        return True
+    directory = os.path.dirname(path)
+    return (
+        name.endswith(".so")
+        and not name.startswith("lib")
+        and (directory.endswith("site-packages") or ctx.system.exists(f"{directory}/__init__.py"))
+    )
 
 
 def _linker_view(ctx: Context) -> tuple[set[str], list[str]] | None:
@@ -27,7 +40,10 @@ def _linker_view(ctx: Context) -> tuple[set[str], list[str]] | None:
     if not ctx.system.which("ldconfig"):
         return None
     names, dirs = set(), set(DEFAULT_LIB_DIRS)
-    for line in run_checked(ctx, LDCONFIG).stdout.splitlines():
+    res = ctx.system.run(LDCONFIG)
+    if not res.ok:
+        return None  # no cache to ask (missing /etc/ld.so.cache, ...): libraries unchecked
+    for line in res.stdout.splitlines():
         name, _, target = line.strip().partition(" => ")
         if target:
             names.add(name.split(" (", 1)[0])
@@ -125,7 +141,7 @@ class PythonVenvsCheck(Check):
             path
             for venv in venvs
             for path in ctx.system.walk_files(f"{venv}/lib")
-            if _is_shared_object(path)
+            if _is_extension_module(ctx, path)
         ]
         view = _linker_view(ctx) if modules else None  # only ask ldconfig when needed
         if view is None:
