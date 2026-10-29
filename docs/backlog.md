@@ -22,8 +22,8 @@ Released `v0.2.0` on 2026-10-29: built and audited on all five releases, publish
 with `SHA256SUMS`, and the SLSA provenance attestation verified with
 `gh attestation verify`.
 
-`v0.3.0`: tagged after this backlog entry merged; what it contains is in
-`debian/changelog`.
+`v0.3.0` released on 2026-10-29. `v0.3.1`: tagged after this backlog entry merged
+(the apt solver log fix); what it contains is in `debian/changelog`.
 
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't
