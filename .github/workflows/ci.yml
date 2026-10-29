@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Weekly as well: the package is audited against the current distribution images.
+  schedule:
+    - cron: "23 4 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -35,3 +38,9 @@ jobs:
           python -m pip install -r requirements-dev.txt
           python -m pip install --no-deps -e .
       - run: make lint coverage PYTHON=python
+
+  package:
+    name: Package
+    uses: $/.github/workflows/package.yml
+    permissions:
+      contents: read

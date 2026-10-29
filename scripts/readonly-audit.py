@@ -2,11 +2,13 @@
 """Fail if a traced pydebuprep run changed anything on the system.
 
 Reads an `strace -f` log of the syscalls listed in readonly-audit.sh and reports
-every call that could change persistent state. Allowed: temporary files under /tmp
-that are deleted again before the run ends, anonymous O_TMPFILE files, writes to
-/dev/null and terminals, signal 0 (an existence probe), and the paths passed with
---allow (the snapshot directory for `pydebuprep snapshot`). Exit status 1 on any
-violation.
+every call that could change persistent state. Allowed: temporary files and
+directories under /tmp that are deleted again before the run ends, anonymous O_TMPFILE
+files, writes to /dev/null and terminals, signal 0 (an existence probe), and the paths
+passed with --allow (the snapshot directory for `pydebuprep snapshot`). A failed call
+changed nothing and is ignored, except under a --strict prefix, where even an attempt
+to write is a violation (UEFI variables are immutable files, so a write there would
+fail rather than show up). Exit status 1 on any violation.
 """
 
 from __future__ import annotations
@@ -26,8 +28,9 @@ QUOTED = re.compile(r'"((?:[^"\\]|\\.)*)"')
 
 
 class Auditor:
-    def __init__(self, allow: Sequence[str]) -> None:
+    def __init__(self, allow: Sequence[str], strict: Sequence[str] = ()) -> None:
         self.allow = tuple(allow)
+        self.strict = tuple(strict)
         self.programs: dict[str, str] = {}
         self.pending: dict[str, str] = {}
         self.created_tmp: dict[str, str] = {}
@@ -57,11 +60,21 @@ class Auditor:
             self.programs[pid] = argv.group(1).replace('"', "")[:80] if argv else rest[:80]
             return
         call = CALL.match(rest)
-        if not call or call.group(3).startswith("-"):
-            return  # unparsable, or failed (a failed call changed nothing)
-        name, args, _ = call.groups()
+        if not call:
+            return
+        name, args, result = call.groups()
         where = f"{self.programs.get(pid, f'pid {pid}')}: {name}({args[:160]})"
-        self.check(name, args, QUOTED.findall(args), where)
+        targets = QUOTED.findall(args)
+        if result.startswith("-"):
+            if self.strict_attempt(name, args, targets):
+                self.violations.append(f"{where} (failed attempt)")
+            return
+        self.check(name, args, targets, where)
+
+    def strict_attempt(self, name: str, args: str, targets: list[str]) -> bool:
+        if not any(t.startswith(self.strict) for t in targets):
+            return False
+        return bool(WRITE_FLAGS.search(args)) if name.startswith("open") else True
 
     def check(self, name: str, args: str, targets: list[str], where: str) -> None:
         if name.startswith("open") or name == "creat":
@@ -84,6 +97,8 @@ class Auditor:
             if not re.search(r",\s*0\)?$", args):  # signal 0 only probes for existence
                 target = args.split(",", 1)[0].strip().lstrip("-")
                 self.signals.append((target, where))
+        elif name in ("mkdir", "mkdirat") and targets and targets[-1].startswith(TMP):
+            self.created_tmp.setdefault(targets[-1], where)
         elif not (targets and all(self.scratch_or_allowed(t) for t in targets)):
             self.violations.append(where)
 
@@ -114,8 +129,14 @@ def main() -> int:
     parser.add_argument(
         "--allow", action="append", default=[], help="path prefix allowed to change"
     )
+    parser.add_argument(
+        "--strict",
+        action="append",
+        default=[],
+        help="path prefix where even a failed attempt to change it is a violation",
+    )
     opts = parser.parse_args()
-    auditor = Auditor(opts.allow)
+    auditor = Auditor(opts.allow, opts.strict)
     with open(opts.log, errors="replace") as fh:
         for raw in fh:
             auditor.feed(raw)

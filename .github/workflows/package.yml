@@ -1,0 +1,144 @@
+name: Package
+
+# Builds the .deb once, then installs it and proves a root run changes nothing, three
+# ways on every supported release:
+#   - in plain containers (no systemd: the checks must cope without it);
+#   - in containers booted with systemd as PID 1, with the services the checks inspect
+#     running, so systemctl, journalctl and systemd-analyze meet a real service manager
+#     and efibootmgr reads the runner's UEFI variables;
+#   - on the Ubuntu runner VMs themselves: real firmware, systemd-resolved and Docker.
+# Called by CI (every pull request and push to main) and by Release, which publishes
+# the "deb" artifact this leaves behind.
+on:
+  workflow_call:
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build .deb
+    runs-on: ubuntu-latest
+    container: debian:bookworm
+    permissions:
+      contents: read
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential devscripts lintian \
+            debhelper dh-python python3-all python3-setuptools python3-yaml python3-pytest
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the tag matches the package and Python versions
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          deb_version=$(dpkg-parsechangelog -S Version)
+          py_version=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/pydebuprep/__init__.py)
+          echo "tag=$TAG debian/changelog=$deb_version __version__=$py_version"
+          test "$TAG" = "v$deb_version"
+          test "$deb_version" = "$py_version"
+      - name: Build
+        run: dpkg-buildpackage -us -uc -b
+      - name: Lintian
+        run: lintian --fail-on error,warning ../*.deb
+      - name: Collect the package and checksums
+        run: |
+          mkdir dist
+          cp ../pydebuprep_*_all.deb dist/
+          cd dist && sha256sum ./*.deb > SHA256SUMS && cat SHA256SUMS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: deb
+          path: dist/
+          if-no-files-found: error
+
+  container:
+    name: Audit in container (${{ matrix.image }})
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["debian:bookworm", "debian:trixie", "ubuntu:22.04", "ubuntu:24.04", "ubuntu:26.04"]
+    container: ${{ matrix.image }}
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: deb
+          path: dist
+      - name: Verify checksums
+        run: cd dist && sha256sum -c SHA256SUMS
+      - name: Install and smoke test
+        run: |
+          apt-get update
+          scripts/smoke-test.sh ./dist/pydebuprep_*_all.deb
+      - name: Prove a root run changes nothing (strace + filesystem timestamps)
+        run: scripts/ci-readonly-audit.sh
+
+  systemd:
+    name: Audit with systemd (${{ matrix.image }})
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["debian:bookworm", "debian:trixie", "ubuntu:22.04", "ubuntu:24.04", "ubuntu:26.04"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: deb
+          path: dist
+      - name: Verify checksums
+        run: cd dist && sha256sum -c SHA256SUMS
+      - name: Boot the container, install, smoke test and audit
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: scripts/ci-systemd-container.sh "$IMAGE" dist/pydebuprep_*_all.deb
+
+  host:
+    name: Audit on the runner (${{ matrix.os }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: deb
+          path: dist
+      - name: Verify checksums
+        run: cd dist && sha256sum -c SHA256SUMS
+      - name: Start a container for the docker check to list
+        run: docker run -d --name audit-sleeper debian:trixie sleep infinity
+      - name: Install and smoke test
+        run: |
+          sudo apt-get update
+          sudo -E scripts/smoke-test.sh ./dist/pydebuprep_*_all.deb
+      - name: Prove a root run changes nothing (strace, timestamps, systemd jobs)
+        run: sudo -E scripts/ci-readonly-audit.sh
