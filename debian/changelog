@@ -1,3 +1,34 @@
+pydebuprep (0.3.0) unstable; urgency=medium
+
+  * New checks:
+    - network: default route and DNS; with a baseline, interfaces, addresses,
+      routes, DNS and the network manager.
+    - firewall: ufw or nftables enabled but no rules loaded; rules lost since
+      the baseline.
+    - time-sync: a time service runs and the clock is synchronised.
+    - apparmor: disabled, complain-mode profiles, denials, lost enforcement.
+    - unattended-upgrades: disabled, or origins naming the old release.
+    - cron: jobs whose program no longer exists; no cron daemon.
+    - ssh-server: sshd -t errors and warnings; DSA keys in authorized_keys.
+    - postgresql, mariadb, postfix, bind, docker and python-venvs, in a new
+      applications section.
+  * boot-time shows the critical chain; disk-space has a minimum free space
+    for / and /var (important_mounts, min_free_mib).
+  * Snapshots are private: the directory is 0700 and each file 0600.
+    Upgrading tightens /var/lib/pydebuprep from 0750. (CodeQL
+    py/overly-permissive-file)
+  * New options: config-conflicts.ignore_paths for files a configuration tool
+    manages, and a shared 'logs: ignore:' list of regular expressions for
+    journal-errors and dmesg-errors.
+  * Without a baseline, the report says so once instead of in every check.
+  * fstab: swap files are no longer reported when the fstab target is 'swap'.
+  * Runs without python3-yaml when YAML isn't needed, with an install hint
+    when it is.
+  * Documentation: SECURITY.md, a CHECKS section in the man page, README
+    badges and install instructions for GitHub releases.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Thu, 29 Oct 2026 15:25:39 +0100
+
 pydebuprep (0.2.0) unstable; urgency=medium
 
   * Configuration file /etc/pydebuprep.conf (YAML) with per-check options,
