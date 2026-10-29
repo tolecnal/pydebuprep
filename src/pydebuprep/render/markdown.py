@@ -4,12 +4,14 @@ import re
 
 from pydebuprep.model import Finding, Report
 from pydebuprep.render._common import (
+    NOTHING_TO_DO,
     baseline_line,
     baseline_state,
     by_category,
     has_baseline_section,
     host_line,
     summary_line,
+    todo_items,
 )
 
 _SPECIAL = re.compile(r"([\\`*_|<>\[\]])")
@@ -43,7 +45,7 @@ def _finding(f: Finding) -> list[str]:
     return out
 
 
-def render(report: Report) -> str:
+def render(report: Report, *, todo: bool = False) -> str:
     out = ["# pydebuprep report", ""]
     out += [f"- {esc(host_line(report))}", f"- Generated: {esc(report.generated_at)}"]
     out += [f"- {esc(baseline_line(report))}", "", "## Summary", "", esc(summary_line(report))]
@@ -65,4 +67,16 @@ def render(report: Report) -> str:
                     out += ["Changes since baseline:", ""]
                     for f in r.baseline_diff or []:
                         out += _finding(f)
+    if todo:
+        out += ["", "## TODO", ""]
+        items = todo_items(report)
+        out += [NOTHING_TO_DO] if not items else []
+        for item in items:
+            label = (
+                f"**{item.severity.upper()}** `{item.check}`: {esc(item.title)}"
+                if item.severity
+                else esc(item.title)
+            )
+            out.append(f"- [ ] {label}")
+            out.extend(f"  - [ ] {esc(step)}" for step in item.steps)
     return "\n".join(out).rstrip() + "\n"

@@ -32,6 +32,7 @@ class ReportSettings:
     output_dir: str | None = None
     min_severity: str = "info"
     color: bool = True
+    todo: bool = False
     baseline: str = "auto"
     snapshot_dir: str = DEFAULT_SNAPSHOT_DIR
 
@@ -42,6 +43,7 @@ REPORT_HELP = {
     "min_severity": "Hide findings below this severity: info, warning, critical "
     "(the exit code still counts them)",
     "color": "Colorize text output when writing to a terminal",
+    "todo": "Add a TODO checklist of what needs fixing at the end of each report",
     "baseline": "Snapshot to compare against: auto (newest in snapshot_dir), none, or a file path",
     "snapshot_dir": "Where snapshots are written and looked up",
 }
@@ -81,11 +83,11 @@ def _report_settings(data: Any, source: str, errors: list[str]) -> ReportSetting
                 errors.append(f"{where}: must be one of {', '.join(SEVERITIES)}")
             else:
                 settings.min_severity = value
-        elif key == "color":
+        elif key in ("color", "todo"):
             if not isinstance(value, bool):
                 errors.append(f"{where}: expected true or false")
             else:
-                settings.color = value
+                setattr(settings, key, value)
         elif key == "output_dir":
             if value is not None and not isinstance(value, str):
                 errors.append(f"{where}: expected a directory path or null")

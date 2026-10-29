@@ -130,8 +130,23 @@ sudo pydebuprep report --format html --output-dir /var/tmp
 | `--checks ID,...` / `--skip ID,...` | Run only, or leave out, specific checks. |
 | `--min-severity warning\|critical` | Hide lower-severity findings (the exit code still counts them). |
 | `--no-color` | Plain text output (also when not a TTY or `NO_COLOR` is set). |
+| `--todo` / `--no-todo` | Add a TODO checklist at the end of the report (see below); `todo: true` in the config makes it the default. |
 | `--check-option CHECK.OPTION=VALUE` | Set a check option; repeat it to add items to a list option. See `pydebuprep list-checks --verbose`. |
 | `--config FILE` / `--no-config` | Use another config file, or none. |
+
+### A TODO list to track the fixes
+
+```sh
+sudo pydebuprep report --todo --format markdown -o upgrade-todo.md
+```
+
+`--todo` ends the report with a checklist of what needs doing: one item per critical
+or warning finding (critical first), with its remediation steps as sub-items to tick
+off; an item for each check that failed to run; a reminder to run as root if checks
+were skipped for that; and a final "run pydebuprep again" item. Info findings are
+left out. Markdown renders it as a task list (tickable on GitHub and GitLab), HTML as
+checkboxes, text as `[ ]`, Jira and Confluence as ☐ bullets, and JSON/YAML add a
+`todo` array for tools. `convert --todo` adds it to a saved report.
 
 ### Converting a saved report
 

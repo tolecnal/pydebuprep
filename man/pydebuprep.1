@@ -12,6 +12,7 @@ pydebuprep \- read\-only health report for Debian and Ubuntu after a release upg
 .RB [ \-\-skip\ \fIID,...\fR ]
 .RB [ \-\-min\-severity\ \fILEVEL\fR ]
 .RB [ \-\-no\-color ]
+.RB [ \-\-todo \ |\  \-\-no\-todo ]
 .RB [ \-\-check\-option\ \fICHECK.OPTION=VALUE\fR ]
 .RB [ \-\-config\ \fIFILE\fR \ |\  \-\-no\-config ]
 .br
@@ -20,6 +21,7 @@ pydebuprep \- read\-only health report for Debian and Ubuntu after a release upg
 .RB [ \-\-format\ \fIFORMAT\fR ]
 .RB [ \-\-output\-dir\ \fIDIR\fR \ |\  \-\-output\ \fIFILE\fR ]
 .RB [ \-\-no\-color ]
+.RB [ \-\-todo \ |\  \-\-no\-todo ]
 .br
 .B pydebuprep snapshot
 .RB [ \-\-snapshot\-dir\ \fIDIR\fR ]
@@ -162,6 +164,19 @@ Never colorize text output. Color is also disabled when standard output is not
 a terminal or the
 .B NO_COLOR
 environment variable is set.
+.TP
+.BR \-\-todo ", " \-\-no\-todo
+Add (or leave out) a TODO checklist at the end of the report, to track the manual
+steps of fixing the system: one item per critical or warning finding, critical
+first, with its remediation steps as sub\-items; an item for each check that
+failed to run; a reminder to run as root if checks were skipped for that reason;
+and a final confirmation run. Info findings are left out. Markdown uses task
+lists and HTML checkboxes; JSON and YAML get a
+.B todo
+array. Overrides
+.B todo
+in the configuration file. Also accepted by
+.BR convert .
 .TP
 .BI \-\-check\-option " CHECK.OPTION=VALUE"
 Set an option of one check, overriding the configuration file. May be given

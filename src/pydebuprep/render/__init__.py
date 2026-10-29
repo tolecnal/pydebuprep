@@ -18,24 +18,24 @@ EXTENSIONS = {
 }
 
 
-def render(report: Report, fmt: str, *, color: bool = False) -> str:
-    """Render to a string that always encodes as UTF-8."""
-    return valid_utf8(_render(report, fmt, color))
+def render(report: Report, fmt: str, *, color: bool = False, todo: bool = False) -> str:
+    """Render to a string that always encodes as UTF-8; todo adds the TODO checklist."""
+    return valid_utf8(_render(report, fmt, color, todo))
 
 
-def _render(report: Report, fmt: str, color: bool) -> str:
+def _render(report: Report, fmt: str, color: bool, todo: bool) -> str:
     if fmt == "text":
-        return text.render(clean_report(report), color=color)
+        return text.render(clean_report(report), color=color, todo=todo)
     if fmt == "json":
-        return json_.render(report)
+        return json_.render(report, todo=todo)
     if fmt == "yaml":
-        return yaml_.render(report)
+        return yaml_.render(report, todo=todo)
     if fmt == "html":
-        return html.render(report)
+        return html.render(report, todo=todo)
     if fmt == "markdown":
-        return markdown.render(clean_report(report))
+        return markdown.render(clean_report(report), todo=todo)
     if fmt == "jira":
-        return jira.render(clean_report(report))
+        return jira.render(clean_report(report), todo=todo)
     if fmt == "confluence":
-        return confluence.render(clean_report(report))
+        return confluence.render(clean_report(report), todo=todo)
     raise ValueError(f"unknown format: {fmt}")

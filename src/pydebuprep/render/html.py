@@ -4,15 +4,18 @@ from html import escape
 
 from pydebuprep.model import Finding, Report
 from pydebuprep.render._common import (
+    NOTHING_TO_DO,
     baseline_line,
     baseline_state,
     by_category,
     has_baseline_section,
     host_line,
     summary_line,
+    todo_items,
 )
 
 STYLE = """
+ul.todo, ul.todo ul { list-style: none; padding-left: 1.2em; }
 :root { --bg:#ffffff; --fg:#1d1f21; --muted:#5f6368; --line:#d9dce1; --code:#f4f5f7;
   --critical:#b3261e; --warning:#8a5a00; --info:#0b5cad; --ok:#1e7d32; }
 @media (prefers-color-scheme: dark) {
@@ -63,7 +66,7 @@ def _finding(f: Finding) -> list[str]:
     return out
 
 
-def render(report: Report) -> str:
+def render(report: Report, *, todo: bool = False) -> str:
     out = [
         "<!doctype html>",
         '<html lang="en"><head><meta charset="utf-8">',
@@ -97,5 +100,29 @@ def render(report: Report) -> str:
                     for f in r.baseline_diff or []:
                         out += _finding(f)
             out.append("</section>")
+    if todo:
+        out.append('<h2 id="todo">TODO</h2>')
+        items = todo_items(report)
+        if not items:
+            out.append(f"<p>{NOTHING_TO_DO}</p>")
+        else:
+            out.append('<ul class="todo">')
+            for item in items:
+                label = (
+                    f'<span class="sev {item.severity}">{item.severity}</span> '
+                    f"<code>{escape(item.check or '')}</code>: {escape(item.title)}"
+                    if item.severity
+                    else escape(item.title)
+                )
+                steps = "".join(
+                    f'<li><label><input type="checkbox"> <code>{escape(step)}</code></label></li>'
+                    for step in item.steps
+                )
+                out.append(
+                    f'<li><label><input type="checkbox"> {label}</label>'
+                    + (f"<ul>{steps}</ul>" if steps else "")
+                    + "</li>"
+                )
+            out.append("</ul>")
     out.append("</body></html>")
     return "\n".join(out) + "\n"

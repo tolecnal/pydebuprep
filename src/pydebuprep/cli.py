@@ -124,6 +124,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="hide findings below this severity (default: info; exit code still counts them)",
     )
     report.add_argument("--no-color", action="store_true", help="never colorize text output")
+    report.add_argument(
+        "--todo",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="add a TODO checklist of what needs fixing at the end of the report",
+    )
     _add_check_option_arg(report)
     _add_config_args(report)
 
@@ -136,6 +142,12 @@ def build_parser() -> argparse.ArgumentParser:
     conv.add_argument("--format", "-f", choices=FORMATS, help="output format (default: text)")
     _add_output_args(conv)
     conv.add_argument("--no-color", action="store_true", help="never colorize text output")
+    conv.add_argument(
+        "--todo",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="add a TODO checklist of what needs fixing at the end of the report",
+    )
 
     snap = sub.add_parser("snapshot", help="record a pre-upgrade baseline")
     snap.add_argument(
@@ -331,15 +343,18 @@ def cmd_report(args: argparse.Namespace, system: System) -> int:
         results=_filter_for_display(results, Severity(min_severity)),
     )
     path = resolve_output_path(output, output_dir, host.hostname, fmt, now)
-    _write_or_print(report, fmt, path, use_color(args.no_color, config.report.color))
+    todo = config.report.todo if args.todo is None else args.todo
+    _write_or_print(report, fmt, path, use_color(args.no_color, config.report.color), todo)
     return summary.exit_code
 
 
-def _write_or_print(report: Report, fmt: str, path: Path | None, color: bool) -> None:
+def _write_or_print(
+    report: Report, fmt: str, path: Path | None, color: bool, todo: bool = False
+) -> None:
     if path is None:
-        _print(render(report, fmt, color=color))
+        _print(render(report, fmt, color=color, todo=todo))
     else:
-        _write(render(report, fmt), path)
+        _write(render(report, fmt, todo=todo), path)
         print(f"Report written to {path}", file=sys.stderr)
 
 
@@ -369,7 +384,7 @@ def cmd_convert(args: argparse.Namespace) -> int:
         _ensure_writable_dir(Path(output).parent, "output directory")
     when = datetime.fromisoformat(report.generated_at).astimezone(timezone.utc)
     path = resolve_output_path(output, output_dir, report.host.hostname, fmt, when)
-    _write_or_print(report, fmt, path, use_color(args.no_color))
+    _write_or_print(report, fmt, path, use_color(args.no_color), bool(args.todo))
     return 0
 
 

@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from pydebuprep.model import Finding, Report
 from pydebuprep.render._common import (
+    NOTHING_TO_DO,
     baseline_line,
     baseline_state,
     by_category,
     has_baseline_section,
     host_line,
     summary_line,
+    todo_items,
 )
 
 COLORS = {
@@ -44,7 +46,7 @@ def _finding(f: Finding, indent: str, color: bool) -> list[str]:
     return lines
 
 
-def render(report: Report, *, color: bool = False) -> str:
+def render(report: Report, *, color: bool = False, todo: bool = False) -> str:
     title = "pydebuprep report"
     out = [title, "=" * len(title), host_line(report), f"Generated: {report.generated_at}"]
     out += [baseline_line(report), "", f"Summary: {summary_line(report)}"]
@@ -67,4 +69,11 @@ def render(report: Report, *, color: bool = False) -> str:
                     out.append("  Changes since baseline:")
                     for f in r.baseline_diff or []:
                         out += _finding(f, "    ", color)
+    if todo:
+        out += ["", "TODO", "----"]
+        items = todo_items(report)
+        out += [NOTHING_TO_DO] if not items else []
+        for item in items:
+            out.append(f"[ ] {item.label}")
+            out.extend(f"    [ ] {step}" for step in item.steps)
     return "\n".join(out) + "\n"
