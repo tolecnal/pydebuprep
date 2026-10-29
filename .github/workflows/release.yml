@@ -1,8 +1,9 @@
 name: Release
 
-# Pushing a tag vX.Y.Z builds the .deb once, installs and audits it on every supported
-# release, then publishes it with SHA256SUMS and a build-provenance attestation as a
-# GitHub Release. Run it manually to build and verify without publishing.
+# The only workflow that builds packages. Pushing a tag vX.Y.Z builds the .deb once,
+# installs and audits it on every supported release, then publishes it with SHA256SUMS
+# and a build-provenance attestation as a GitHub Release. Run it manually (Actions ->
+# Release -> Run workflow) to build and verify a branch without publishing.
 on:
   push:
     tags: ["v*"]

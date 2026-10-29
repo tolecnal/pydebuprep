@@ -279,7 +279,7 @@ without publishing it.
 | Security / pip-audit | Known vulnerabilities in the pinned tools (`requirements-dev.txt`, `requirements-audit.txt`) |
 | Security / zizmor | GitHub Actions security: pinning, permissions, credentials, injection; results in the Security tab |
 | Security / Dependency review | New vulnerable dependencies in pull requests |
-| CI / Package | Builds and audits the `.deb` on every release with `scripts/readonly-audit.sh` |
+| Release | Builds the `.deb` only for a release tag (or a manual run), and audits it on every supported release with `scripts/readonly-audit.sh` before publishing |
 
 Dependabot (`.github/dependabot.yml`) proposes weekly updates for the pinned action
 commits and Python tools. It waits 7 days before suggesting a new release, so a
