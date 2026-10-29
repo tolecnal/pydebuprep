@@ -71,6 +71,19 @@ _pydebuprep_report() {
         '(--config --no-config -c)--no-config[ignore any config file]'
 }
 
+_pydebuprep_convert() {
+    _arguments -s -S \
+        '(--help -h)--help[show this help message and exit]' \
+        '(--help -h)-h[show this help message and exit]' \
+        '(--format -f)--format=[output format]:format:(text json yaml html markdown jira confluence)' \
+        '(--format -f)-f[output format]:format:(text json yaml html markdown jira confluence)' \
+        '(--output --output-dir -o)--output-dir=[write the report to a timestamped file in DIR instead of stdout]:output-dir:_files -/' \
+        '(--output --output-dir -o)--output=[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
+        '(--output --output-dir -o)-o[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
+        '--no-color[never colorize text output]' \
+        '1:file:_files'
+}
+
 _pydebuprep_snapshot() {
     _arguments -s -S \
         '(--help -h)--help[show this help message and exit]' \
@@ -116,6 +129,7 @@ _pydebuprep() {
     local -a commands
     commands=(
         'report:run all checks and print a report (default)'
+        'convert:render a saved JSON or YAML report in another format'
         'snapshot:record a pre-upgrade baseline'
         'list-checks:list available checks'
         'configtest:validate the config file and exit'

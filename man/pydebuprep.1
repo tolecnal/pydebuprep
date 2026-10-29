@@ -15,6 +15,12 @@ pydebuprep \- read\-only health report for Debian and Ubuntu after a release upg
 .RB [ \-\-check\-option\ \fICHECK.OPTION=VALUE\fR ]
 .RB [ \-\-config\ \fIFILE\fR \ |\  \-\-no\-config ]
 .br
+.B pydebuprep convert
+.I FILE
+.RB [ \-\-format\ \fIFORMAT\fR ]
+.RB [ \-\-output\-dir\ \fIDIR\fR \ |\  \-\-output\ \fIFILE\fR ]
+.RB [ \-\-no\-color ]
+.br
 .B pydebuprep snapshot
 .RB [ \-\-snapshot\-dir\ \fIDIR\fR ]
 .RB [ \-\-check\-option\ \fICHECK.OPTION=VALUE\fR ]
@@ -61,6 +67,23 @@ skipped otherwise.
 Run all checks and print a report. This is the default when no command is
 given. If a snapshot exists, the newest one is used as a baseline and each
 check reports what changed since it was taken.
+.TP
+.BI convert " FILE"
+Render a report saved earlier with
+.B \-\-format json
+or
+.B \-\-format yaml
+in another format, for example to paste a host's report into Jira later.
+.I FILE
+may be
+.B \-
+for standard input. The output is the same as running
+.B report
+in that format at the time; the timestamp and host in file names come from the
+saved report. Text, HTML, Markdown, Jira and Confluence reports can't be read
+back, so keep a JSON or YAML copy. The file is validated field by field; an
+invalid one is rejected with the field at fault and exit status 3. Exits 0 on
+success, whatever the report's findings.
 .TP
 .B snapshot
 Record a baseline before upgrading: OS release, kernel, active and enabled
