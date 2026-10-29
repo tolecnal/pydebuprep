@@ -19,7 +19,7 @@ _pydebuprep_check_options() {
         return
     fi
     local -a opts
-    opts=(apt-lists-age.max_age_days= boot-space.critical_pct= boot-space.warning_pct= config-conflicts.critical_paths= debsums.timeout_seconds= disk-space.critical_pct= disk-space.exclude_mounts= disk-space.include_remote= disk-space.warning_pct= dmesg-errors.ignore= journal-errors.ignore= systemd-failed.ignore_units= systemd-timers.ignore_units=)
+    opts=(apt-lists-age.max_age_days= boot-space.critical_pct= boot-space.warning_pct= config-conflicts.critical_paths= config-conflicts.ignore_paths= debsums.timeout_seconds= disk-space.critical_pct= disk-space.exclude_mounts= disk-space.include_remote= disk-space.warning_pct= dmesg-errors.ignore= journal-errors.ignore= systemd-failed.ignore_units= systemd-timers.ignore_units=)
     compadd -S '' -a opts
 }
 

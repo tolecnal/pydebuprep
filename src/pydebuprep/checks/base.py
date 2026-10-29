@@ -25,6 +25,9 @@ class Context:
     system: System
     osinfo: OsInfo
     baseline: dict[str, Any] | None = None
+    # Regular expressions from the config file's logs.ignore, shared by the log checks
+    # and matched against the message text.
+    log_ignore: tuple[str, ...] = ()
 
     @property
     def is_root(self) -> bool:

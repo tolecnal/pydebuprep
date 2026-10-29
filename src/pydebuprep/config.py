@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import textwrap
 from dataclasses import dataclass, field
 from typing import Any
 
-import yaml
-
 from pydebuprep import checks
 from pydebuprep.checks.base import Option
+from pydebuprep.deps import require_yaml
 from pydebuprep.model import CATEGORY_ORDER, Severity
 from pydebuprep.render import FORMATS
 from pydebuprep.snapshot import DEFAULT_SNAPSHOT_DIR
@@ -52,6 +53,7 @@ class Config:
     disabled: set[str] = field(default_factory=set)
     check_settings: dict[str, dict[str, Any]] = field(default_factory=dict)
     path: str | None = None
+    log_ignore: list[str] = field(default_factory=list)
 
     @classmethod
     def defaults(cls) -> Config:
@@ -135,6 +137,7 @@ def _check_settings(
 
 def parse_config(text: str, source: str) -> Config:
     """Parse and validate a config file; ConfigError lists every problem found."""
+    yaml = require_yaml()
     try:
         data = yaml.safe_load(text)
     except yaml.YAMLError as exc:
@@ -149,13 +152,40 @@ def parse_config(text: str, source: str) -> Config:
     errors = [
         f"{source}: unknown top-level key {key!r}"
         for key in data
-        if key not in ("report", "checks")
+        if key not in ("report", "logs", "checks")
     ]
     report = _report_settings(data.get("report"), source, errors)
+    log_ignore = _log_ignore(data.get("logs"), source, errors)
     disabled, check_settings = _check_settings(data.get("checks"), source, errors)
     if errors:
         raise ConfigError(errors)
-    return Config(report, disabled, check_settings, source)
+    return Config(report, disabled, check_settings, source, log_ignore)
+
+
+LOGS_HELP = (
+    "Regular expressions for log messages to leave out of both journal-errors and "
+    "dmesg-errors, matched against the message text. Kernel messages appear in both, so "
+    "one pattern here covers them; use a check's own 'ignore' option for the rest."
+)
+
+
+def _log_ignore(data: Any, source: str, errors: list[str]) -> list[str]:
+    if data is None:
+        return []
+    if not isinstance(data, dict):
+        errors.append(f"{source}: logs: expected a mapping")
+        return []
+    errors.extend(f"{source}: logs: unknown key {key!r}" for key in data if key != "ignore")
+    patterns = data.get("ignore") or []
+    if not isinstance(patterns, list) or not all(isinstance(p, str) for p in patterns):
+        errors.append(f"{source}: logs.ignore: expected a list of regular expressions")
+        return []
+    for pattern in patterns:
+        try:
+            re.compile(pattern)
+        except re.error as exc:
+            errors.append(f"{source}: logs.ignore: invalid pattern {pattern!r}: {exc}")
+    return list(patterns)
 
 
 def load_config(path: str | None, *, default_path: str = DEFAULT_CONFIG_PATH) -> Config:
@@ -207,8 +237,16 @@ def _yaml_value(value: Any) -> str:
     if isinstance(value, list):
         return "[" + ", ".join(json.dumps(v) for v in value) + "]"
     text = str(value)
-    plain = yaml.safe_load(text) == text and ": " not in text and not text.startswith("#")
-    return text if plain else json.dumps(text)
+    return text if _plain_yaml_scalar(text) else json.dumps(text)
+
+
+YAML_WORDS = {"null", "true", "false", "yes", "no", "on", "off", "y", "n", "~", ""}
+PLAIN = re.compile(r"[A-Za-z_/][A-Za-z0-9_./@+-]*")
+
+
+def _plain_yaml_scalar(text: str) -> bool:
+    """Whether TEXT reads back as the same string when written unquoted in YAML."""
+    return bool(PLAIN.fullmatch(text)) and text.lower() not in YAML_WORDS
 
 
 def _option_lines(option: Option) -> list[str]:
@@ -230,6 +268,12 @@ def example_config() -> str:
     ]
     for key, help_text in REPORT_HELP.items():
         lines += [f"  # {help_text}", f"  {key}: {_yaml_value(getattr(defaults, key))}"]
+    lines += [
+        "",
+        *(f"# {line}" for line in textwrap.wrap(LOGS_HELP, 86, break_on_hyphens=False)),
+        "logs:",
+        "  ignore: []",
+    ]
     lines += [
         "",
         "# One section per check. 'enabled: false' leaves a check out; the other keys are",

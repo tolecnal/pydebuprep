@@ -100,3 +100,22 @@ def test_debsums_timeout_option() -> None:
         ctx = make_ctx(commands={DEBSUMS: ""})
         DebsumsCheck(settings).run(ctx)
         assert ctx.system.timeouts == [expected]  # type: ignore[attr-defined]
+
+
+def test_config_conflicts_ignore_paths() -> None:
+    check = ConfigConflictsCheck(
+        {"ignore_paths": ["/etc/nginx/*", "/etc/ssh/sshd_config", "*.ucf-old"]}
+    )
+    fs = check.run(
+        ctx_with(
+            "/etc/nginx/nginx.conf.dpkg-dist",  # managed by Ansible: ignored
+            "/etc/nginx/sites-available/x.dpkg-new",  # '*' spans '/', like fnmatch
+            "/etc/ssh/sshd_config.dpkg-dist",  # original path matches: ignored
+            "/etc/default/grub.ucf-old",  # leftover path matches: ignored
+            "/etc/php/8.4/fpm/php.ini.ucf-dist",  # still reported
+        )
+    )
+    assert [(f.severity, f.title) for f in fs] == [
+        (Severity.WARNING, "1 config file has unmerged package versions")
+    ]
+    assert fs[0].evidence == ["/etc/php/8.4/fpm/php.ini.ucf-dist"]

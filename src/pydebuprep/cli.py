@@ -14,6 +14,7 @@ from typing import Any
 from pydebuprep import __version__, checks
 from pydebuprep.checks.base import Check, CommandFailed, Context, running_kernel
 from pydebuprep.config import DEFAULT_CONFIG_PATH, Config, ConfigError, example_config, load_config
+from pydebuprep.deps import MissingDependency
 from pydebuprep.model import CATEGORY_ORDER, CheckResult, Host, Report, Severity, compute_summary
 from pydebuprep.osinfo import detect_os
 from pydebuprep.render import EXTENSIONS, FORMATS, render
@@ -278,7 +279,7 @@ def cmd_report(args: argparse.Namespace, system: System) -> int:
         # os-release reports these itself; repeat them only when it isn't running.
         for warning in baseline_warnings(loaded[1], system.hostname(), osinfo.codename):
             print(f"pydebuprep: warning: {warning}", file=sys.stderr)
-    ctx = Context(system, osinfo, loaded[1] if loaded else None)
+    ctx = Context(system, osinfo, loaded[1] if loaded else None, tuple(config.log_ignore))
     results = run_checks(selected, ctx)
     summary = compute_summary(results)
     try:
@@ -382,6 +383,9 @@ def main(argv: list[str] | None = None, *, system: System | None = None) -> int:
             _print(bash_completion() if args.shell == "bash" else zsh_completion())
             return 0
         return cmd_report(args, system)
+    except MissingDependency as exc:
+        print(f"pydebuprep: error: {exc}", file=sys.stderr)
+        return EXIT_TOOL_ERROR
     except ConfigError as exc:
         for error in exc.errors:
             print(f"pydebuprep: config error: {error}", file=sys.stderr)

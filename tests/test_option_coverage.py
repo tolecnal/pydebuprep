@@ -31,6 +31,10 @@ OPTION_TESTS: dict[tuple[str, str], str] = {
         "config-conflicts",
         "critical_paths",
     ): "checks.test_config_and_debsums::test_config_conflicts_critical_paths_configurable",
+    (
+        "config-conflicts",
+        "ignore_paths",
+    ): "checks.test_config_and_debsums::test_config_conflicts_ignore_paths",
     ("debsums", "timeout_seconds"): "checks.test_config_and_debsums::test_debsums_timeout_option",
     (
         "disk-space",

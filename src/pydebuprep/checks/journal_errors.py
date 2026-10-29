@@ -25,6 +25,10 @@ def compile_patterns(patterns: list[str]) -> list[re.Pattern[str]]:
     return compiled
 
 
+def shared_patterns(ctx: Context) -> list[re.Pattern[str]]:
+    return compile_patterns(list(ctx.log_ignore))
+
+
 def _message(value: object) -> str:
     if isinstance(value, list):
         try:
@@ -57,6 +61,7 @@ class JournalErrorsCheck(Check):
         counts: Counter[tuple[str, str]] = Counter()
         examples: dict[tuple[str, str], str] = {}
         ignored = 0
+        shared = shared_patterns(ctx)
         variants: dict[tuple[str, str], set[str]] = {}
         for line in res.stdout.splitlines():
             try:
@@ -67,7 +72,9 @@ class JournalErrorsCheck(Check):
                 continue
             ident = entry.get("SYSLOG_IDENTIFIER") or entry.get("_COMM") or "kernel"
             msg = " ".join(_message(entry.get("MESSAGE", "")).split())[:MAX_MESSAGE]
-            if any(p.search(f"{ident}: {msg}") for p in self.patterns):
+            if any(p.search(msg) for p in shared) or any(
+                p.search(f"{ident}: {msg}") for p in self.patterns
+            ):
                 ignored += 1
                 continue
             key = (str(ident), VARIABLE.sub("#", msg))

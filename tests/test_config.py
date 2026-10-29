@@ -170,3 +170,37 @@ def test_load_config_keeps_absolute_paths(tmp_path: Path) -> None:
     p.write_text("report:\n  output_dir: /var/tmp/x\n  baseline: /srv/s.json\n")
     cfg = load_config(str(p))
     assert (cfg.report.output_dir, cfg.report.baseline) == ("/var/tmp/x", "/srv/s.json")
+
+
+def test_logs_ignore_section() -> None:
+    cfg = parse_config('logs:\n  ignore: ["^ACPI BIOS Error", "a{1,3}"]\n', "x.conf")
+    assert cfg.log_ignore == ["^ACPI BIOS Error", "a{1,3}"]
+    assert parse_config("", "x.conf").log_ignore == []
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        ("logs:\n  ignore: ['(']\n", "x.conf: logs.ignore: invalid pattern '('"),
+        (
+            "logs:\n  ignore: '^ACPI'\n",
+            "x.conf: logs.ignore: expected a list of regular expressions",
+        ),
+        (
+            "logs:\n  ignore: [1, true]\n",
+            "x.conf: logs.ignore: expected a list of regular expressions",
+        ),
+        ("logs:\n  ignroe: []\n", "x.conf: logs: unknown key 'ignroe'"),
+        ("logs: [1]\n", "x.conf: logs: expected a mapping"),
+    ],
+)
+def test_logs_section_errors(text: str, message: str) -> None:
+    with pytest.raises(ConfigError) as exc:
+        parse_config(text, "x.conf")
+    assert any(e.startswith(message) for e in exc.value.errors), exc.value.errors
+
+
+def test_example_config_has_logs_section() -> None:
+    text = example_config()
+    assert "\nlogs:\n" in text
+    assert parse_config(text, "example").log_ignore == []

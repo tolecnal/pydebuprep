@@ -108,7 +108,11 @@ checks:
     warning_pct: 20.0
     exclude_mounts: ["/mnt/scratch*"]
   journal-errors:
-    ignore: ["^networkctl: Interface .* not found"]
+    ignore: ["^networkctl: Interface .* not found"]   # journal only: "IDENTIFIER: message"
+logs:
+  # Shared by journal-errors and dmesg-errors, matched against the message text.
+  # Kernel messages show up in both, so one pattern here hides them in both.
+  ignore: ["^ACPI BIOS Error"]
 ```
 
 ```sh
@@ -123,7 +127,7 @@ The package also installs the example as
 | Check | Options (defaults) |
 |---|---|
 | `apt-lists-age` | `max_age_days` (7) |
-| `config-conflicts` | `critical_paths` (sshd_config, sshd_config.d/, sudoers, sudoers.d/) |
+| `config-conflicts` | `critical_paths` (sshd_config, sshd_config.d/, sudoers, sudoers.d/), `ignore_paths` ([]): patterns for files to leave out, e.g. ones Ansible manages |
 | `debsums` | `timeout_seconds` (600) |
 | `boot-space` | `warning_pct` (25.0), `critical_pct` (10.0) |
 | `disk-space` | `include_remote` (false), `warning_pct` (25.0), `critical_pct` (10.0), `exclude_mounts` ([]) |
@@ -270,6 +274,9 @@ Running the workflow by hand (workflow_dispatch) builds and verifies the package
 without publishing it.
 
 ## Security checks
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md). Please use GitHub's private
+reporting, not a public issue.
 
 | Workflow | What it covers |
 |---|---|

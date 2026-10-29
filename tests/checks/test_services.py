@@ -298,3 +298,28 @@ def test_compare_service_no_longer_enabled() -> None:
     assert [(f.severity, f.title) for f in fs] == [
         (Severity.WARNING, "backup.service was enabled before the upgrade but is not now")
     ]
+
+
+def test_shared_log_ignore_applies_to_journal_message_text() -> None:
+    out = "\n".join([jline("kernel", "ACPI BIOS Error (bug): x"), jline("sshd", "boom")])
+    ctx = make_ctx(commands={JOURNAL: out})
+    ctx.log_ignore = ("^ACPI BIOS Error",)  # anchored at the message text, not "kernel: ..."
+    (f,) = JournalErrorsCheck().run(ctx)
+    assert f.evidence == ["1x sshd: boom"]
+    assert "1 ignored" in f.detail
+
+
+def test_shared_log_ignore_applies_to_dmesg() -> None:
+    ctx = make_ctx(commands={DMESG_ERR: "ACPI BIOS Error (bug): x\nreal error\n", DMESG_WARN: ""})
+    ctx.log_ignore = ("^ACPI BIOS Error",)
+    (f,) = DmesgErrorsCheck().run(ctx)
+    assert f.evidence == ["1x real error"]
+    assert "1 ignored" in f.detail
+
+
+def test_shared_and_own_ignore_lists_combine() -> None:
+    out = "\n".join([jline("a", "one"), jline("b", "two"), jline("c", "three")])
+    ctx = make_ctx(commands={JOURNAL: out})
+    ctx.log_ignore = ("^one$",)
+    (f,) = JournalErrorsCheck({"ignore": ["^b: "]}).run(ctx)
+    assert f.evidence == ["1x c: three"]

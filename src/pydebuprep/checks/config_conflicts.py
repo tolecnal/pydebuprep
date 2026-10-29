@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fnmatch
 import os
 
 from pydebuprep.checks.base import Check, Context, Option, count
@@ -39,7 +40,19 @@ class ConfigConflictsCheck(Check):
             CRITICAL_PATHS,
             "Config files whose unmerged updates are critical; a trailing / means a directory",
         ),
+        Option(
+            "ignore_paths",
+            [],
+            "Files to leave out, e.g. ones a configuration tool such as Ansible manages "
+            "(shell-style patterns, matched against the config file or its leftover copy)",
+        ),
     )
+
+    def _ignored(self, path: str, original: str) -> bool:
+        return any(
+            fnmatch.fnmatchcase(path, p) or fnmatch.fnmatchcase(original, p)
+            for p in self.opt("ignore_paths")
+        )
 
     def _is_critical(self, original: str) -> bool:
         return any(
@@ -52,7 +65,7 @@ class ConfigConflictsCheck(Check):
         leftovers = sorted(
             (path, orig)
             for path in ctx.system.walk_files("/etc", errors)
-            if (orig := _original(path)) is not None
+            if (orig := _original(path)) is not None and not self._ignored(path, orig)
         )
         findings = [
             Finding(

@@ -76,6 +76,12 @@ def clean_report(report: Report) -> Report:
     )
 
 
+def has_baseline_section(report: Report) -> bool:
+    """Whether checks get a "Changes since baseline" section; without a baseline the
+    header says so once instead."""
+    return report.baseline is not None
+
+
 def baseline_state(report: Report, result: CheckResult) -> str | None:
     """Short wording for the baseline section, or None when there are diff findings."""
     if report.baseline is None:
