@@ -68,9 +68,15 @@ class FakeSystem(System):
     def read_text(self, path: str) -> str | None:
         return self.files.get(path)
 
+    def read_range(self, path: str, offset: int, size: int) -> bytes | None:
+        data = self.read_bytes(path)
+        return None if data is None else data[offset : offset + size]
+
     def read_bytes(self, path: str) -> bytes | None:
-        text = self.files.get(path)
-        return None if text is None else text.encode("utf-8")
+        data: str | bytes | None = self.files.get(path)
+        if isinstance(data, bytes):  # binary test files may be given as bytes
+            return data
+        return None if data is None else data.encode("utf-8")
 
     def exists(self, path: str) -> bool:
         prefix = path.rstrip("/") + "/"

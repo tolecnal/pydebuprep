@@ -170,3 +170,11 @@ def test_read_bytes(tmp_path: Path) -> None:
     (tmp_path / "k.gpg").write_bytes(b"\x99\x00")
     assert System().read_bytes(str(tmp_path / "k.gpg")) == b"\x99\x00"
     assert System().read_bytes(str(tmp_path / "missing")) is None
+
+
+def test_read_range(tmp_path: Path) -> None:
+    (tmp_path / "f").write_bytes(b"0123456789")
+    assert System().read_range(str(tmp_path / "f"), 2, 3) == b"234"
+    assert System().read_range(str(tmp_path / "f"), 8, 10) == b"89"
+    assert System().read_range(str(tmp_path / "f"), -1, 3) is None
+    assert System().read_range(str(tmp_path / "missing"), 0, 3) is None

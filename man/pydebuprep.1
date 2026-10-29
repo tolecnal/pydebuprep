@@ -360,7 +360,7 @@ for each check's options.
 (applications) Clusters still on an older major version than the newest installed server, or left behind after migrating; clusters that should start but are down; clusters online before but not now
 .TP
 .B python\-venvs
-(applications) Virtualenvs whose Python no longer exists, or built for an older Python
+(applications) Virtualenvs whose Python no longer exists, or built for an older Python; compiled modules needing libraries that are missing (read from their ELF headers, never ldd); scripts whose interpreter doesn't exist
 .TP
 .B firewall
 (network) ufw or nftables enabled but no rules loaded; rules lost since the baseline (root; only queries already\-loaded kernel modules)

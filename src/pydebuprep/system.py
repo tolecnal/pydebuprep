@@ -50,6 +50,7 @@ ALLOWED_COMMANDS: set[tuple[str, ...]] = {
     ("dpkg-query", "-W", "-f=${Package}\t${Version}\n"),
     ("apt-get", "check"),
     ("apt-get", "-s", "autoremove"),
+    ("ldconfig", "-p"),  # prints /etc/ld.so.cache; never rebuilds it
     ("apt", "list", "--upgradable"),
     ("apt", "list", "--installed"),
     ("apt-mark", "showhold"),
@@ -278,6 +279,15 @@ class System:
             with open(path, "rb") as fh:
                 return fh.read()
         except OSError:
+            return None
+
+    def read_range(self, path: str, offset: int, size: int) -> bytes | None:
+        """SIZE bytes from OFFSET (fewer at the end of the file), or None if unreadable."""
+        try:
+            with open(path, "rb") as fh:
+                fh.seek(offset)
+                return fh.read(size)
+        except (OSError, ValueError, OverflowError):
             return None
 
     def exists(self, path: str) -> bool:
