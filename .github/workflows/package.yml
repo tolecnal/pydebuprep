@@ -142,7 +142,8 @@ jobs:
       # debsums checks every file of the runner's ~2000 packages (minutes per run, more
       # under strace); the containers audit it on every release.
       - name: Leave debsums out on the runner
-        run: printf 'checks:\n  debsums:\n    enabled: false\n' | sudo tee /etc/pydebuprep.conf
+        run: |
+          printf 'checks:\n  debsums:\n    enabled: false\n' | sudo tee /etc/pydebuprep.conf
       - name: Install and smoke test
         run: |
           sudo apt-get update
