@@ -278,7 +278,7 @@ def cmd_report(args: argparse.Namespace, system: System) -> int:
         # os-release reports these itself; repeat them only when it isn't running.
         for warning in baseline_warnings(loaded[1], system.hostname(), osinfo.codename):
             print(f"pydebuprep: warning: {warning}", file=sys.stderr)
-    ctx = Context(system, osinfo, loaded[1] if loaded else None)
+    ctx = Context(system, osinfo, loaded[1] if loaded else None, tuple(config.log_ignore))
     results = run_checks(selected, ctx)
     summary = compute_summary(results)
     try:

@@ -108,7 +108,11 @@ checks:
     warning_pct: 20.0
     exclude_mounts: ["/mnt/scratch*"]
   journal-errors:
-    ignore: ["^networkctl: Interface .* not found"]
+    ignore: ["^networkctl: Interface .* not found"]   # journal only: "IDENTIFIER: message"
+logs:
+  # Shared by journal-errors and dmesg-errors, matched against the message text.
+  # Kernel messages show up in both, so one pattern here hides them in both.
+  ignore: ["^ACPI BIOS Error"]
 ```
 
 ```sh

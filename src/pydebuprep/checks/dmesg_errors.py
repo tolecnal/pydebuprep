@@ -13,18 +13,20 @@ from pydebuprep.checks.base import (
     output_lines,
     run_checked,
 )
-from pydebuprep.checks.journal_errors import compile_patterns
+from pydebuprep.checks.journal_errors import compile_patterns, shared_patterns
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
 DMESG_ERR = ("dmesg", "--level=err", "--notime")
 DMESG_WARN = ("dmesg", "--level=warn", "--notime")
 
 
-def _counted(text: str, ignore: list[re.Pattern[str]]) -> tuple[int, list[str]]:
+def _counted(text: str, ignore: list[re.Pattern[str]]) -> tuple[int, list[str], int]:
+    """Messages left after ignoring, as (count, "Nx message" evidence, ignored count)."""
     lines = [line.strip() for line in output_lines(text)]
-    lines = [line for line in lines if not any(p.search(line) for p in ignore)]
-    counts = Counter(lines)
-    return len(lines), [f"{n}x {line}" for line, n in counts.most_common()]
+    kept = [line for line in lines if not any(p.search(line) for p in ignore)]
+    counts = Counter(kept)
+    evidence = [f"{n}x {line}" for line, n in counts.most_common()]
+    return len(kept), evidence, len(lines) - len(kept)
 
 
 class DmesgErrorsCheck(Check):
@@ -44,6 +46,7 @@ class DmesgErrorsCheck(Check):
 
     def run(self, ctx: Context) -> list[Finding]:
         findings = []
+        ignore = [*self.patterns, *shared_patterns(ctx)]
         for argv, severity, kind in (
             (DMESG_ERR, Severity.WARNING, "error"),
             (DMESG_WARN, Severity.INFO, "warning"),
@@ -56,13 +59,14 @@ class DmesgErrorsCheck(Check):
             if not res.ok:
                 stderr = res.stderr.strip().splitlines()
                 raise CommandFailed(stderr[0] if stderr else f"dmesg exited {res.returncode}")
-            total, evidence = _counted(res.stdout, self.patterns)
+            total, evidence, ignored = _counted(res.stdout, ignore)
             if total:
                 findings.append(
                     Finding(
                         severity,
                         f"{count(total, f'kernel {kind} message')} since boot",
-                        detail="Look for driver or firmware problems introduced by the new kernel.",
+                        detail="Look for driver or firmware problems introduced by the new kernel."
+                        + (f" ({ignored} ignored by configuration.)" if ignored else ""),
                         evidence=truncate_evidence(evidence),
                         remediation=[
                             f"sudo dmesg --level={'err' if kind == 'error' else 'warn'} -T",

@@ -187,6 +187,14 @@ holds defaults for
 .BR none ,
 or a snapshot path) and
 .BR snapshot_dir .
+.B logs
+has an
+.B ignore
+list of regular expressions shared by
+.B journal\-errors
+and
+.BR dmesg\-errors ,
+matched against the message text, so one pattern hides a kernel message in both.
 .B checks
 has one entry per check ID:
 .B "enabled: false"

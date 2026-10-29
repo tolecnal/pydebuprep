@@ -353,3 +353,21 @@ def test_relative_paths_in_config_resolve_against_config_dir(
     assert run(["--config", str(c), "--format", "json"]) == 1
     (report,) = (etc / "reports").iterdir()
     assert json.loads(report.read_text())["baseline"]["path"] == str(snap)
+
+
+def test_logs_ignore_reaches_checks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    class SeesLogIgnore(Check):
+        id = "sees"
+        title = "Sees"
+        category = "services"
+
+        def run(self, ctx: Context) -> list[Finding]:
+            return [Finding(Severity.INFO, f"log_ignore={list(ctx.log_ignore)!r}")]
+
+    monkeypatch.setattr(checks, "ALL_CHECKS", [SeesLogIgnore])
+    c = conf(tmp_path, "logs:\n  ignore: ['^ACPI', 'x{1,2}']\n")
+    run(["--config", c, "--no-baseline", "--format", "json"])
+    data = json.loads(capsys.readouterr().out)
+    assert data["results"][0]["findings"][0]["title"] == "log_ignore=['^ACPI', 'x{1,2}']"
