@@ -19,7 +19,7 @@ from pydebuprep.snapshot import DEFAULT_SNAPSHOT_DIR
 from pydebuprep.state import DEFAULT_PENDING_DIR
 
 DEFAULT_CONFIG_PATH = "/etc/pydebuprep.conf"
-DEFAULT_TOKEN_FILE = "/etc/pydebuprep/token"
+DEFAULT_TOKEN_FILE = "/etc/pydebuprep/token"  # nosec B105 - a path, not a token
 SEVERITIES = tuple(s.value for s in reversed(Severity))  # info, warning, critical
 
 
@@ -62,6 +62,7 @@ class UploadSettings:
 
 UPLOAD_HELP = {
     "url": "Portal to upload each report to, e.g. https://portal.example.com (null = don't upload)",
+    # nosec B105 - help text, not a token
     "token_file": "File holding the upload token, readable by root only; the PYDEBUPREP_TOKEN "
     "environment variable takes precedence",
     "ca_file": "Extra CA certificates to trust for the portal, besides the system's "

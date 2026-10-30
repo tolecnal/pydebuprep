@@ -68,7 +68,7 @@ def test_no_subprocess_outside_system() -> None:
 
 
 def test_open_only_where_writes_are_expected() -> None:
-    allowed = {"system.py", "snapshot.py", "cli.py", "config.py", "state.py"}
+    allowed = {"system.py", "snapshot.py", "cli.py", "config.py", "state.py", "portal.py"}
     for path in _sources():
         if path.name not in allowed:
             assert not re.search(r"\bopen\(", path.read_text()), path
@@ -84,10 +84,12 @@ def test_state_writes_only_through_write_private() -> None:
     assert "makedirs" not in text and "mkdir" not in text
 
 
-def test_config_only_reads() -> None:
-    text = (SRC / "config.py").read_text()
+@pytest.mark.parametrize("module", ["config.py", "portal.py"])
+def test_config_and_portal_only_read(module: str) -> None:
+    text = (SRC / module).read_text()
     for call in re.findall(r"\bopen\([^)]*\)", text):
         assert not re.search(r"""["'][wxa+]""", call), call
+    assert "O_WRONLY" not in text and "O_CREAT" not in text
 
 
 def test_registry_ids_unique_and_kebab() -> None:
