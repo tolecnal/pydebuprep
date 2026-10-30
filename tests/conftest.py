@@ -78,3 +78,7 @@ def _no_host_config(
     empty = tmp_path_factory.mktemp("conf") / "pydebuprep.conf"
     empty.write_text("")
     monkeypatch.setenv("PYDEBUPREP_CONFIG", str(empty))
+    # ...nor a real token, CA bundle or state directory (pending uploads, cached configs).
+    monkeypatch.delenv("PYDEBUPREP_TOKEN", raising=False)
+    monkeypatch.delenv("PYDEBUPREP_CA_FILE", raising=False)
+    monkeypatch.setenv("PYDEBUPREP_STATE_DIR", str(tmp_path_factory.mktemp("state")))

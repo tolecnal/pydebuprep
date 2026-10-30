@@ -85,7 +85,7 @@ def running_portal(*, tls: ssl.SSLContext | None = None) -> Iterator[Portal]:
         server.socket = tls.wrap_socket(server.socket, server_side=True)
     scheme = "https" if tls is not None else "http"
     portal.url = f"{scheme}://127.0.0.1:{server.server_address[1]}"
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread = threading.Thread(target=server.serve_forever, args=(0.05,), daemon=True)
     thread.start()
     try:
         yield portal

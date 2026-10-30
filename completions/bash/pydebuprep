@@ -69,7 +69,7 @@ _pydebuprep() {
     fi
 
     # Like the CLI: a command is only recognised as the first word.
-    local commands="report convert snapshot list-checks configtest example-config completion"
+    local commands="report convert snapshot list-checks configtest upload example-config completion"
     local cmd=""
     if ((cword > 1)); then
         case " $commands " in
@@ -102,21 +102,27 @@ _pydebuprep() {
             _pydebuprep_check_option
             return
             ;;
+        --ca-file|--token-file)
+            :
+            return
+            ;;
     esac
 
     local opts words_for_cmd="" file_arg=""
     case ${cmd:-report} in
-        report) opts="--baseline --check-option --checks --config --format --help --min-severity --no-baseline --no-color --no-config --no-todo --output --output-dir --skip --snapshot-dir --todo -c -f -h -o" ;;
+        report) opts="--allow-http --baseline --ca-file --check-option --checks --config --format --help --min-severity --no-baseline --no-color --no-config --no-todo --output --output-dir --skip --snapshot-dir --todo --token-file -c -f -h -o" ;;
         convert) opts="--format --help --no-color --no-todo --output --output-dir --todo -f -h -o" ;;
-        snapshot) opts="--check-option --config --help --no-config --snapshot-dir -c -h" ;;
+        snapshot) opts="--allow-http --ca-file --check-option --config --help --no-config --snapshot-dir --token-file -c -h" ;;
         list-checks) opts="--help --verbose -h -v" ;;
-        configtest) opts="--config --help --no-config -c -h" ;;
+        configtest) opts="--allow-http --ca-file --config --help --no-config --token-file -c -h" ;;
+        upload) opts="--allow-http --ca-file --config --help --no-config --token-file -c -h" ;;
         example-config) opts="--help -h" ;;
         completion) opts="--help -h" ;;
     esac
     case $cmd in
         completion) words_for_cmd="bash zsh" ;;
         convert) file_arg=1 ;;
+        upload) file_arg=1 ;;
     esac
 
     if [[ $cur == -* ]]; then

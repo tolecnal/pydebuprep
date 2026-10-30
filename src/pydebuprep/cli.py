@@ -13,10 +13,18 @@ from typing import Any
 
 from pydebuprep import __version__, checks
 from pydebuprep.checks.base import Check, CommandFailed, Context, running_kernel
-from pydebuprep.config import DEFAULT_CONFIG_PATH, Config, ConfigError, example_config, load_config
+from pydebuprep.config import (
+    DEFAULT_CONFIG_PATH,
+    Config,
+    ConfigError,
+    UploadSettings,
+    example_config,
+    load_config,
+)
 from pydebuprep.deps import MissingDependency
 from pydebuprep.model import CATEGORY_ORDER, CheckResult, Host, Report, Severity, compute_summary
 from pydebuprep.osinfo import detect_os
+from pydebuprep.portal import CA_FILE_ENV, Connection, PortalError, read_token, upload_report
 from pydebuprep.render import EXTENSIONS, FORMATS, render
 from pydebuprep.reportfile import ReportFileError, load_report
 from pydebuprep.runner import run_checks
@@ -30,13 +38,20 @@ from pydebuprep.snapshot import (
     format_timestamp,
     load_snapshot,
 )
-from pydebuprep.state import UNSAFE_IN_FILE_NAME
+from pydebuprep.state import (
+    UNSAFE_IN_FILE_NAME,
+    StateError,
+    pending_reports,
+    remove_pending,
+    save_pending,
+)
 from pydebuprep.system import System
 
 EXIT_TOOL_ERROR = 3
 COMMANDS = (
     "report",
     "convert",
+    "upload",
     "snapshot",
     "list-checks",
     "configtest",
@@ -72,6 +87,26 @@ def _add_check_option_arg(parser: argparse.ArgumentParser) -> None:
         default=[],
         metavar="CHECK.OPTION=VALUE",
         help="set a check option, overriding the config file (repeatable)",
+    )
+
+
+def _add_portal_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--allow-http",
+        action="store_true",
+        help="allow http:// portal URLs (the token is sent unencrypted; for test setups)",
+    )
+    parser.add_argument(
+        "--ca-file",
+        metavar="FILE",
+        help=f"extra CA certificates to trust for the portal (default: ${CA_FILE_ENV}, "
+        "then upload: ca_file:)",
+    )
+    parser.add_argument(
+        "--token-file",
+        metavar="FILE",
+        help="file holding the portal token (default: upload: token_file:, "
+        "/etc/pydebuprep/token); $PYDEBUPREP_TOKEN takes precedence",
     )
 
 
@@ -131,6 +166,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_check_option_arg(report)
     _add_config_args(report)
+    _add_portal_args(report)
 
     conv = sub.add_parser("convert", help="render a saved JSON or YAML report in another format")
     conv.add_argument(
@@ -156,6 +192,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_check_option_arg(snap)
     _add_config_args(snap)
+    _add_portal_args(snap)
 
     listing = sub.add_parser("list-checks", help="list available checks")
     listing.add_argument(
@@ -164,6 +201,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     test = sub.add_parser("configtest", help="validate the config file and exit")
     _add_config_args(test)
+    _add_portal_args(test)
+
+    up = sub.add_parser(
+        "upload",
+        help="send saved JSON or YAML reports to the portal (default: those kept "
+        "after a failed upload)",
+    )
+    up.add_argument(
+        "files",
+        nargs="*",
+        metavar="FILE",
+        help="reports to send (default: every report in upload: pending_dir:)",
+    )
+    _add_config_args(up)
+    _add_portal_args(up)
 
     sub.add_parser("example-config", help="print an example config file with all defaults")
 
@@ -344,7 +396,98 @@ def cmd_report(args: argparse.Namespace, system: System) -> int:
     path = resolve_output_path(output, output_dir, host.hostname, fmt, now)
     todo = config.report.todo if args.todo is None else args.todo
     _write_or_print(report, fmt, path, use_color(args.no_color, config.report.color), todo)
+    if config.upload.url:
+        # The portal gets every finding: --min-severity only shapes the local output.
+        full = dataclasses.replace(report, results=results)
+        _upload_after_report(full, config.upload.url, args, config.upload)
     return summary.exit_code
+
+
+def connection(args: argparse.Namespace, settings: UploadSettings) -> Connection:
+    ca_file = args.ca_file or os.environ.get(CA_FILE_ENV) or settings.ca_file
+    return Connection(allow_http=args.allow_http, ca_file=ca_file)
+
+
+def token_file(args: argparse.Namespace, settings: UploadSettings) -> str:
+    return str(args.token_file or settings.token_file)
+
+
+def _warn(message: str) -> None:
+    print(f"pydebuprep: warning: {message}", file=sys.stderr)
+
+
+def _upload_after_report(
+    report: Report, url: str, args: argparse.Namespace, settings: UploadSettings
+) -> None:
+    """Upload the report; on failure keep it for `pydebuprep upload`. Never fails the run."""
+    body = render(report, "json").encode()
+    try:
+        token = read_token(token_file(args, settings), os.environ)
+        where = upload_report(url, token, connection(args, settings), body)
+    except PortalError as exc:
+        _warn(f"upload failed: {exc}")
+        if settings.pending_dir is None:
+            _warn("the report was not kept (upload: pending_dir is null)")
+            return
+        try:
+            kept = save_pending(
+                settings.pending_dir, body, report.host.hostname, report.generated_at
+            )
+        except StateError as exc:
+            _warn(f"could not keep it: {exc}")
+            return
+        print(f"pydebuprep: kept for `pydebuprep upload`: {kept}", file=sys.stderr)
+        return
+    print(f"Report uploaded to {where}", file=sys.stderr)
+
+
+def _upload_body(path: str) -> bytes:
+    """A saved report as JSON: JSON files as they are, YAML converted."""
+    try:
+        with open(path, "rb") as fh:
+            data = fh.read()
+    except OSError as exc:
+        raise ToolError(f"{path}: {exc.strerror or exc}") from None
+    try:
+        report = load_report(data.decode("utf-8"))
+    except UnicodeDecodeError:
+        raise ToolError(f"{path}: not a UTF-8 text file") from None
+    except ReportFileError as exc:
+        raise ToolError(f"{path}: {exc}") from None
+    return data if data.lstrip().startswith(b"{") else render(report, "json").encode()
+
+
+def cmd_upload(args: argparse.Namespace) -> int:
+    settings = _load_config(args).upload
+    if not settings.url:
+        raise ToolError("no upload URL configured (upload: url: in the config file)")
+    pending_dir = settings.pending_dir
+    files = list(args.files) or (pending_reports(pending_dir) if pending_dir else [])
+    if not files:
+        print("Nothing to upload")
+        return 0
+    try:
+        token = read_token(token_file(args, settings), os.environ)
+    except PortalError as exc:
+        raise ToolError(str(exc)) from None
+    conn = connection(args, settings)
+    failed = 0
+    for path in files:
+        try:
+            where = upload_report(settings.url, token, conn, _upload_body(path))
+        except ToolError as exc:
+            print(f"pydebuprep: error: {exc}", file=sys.stderr)
+            failed += 1
+            continue
+        except PortalError as exc:
+            print(f"pydebuprep: error: {path}: upload failed: {exc}", file=sys.stderr)
+            failed += 1
+            continue
+        print(f"{path}: uploaded to {where}")
+        # Only reports kept after a failed upload are removed, never the user's own files.
+        if pending_dir and os.path.dirname(os.path.abspath(path)) == os.path.abspath(pending_dir):
+            remove_pending(path)
+    return EXIT_TOOL_ERROR if failed else 0
 
 
 def _write_or_print(
@@ -445,6 +588,8 @@ def main(argv: list[str] | None = None, *, system: System | None = None) -> int:
     try:
         if args.command == "convert":
             return cmd_convert(args)
+        if args.command == "upload":
+            return cmd_upload(args)
         if args.command == "snapshot":
             return cmd_snapshot(args, system)
         if args.command == "list-checks":

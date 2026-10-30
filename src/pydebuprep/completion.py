@@ -43,6 +43,7 @@ class CommandSpec:
     options: list[OptionSpec]
     positional_choices: list[str] = field(default_factory=list)
     positional_file: bool = False  # one positional argument naming a file
+    positional_repeat: bool = False  # ...or any number of them
 
 
 @dataclass
@@ -139,7 +140,7 @@ def completion_spec() -> CompletionSpec:
         if isinstance(action, argparse._SubParsersAction):
             helps = {a.dest: a.help or "" for a in action._choices_actions}
             for name, sub in action.choices.items():
-                options, positional, positional_file = [], [], False
+                options, positional, positional_file, repeat = [], [], False, False
                 excluded = _exclusions(sub)
                 for sub_action in sub._actions:
                     if sub_action.option_strings:
@@ -150,8 +151,9 @@ def completion_spec() -> CompletionSpec:
                         positional = [_safe(str(c)) for c in sub_action.choices]
                     elif sub_action.metavar == "FILE":
                         positional_file = True
+                        repeat = sub_action.nargs in ("*", "+")
                 commands[_safe(name)] = CommandSpec(
-                    name, helps.get(name, ""), options, positional, positional_file
+                    name, helps.get(name, ""), options, positional, positional_file, repeat
                 )
         elif action.option_strings:
             global_flags.extend(_options(action, parser.prog, []))
@@ -380,7 +382,7 @@ def zsh_completion() -> str:
         if c.positional_choices:
             specs.append(f"'1:{c.name}:({' '.join(c.positional_choices)})'")
         if c.positional_file:
-            specs.append("'1:file:_files'")
+            specs.append("'*:file:_files'" if c.positional_repeat else "'1:file:_files'")
         body = " \\\n        ".join(specs) if specs else ""
         functions.append(
             f"_pydebuprep_{c.name.replace('-', '_')}() {{\n"
