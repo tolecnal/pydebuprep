@@ -29,7 +29,9 @@ provenance attestation.
 `v0.4.0` released on 2026-10-30, built and audited on all five releases, published
 with `SHA256SUMS` and a verified provenance attestation; what it contains is in
 `debian/changelog`. Waiting for the next release: zsh describes `--no-todo` as
-turning `--todo` off (#25).
+turning `--todo` off (#25); portal support in the CLI (upload, `pydebuprep upload`,
+`--config https://…` with a saved copy, the remote-config safety rules, JSON Schemas
+of the report and config, the audit of portal runs).
 
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -293,6 +294,14 @@ def render_marker(kind: str, arg: str | None) -> str:
 
 def expand(markdown: str) -> str:
     return MARKER.sub(lambda m: render_marker(m.group(1), m.group(2)), markdown)
+
+
+def on_post_build(config: Any, **_: Any) -> None:
+    """Publish the JSON Schemas at the URLs their $id names (/schema/*.schema.json)."""
+    target = Path(config["site_dir"]) / "schema"
+    target.mkdir(parents=True, exist_ok=True)
+    for source in sorted((ROOT / "schema").glob("*.schema.json")):
+        shutil.copyfile(source, target / source.name)
 
 
 def on_page_markdown(markdown: str, **_: Any) -> str:

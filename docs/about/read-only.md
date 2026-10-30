@@ -66,6 +66,12 @@ operating system uses.** Within that, it writes only:
 - **the snapshot file**, when you run `snapshot`;
 - **the report file you asked for** with `--output` or `--output-dir` (never
   overwriting an existing file);
+- **only when you use a [portal](../guide/portal.md)**: a report that failed to
+  upload, in `/var/lib/pydebuprep/pending`, and a copy of a config fetched from a
+  URL, in `/var/lib/pydebuprep/configs`. Both directories are created by the package
+  (mode `0700`); pydebuprep writes files there (mode `0600`, under a temporary name
+  renamed into place, never through a symlink) and creates no directories. A config
+  from a URL can't move these paths;
 - **temporary scratch files**, when a check needs a file to work with — for example
   to hand a signing key to `gpgv` in a form it can read. They go in a private
   directory of pydebuprep's own, created under `/tmp` with mode `0700` (files `0600`,
@@ -73,7 +79,9 @@ operating system uses.** Within that, it writes only:
   Commands may write only into that directory, and the allowlist enforces it.
 
 The audit holds pydebuprep to this: a scratch file that outlives the run, or a write
-anywhere else, fails it.
+anywhere else, fails it. It also runs a report against a stand-in portal, once with
+the portal up and once with it down, where writes outside `/var/lib/pydebuprep` fail
+it the same way.
 
 ## What "read-only" can't cover
 

@@ -83,6 +83,7 @@ nav:
       - Output formats: guide/output-formats.md
       - Reading the results: guide/results.md
       - Running across a fleet: guide/fleet.md
+      - Using a portal: guide/portal.md
   - Configuration:
       - configuration/index.md
       - Reference: configuration/reference.md

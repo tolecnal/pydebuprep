@@ -216,6 +216,21 @@ Read settings from
 instead of
 .IR /etc/pydebuprep.conf .
 The file must exist.
+.I FILE
+may also be an
+.B https://
+URL of a config served by a pydebuprep portal: it is fetched with the token (see
+.BR \-\-token\-file ),
+validated like a local file, and saved in
+.IR /var/lib/pydebuprep/configs/ .
+If the portal can't be reached, the saved copy is used and the report says so; with
+no saved copy the run fails. A config from a URL may not set
+.BR report.output_dir ", " report.snapshot_dir ", " upload.token_file ", " upload.ca_file
+or
+.BR upload.pending_dir ,
+and its
+.B upload.url
+must be on the same server.
 .TP
 .B \-\-no\-config
 Ignore any configuration file and use built\-in defaults.
@@ -308,6 +323,19 @@ logs:
 Command\-line options override the file, which overrides built\-in defaults.
 Relative paths in the file are relative to the file's directory. Unknown keys,
 unknown checks and invalid values are errors.
+.PP
+An optional fourth section,
+.BR upload ,
+sends each report to a pydebuprep portal:
+.B url
+(the portal; null, the default, means no upload),
+.BR token_file ,
+.B ca_file
+(extra CA certificates, besides the system's) and
+.B pending_dir
+(where a report that failed to upload is kept for
+.BR "pydebuprep upload" ;
+null keeps nothing). A failed upload never changes the report or its exit status.
 .SH CHECKS
 Checks run in this order and are grouped by category in the report. Use
 .B list\-checks \-\-verbose
@@ -443,11 +471,34 @@ installed) and zsh.
 Default snapshot directory (mode 0700). Snapshots are JSON files (mode 0600)
 named after the UTC time they were taken; they are private because they contain
 cron command lines, network details and package lists.
+.TP
+.I /etc/pydebuprep/token
+The portal token (mode 0600; a file readable by other users is refused).
+.TP
+.I /var/lib/pydebuprep/pending/
+Reports that failed to upload, kept for
+.B pydebuprep upload
+(mode 0600).
+.TP
+.I /var/lib/pydebuprep/configs/
+Copies of configs fetched from a URL, used when the portal can't be reached.
 .SH ENVIRONMENT
 .TP
 .B PYDEBUPREP_CONFIG
-Path of the configuration file to read instead of
+Path or URL of the configuration file to read instead of
 .IR /etc/pydebuprep.conf .
+.TP
+.B PYDEBUPREP_TOKEN
+The portal token; takes precedence over the token file.
+.TP
+.B PYDEBUPREP_CA_FILE
+Extra CA certificates to trust for the portal, as
+.BR \-\-ca\-file .
+.TP
+.B PYDEBUPREP_STATE_DIR
+pydebuprep's own directory instead of
+.I /var/lib/pydebuprep
+(pending uploads and saved configs), for installations without the package.
 .TP
 .B NO_COLOR
 Disables colored text output.
