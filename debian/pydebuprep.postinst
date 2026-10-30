@@ -4,8 +4,10 @@ set -e
 if [ "$1" = "configure" ]; then
     # Snapshots hold cron command lines, network details and package lists: keep
     # them private to root. install -d also tightens directories from older versions,
-    # which hides any older, umask-default snapshot files inside them.
-    install -d -m 0700 /var/lib/pydebuprep /var/lib/pydebuprep/snapshots
+    # which hides any older, umask-default snapshot files inside them. pending/ keeps
+    # reports that failed to upload, configs/ copies of configs fetched from a URL:
+    # pydebuprep itself never creates a directory.
+    install -d -m 0700 /var/lib/pydebuprep /var/lib/pydebuprep/snapshots /var/lib/pydebuprep/pending /var/lib/pydebuprep/configs
 fi
 
 #DEBHELPER#
