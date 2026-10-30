@@ -25,7 +25,9 @@ from pydebuprep.config import (  # noqa: E402
     DEFAULT_CONFIG_PATH,
     LOGS_HELP,
     REPORT_HELP,
+    UPLOAD_HELP,
     ReportSettings,
+    UploadSettings,
     _yaml_value,
     example_config,
 )
@@ -188,6 +190,18 @@ def config_reference() -> str:
         "| Key | Default | Description |",
         "|---|---|---|",
         f"| `ignore` | `[]` | {_cell(LOGS_HELP)} |",
+        "",
+        "## `upload`",
+        "",
+        "Uploading each report to a pydebuprep portal; off unless `url` is set.",
+        "",
+        "| Key | Default | Description |",
+        "|---|---|---|",
+    ]
+    upload = UploadSettings()
+    for key, text in UPLOAD_HELP.items():
+        out.append(f"| `{key}` | `{_yaml_value(getattr(upload, key))}` | {_cell(text)} |")
+    out += [
         "",
         "## `checks`",
         "",

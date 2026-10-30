@@ -98,6 +98,9 @@ def test_every_command_and_config_key_is_in_the_reference() -> None:
     reference = docs_hooks.config_reference()
     for key in config.REPORT_HELP:
         assert f"| `{key}` |" in reference
+    assert "## `upload`" in reference
+    for key in config.UPLOAD_HELP:
+        assert f"| `{key}` |" in reference
     for cls in checks.ALL_CHECKS:
         for opt in cls.options:
             assert f"[`{cls.id}`](../checks/{cls.id}.md) | `{opt.name}` |" in reference

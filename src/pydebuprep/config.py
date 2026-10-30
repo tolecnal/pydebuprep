@@ -8,6 +8,7 @@ import re
 import textwrap
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
 from pydebuprep import checks
 from pydebuprep.checks.base import Option
@@ -15,8 +16,10 @@ from pydebuprep.deps import require_yaml
 from pydebuprep.model import CATEGORY_ORDER, Severity
 from pydebuprep.render import FORMATS
 from pydebuprep.snapshot import DEFAULT_SNAPSHOT_DIR
+from pydebuprep.state import DEFAULT_PENDING_DIR
 
 DEFAULT_CONFIG_PATH = "/etc/pydebuprep.conf"
+DEFAULT_TOKEN_FILE = "/etc/pydebuprep/token"
 SEVERITIES = tuple(s.value for s in reversed(Severity))  # info, warning, critical
 
 
@@ -50,12 +53,32 @@ REPORT_HELP = {
 
 
 @dataclass
+class UploadSettings:
+    url: str | None = None
+    token_file: str = DEFAULT_TOKEN_FILE
+    ca_file: str | None = None
+    pending_dir: str | None = DEFAULT_PENDING_DIR
+
+
+UPLOAD_HELP = {
+    "url": "Portal to upload each report to, e.g. https://portal.example.com (null = don't upload)",
+    "token_file": "File holding the upload token, readable by root only; the PYDEBUPREP_TOKEN "
+    "environment variable takes precedence",
+    "ca_file": "Extra CA certificates to trust for the portal, besides the system's "
+    "(null = system CAs only)",
+    "pending_dir": "Where reports that failed to upload are kept for `pydebuprep upload` "
+    "(null = don't keep them)",
+}
+
+
+@dataclass
 class Config:
     report: ReportSettings = field(default_factory=ReportSettings)
     disabled: set[str] = field(default_factory=set)
     check_settings: dict[str, dict[str, Any]] = field(default_factory=dict)
     path: str | None = None
     log_ignore: list[str] = field(default_factory=list)
+    upload: UploadSettings = field(default_factory=UploadSettings)
 
     @classmethod
     def defaults(cls) -> Config:
@@ -95,6 +118,55 @@ def _report_settings(data: Any, source: str, errors: list[str]) -> ReportSetting
                 settings.output_dir = value or None
         elif not isinstance(value, str) or not value:
             errors.append(f"{where}: expected a non-empty string")
+        else:
+            setattr(settings, key, value)
+    return settings
+
+
+def url_problem(url: Any) -> str | None:
+    """Why URL can't be a portal URL, or None if it can."""
+    expected = "expected an https:// or http:// URL"
+    if not isinstance(url, str):
+        return expected
+    try:
+        parts = urlsplit(url)
+        parts.port  # noqa: B018 - raises ValueError for an invalid port
+    except ValueError:
+        return "invalid port"
+    if parts.scheme not in ("https", "http") or not parts.hostname:
+        return expected
+    if parts.username is not None or parts.password is not None:
+        return "must not contain a user name or password"
+    if parts.query or parts.fragment or url.endswith(("?", "#")):
+        return "must not have a query or fragment"
+    return None
+
+
+def _upload_settings(data: Any, source: str, errors: list[str]) -> UploadSettings:
+    settings = UploadSettings()
+    if data is None:
+        return settings
+    if not isinstance(data, dict):
+        errors.append(f"{source}: upload: expected a mapping")
+        return settings
+    for key, value in data.items():
+        where = f"{source}: upload.{key}"
+        if key not in UPLOAD_HELP:
+            errors.append(f"{source}: upload: unknown key {key!r}")
+        elif key == "url":
+            problem = None if value is None else url_problem(value)
+            if problem:
+                errors.append(f"{where}: {problem}")
+            else:
+                settings.url = value
+        elif key == "token_file":
+            if not isinstance(value, str) or not value:
+                errors.append(f"{where}: expected a non-empty string")
+            else:
+                settings.token_file = value
+        elif value is not None and (not isinstance(value, str) or not value):
+            kind = "file" if key == "ca_file" else "directory"
+            errors.append(f"{where}: expected a {kind} path or null")
         else:
             setattr(settings, key, value)
     return settings
@@ -154,14 +226,15 @@ def parse_config(text: str, source: str) -> Config:
     errors = [
         f"{source}: unknown top-level key {key!r}"
         for key in data
-        if key not in ("report", "logs", "checks")
+        if key not in ("report", "logs", "checks", "upload")
     ]
     report = _report_settings(data.get("report"), source, errors)
     log_ignore = _log_ignore(data.get("logs"), source, errors)
     disabled, check_settings = _check_settings(data.get("checks"), source, errors)
+    upload = _upload_settings(data.get("upload"), source, errors)
     if errors:
         raise ConfigError(errors)
-    return Config(report, disabled, check_settings, source, log_ignore)
+    return Config(report, disabled, check_settings, source, log_ignore, upload)
 
 
 LOGS_HELP = (
@@ -226,6 +299,12 @@ def _resolve_paths(config: Config, base: str) -> Config:
     report.snapshot_dir = resolve(report.snapshot_dir)
     if report.baseline not in ("auto", "none"):
         report.baseline = resolve(report.baseline)
+    upload = config.upload
+    upload.token_file = resolve(upload.token_file)
+    if upload.ca_file is not None:
+        upload.ca_file = resolve(upload.ca_file)
+    if upload.pending_dir is not None:
+        upload.pending_dir = resolve(upload.pending_dir)
     return config
 
 
@@ -275,7 +354,13 @@ def example_config() -> str:
         *(f"# {line}" for line in textwrap.wrap(LOGS_HELP, 86, break_on_hyphens=False)),
         "logs:",
         "  ignore: []",
+        "",
+        "# Uploading each report to a pydebuprep portal. Off unless url is set.",
+        "upload:",
     ]
+    upload = UploadSettings()
+    for key, help_text in UPLOAD_HELP.items():
+        lines += [f"  # {help_text}", f"  {key}: {_yaml_value(getattr(upload, key))}"]
     lines += [
         "",
         "# One section per check. 'enabled: false' leaves a check out; the other keys are",
