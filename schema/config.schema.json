@@ -1,0 +1,875 @@
+{
+  "$id": "https://pydebuprep.app/schema/config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The YAML configuration file (/etc/pydebuprep.conf, or --config).",
+  "properties": {
+    "checks": {
+      "additionalProperties": false,
+      "properties": {
+        "apparmor": {
+          "additionalProperties": false,
+          "description": "AppArmor",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "apt-autoremove": {
+          "additionalProperties": false,
+          "description": "Packages no longer needed",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "apt-held": {
+          "additionalProperties": false,
+          "description": "Held packages",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "apt-lists-age": {
+          "additionalProperties": false,
+          "description": "Age of downloaded package lists",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_age_days": {
+              "default": 7,
+              "description": "Report package lists older than this",
+              "type": "integer"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "apt-sources": {
+          "additionalProperties": false,
+          "description": "APT sources",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "apt-upgradable": {
+          "additionalProperties": false,
+          "description": "Pending package upgrades",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "bind": {
+          "additionalProperties": false,
+          "description": "BIND configuration",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "boot-space": {
+          "additionalProperties": false,
+          "description": "Free space on /boot and the EFI partition",
+          "properties": {
+            "critical_pct": {
+              "default": 10.0,
+              "description": "Critical when free space or inodes drop below this percentage",
+              "type": "number"
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "warning_pct": {
+              "default": 25.0,
+              "description": "Warn when free space or inodes drop below this percentage",
+              "type": "number"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "boot-time": {
+          "additionalProperties": false,
+          "description": "Boot time",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "bootloader": {
+          "additionalProperties": false,
+          "description": "Bootloader configuration",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "config-conflicts": {
+          "additionalProperties": false,
+          "description": "Unmerged configuration files",
+          "properties": {
+            "critical_paths": {
+              "default": [
+                "/etc/ssh/sshd_config",
+                "/etc/ssh/sshd_config.d/",
+                "/etc/sudoers",
+                "/etc/sudoers.d/"
+              ],
+              "description": "Config files whose unmerged updates are critical; a trailing / means a directory",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "ignore_paths": {
+              "default": [],
+              "description": "Files to leave out, e.g. ones a configuration tool such as Ansible manages (shell-style patterns, matched against the config file or its leftover copy)",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "cron": {
+          "additionalProperties": false,
+          "description": "cron jobs",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "debsums": {
+          "additionalProperties": false,
+          "description": "Package file checksums",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "timeout_seconds": {
+              "default": 600,
+              "description": "Give up after this many seconds",
+              "type": "integer"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "disk-space": {
+          "additionalProperties": false,
+          "description": "Free disk space and inodes",
+          "properties": {
+            "critical_pct": {
+              "default": 10.0,
+              "description": "Critical when free space or inodes drop below this percentage",
+              "type": "number"
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "exclude_mounts": {
+              "default": [],
+              "description": "Mount points to leave out (shell-style patterns)",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "important_mounts": {
+              "default": [
+                "/",
+                "/var"
+              ],
+              "description": "Mount points that also need min_free_mib free whatever their size; upgrades download and unpack packages here",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "include_remote": {
+              "default": false,
+              "description": "Also check network and FUSE filesystems (NFS, CIFS, sshfs, rclone, ...)",
+              "type": "boolean"
+            },
+            "min_free_mib": {
+              "default": 2048,
+              "description": "Free space (MiB) the important mounts need: warning below it, critical below half of it; 0 turns this off",
+              "type": "integer"
+            },
+            "warning_pct": {
+              "default": 25.0,
+              "description": "Warn when free space or inodes drop below this percentage",
+              "type": "number"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "dkms": {
+          "additionalProperties": false,
+          "description": "Out-of-tree kernel modules (DKMS)",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "dmesg-errors": {
+          "additionalProperties": false,
+          "description": "Kernel errors and warnings",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": [],
+              "description": "Regular expressions; matching kernel messages are left out",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "docker": {
+          "additionalProperties": false,
+          "description": "Docker containers",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "http_probes": {
+              "default": [],
+              "description": "With probe: CONTAINER=URL items; GET each localhost URL, 2xx/3xx passes",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "ignore_containers": {
+              "default": [],
+              "description": "Containers to leave out (shell-style patterns)",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "probe": {
+              "default": false,
+              "description": "Ask the server whether it answers (connects; off by default)",
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "dpkg-audit": {
+          "additionalProperties": false,
+          "description": "Broken or half-configured packages",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "dpkg-rc": {
+          "additionalProperties": false,
+          "description": "Leftover configuration of removed packages",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "firewall": {
+          "additionalProperties": false,
+          "description": "Firewall rules",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "fstab": {
+          "additionalProperties": false,
+          "description": "/etc/fstab and mounts",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "journal-errors": {
+          "additionalProperties": false,
+          "description": "Errors in the journal (current boot)",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "ignore": {
+              "default": [],
+              "description": "Regular expressions; messages matching any of them (as 'IDENTIFIER: message') are left out",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "kernel-running": {
+          "additionalProperties": false,
+          "description": "Running kernel",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "mariadb": {
+          "additionalProperties": false,
+          "description": "MariaDB and MySQL",
+          "properties": {
+            "credentials_file": {
+              "default": "",
+              "description": "Credentials for the probe, if the default login doesn't work",
+              "type": "string"
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "probe": {
+              "default": false,
+              "description": "Ask the server whether it answers (connects; off by default)",
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "needrestart": {
+          "additionalProperties": false,
+          "description": "Services using outdated libraries",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "network": {
+          "additionalProperties": false,
+          "description": "Network interfaces, routes and DNS",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "ignore_interfaces": {
+              "default": [
+                "lo",
+                "veth*",
+                "docker*",
+                "br-*",
+                "virbr*",
+                "vnet*",
+                "tap*",
+                "cni*",
+                "flannel*",
+                "cali*"
+              ],
+              "description": "Interfaces left out of the baseline comparison (shell-style patterns); containers and VMs create and remove these all the time",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "obsolete-packages": {
+          "additionalProperties": false,
+          "description": "Packages not available from any repository",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "os-release": {
+          "additionalProperties": false,
+          "description": "Operating system release",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "postfix": {
+          "additionalProperties": false,
+          "description": "postfix configuration",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "postgresql": {
+          "additionalProperties": false,
+          "description": "PostgreSQL clusters",
+          "properties": {
+            "credentials_file": {
+              "default": "",
+              "description": "Credentials for the probe, if the default login doesn't work",
+              "type": "string"
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "probe": {
+              "default": false,
+              "description": "Ask the server whether it answers (connects; off by default)",
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "python-venvs": {
+          "additionalProperties": false,
+          "description": "Python virtualenvs",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "exclude_paths": {
+              "default": [
+                "*/.cache/*"
+              ],
+              "description": "Virtualenvs to leave out (shell-style patterns), e.g. tools' throwaway environments under ~/.cache",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "max_depth": {
+              "default": 5,
+              "description": "How many directories deep to search below each path",
+              "type": "integer"
+            },
+            "search_paths": {
+              "default": [
+                "/opt",
+                "/srv",
+                "/usr/local",
+                "/root",
+                "/home",
+                "/var/www"
+              ],
+              "description": "Directories searched for virtualenvs (pyvenv.cfg)",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "ssh-server": {
+          "additionalProperties": false,
+          "description": "SSH server configuration",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "systemd-critical-services": {
+          "additionalProperties": false,
+          "description": "Critical systemd units",
+          "properties": {
+            "builtin": {
+              "default": true,
+              "description": "Also require ssh, cron and journald where installed",
+              "type": "boolean"
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "ignore_units": {
+              "default": [],
+              "description": "Units to leave out (shell-style patterns)",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "required_active": {
+              "default": [],
+              "description": "Units that must be running (or socket-activated)",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "required_enabled": {
+              "default": [],
+              "description": "Units that must be enabled",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "systemd-failed": {
+          "additionalProperties": false,
+          "description": "Failed systemd units",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "ignore_units": {
+              "default": [],
+              "description": "Units to leave out (shell-style patterns)",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "systemd-timers": {
+          "additionalProperties": false,
+          "description": "systemd timers",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "ignore_units": {
+              "default": [],
+              "description": "Timers to leave out (shell-style patterns)",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "time-sync": {
+          "additionalProperties": false,
+          "description": "Time synchronisation",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "unattended-upgrades": {
+          "additionalProperties": false,
+          "description": "Automatic security updates",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "logs": {
+      "additionalProperties": false,
+      "properties": {
+        "ignore": {
+          "description": "Regular expressions for log messages to leave out of both journal-errors and dmesg-errors, matched against the message text. Kernel messages appear in both, so one pattern here covers them; use a check's own 'ignore' option for the rest.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "report": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline": {
+          "description": "Snapshot to compare against: auto (newest in snapshot_dir), none, or a file path",
+          "type": "string"
+        },
+        "color": {
+          "description": "Colorize text output when writing to a terminal",
+          "type": "boolean"
+        },
+        "format": {
+          "description": "Output format: text, json, yaml, html, markdown, jira, confluence",
+          "enum": [
+            "text",
+            "json",
+            "yaml",
+            "html",
+            "markdown",
+            "jira",
+            "confluence"
+          ]
+        },
+        "min_severity": {
+          "description": "Hide findings below this severity: info, warning, critical (the exit code still counts them)",
+          "enum": [
+            "info",
+            "warning",
+            "critical"
+          ]
+        },
+        "output_dir": {
+          "description": "Write reports to timestamped files in this directory (null = standard output)",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "snapshot_dir": {
+          "description": "Where snapshots are written and looked up",
+          "type": "string"
+        },
+        "todo": {
+          "description": "Add a TODO checklist of what needs fixing at the end of each report",
+          "type": "boolean"
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "upload": {
+      "additionalProperties": false,
+      "properties": {
+        "ca_file": {
+          "description": "Extra CA certificates to trust for the portal, besides the system's (null = system CAs only)",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pending_dir": {
+          "description": "Where reports that failed to upload are kept for `pydebuprep upload` (null = don't keep them)",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "token_file": {
+          "description": "File holding the upload token, readable by root only; the PYDEBUPREP_TOKEN environment variable takes precedence",
+          "type": "string"
+        },
+        "url": {
+          "description": "Portal to upload each report to, e.g. https://portal.example.com (null = don't upload)",
+          "format": "uri",
+          "pattern": "^https?://",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": [
+        "object",
+        "null"
+      ]
+    }
+  },
+  "title": "pydebuprep configuration",
+  "type": [
+    "object",
+    "null"
+  ]
+}

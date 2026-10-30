@@ -1,0 +1,341 @@
+{
+  "$defs": {
+    "baseline": {
+      "additionalProperties": false,
+      "properties": {
+        "created_at": {
+          "type": "string"
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "os_version": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "created_at",
+        "hostname",
+        "os_version",
+        "path"
+      ],
+      "type": "object"
+    },
+    "config": {
+      "additionalProperties": false,
+      "properties": {
+        "fetched_at": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "source": {
+          "format": "uri",
+          "type": "string"
+        },
+        "stale": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "fetched_at",
+        "source",
+        "stale"
+      ],
+      "type": "object"
+    },
+    "finding": {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "references": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "remediation": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "severity": {
+          "enum": [
+            "critical",
+            "warning",
+            "info"
+          ]
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "detail",
+        "evidence",
+        "references",
+        "remediation",
+        "severity",
+        "title"
+      ],
+      "type": "object"
+    },
+    "host": {
+      "additionalProperties": false,
+      "properties": {
+        "codename": {
+          "type": "string"
+        },
+        "hostname": {
+          "type": "string"
+        },
+        "is_root": {
+          "type": "boolean"
+        },
+        "kernel": {
+          "type": "string"
+        },
+        "os_id": {
+          "type": "string"
+        },
+        "os_version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "codename",
+        "hostname",
+        "is_root",
+        "kernel",
+        "os_id",
+        "os_version"
+      ],
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline_diff": {
+          "oneOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/finding"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "category": {
+          "examples": [
+            "release",
+            "packages",
+            "boot",
+            "services",
+            "applications",
+            "network",
+            "security",
+            "storage"
+          ],
+          "type": "string"
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/finding"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        },
+        "skipped_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "findings",
+            "skipped",
+            "error"
+          ]
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "baseline_diff",
+        "category",
+        "error",
+        "findings",
+        "id",
+        "skipped_reason",
+        "status",
+        "title"
+      ],
+      "type": "object"
+    },
+    "summary": {
+      "additionalProperties": false,
+      "properties": {
+        "critical": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "error": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "exit_code": {
+          "enum": [
+            0,
+            1,
+            2
+          ]
+        },
+        "info": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ok": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "skipped": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "warning": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "critical",
+        "error",
+        "exit_code",
+        "info",
+        "ok",
+        "skipped",
+        "warning"
+      ],
+      "type": "object"
+    },
+    "todo_item": {
+      "additionalProperties": false,
+      "properties": {
+        "check": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "severity": {
+          "enum": [
+            "critical",
+            "warning",
+            null
+          ]
+        },
+        "steps": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "check",
+        "severity",
+        "steps",
+        "title"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://pydebuprep.app/schema/report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A report written with --format json or --format yaml. Present only when the config came from a URL: config. Present only with --todo: todo.",
+  "properties": {
+    "baseline": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/baseline"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "config": {
+      "$ref": "#/$defs/config"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "host": {
+      "$ref": "#/$defs/host"
+    },
+    "results": {
+      "items": {
+        "$ref": "#/$defs/result"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "1"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "todo": {
+      "items": {
+        "$ref": "#/$defs/todo_item"
+      },
+      "type": "array"
+    },
+    "tool": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "baseline",
+    "generated_at",
+    "host",
+    "results",
+    "schema_version",
+    "summary",
+    "tool"
+  ],
+  "title": "pydebuprep report",
+  "type": "object"
+}
