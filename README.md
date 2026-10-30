@@ -254,12 +254,12 @@ host never looks healthy just because a check couldn't look.
 | `os-release` | release | Supported release; upgrade path vs. the baseline |
 | `apt-autoremove` | packages | Packages `apt autoremove` would remove (simulated) |
 | `apt-held` | packages | Held packages |
-| `apt-upgradable` | packages | Upgrades still pending |
+| `apt-upgradable` | packages | Pending security updates, packages kept back, updates deferred by phasing, and other upgrades, separately |
 | `config-conflicts` | packages | `*.dpkg-dist`, `*.dpkg-new`, `*.ucf-dist`… left in `/etc` (critical for sshd/sudoers) |
 | `debsums` | packages | Package files that no longer match their checksums (root, needs `debsums`) |
-| `dpkg-audit` | packages | `dpkg --audit` and `apt-get check` |
+| `dpkg-audit` | packages | Packages unpacked but not configured, needing reinstalling, or waiting for triggers (separately); `dpkg --audit` and `apt-get check` |
 | `dpkg-rc` | packages | Removed packages with leftover config |
-| `obsolete-packages` | packages | Installed packages no repository provides any more |
+| `obsolete-packages` | packages | Installed packages no repository provides any more; packages from third-party repositories, by vendor; packages whose origin changed since the baseline |
 | `boot-space` | boot | Free space and inodes on `/boot` and the EFI partition |
 | `bootloader` | boot | `grub.cfg` references the newest kernel; UEFI boot entries |
 | `dkms` | boot | DKMS modules built for the running kernel |

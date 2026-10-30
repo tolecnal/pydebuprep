@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fnmatch
+import gzip
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -36,6 +37,7 @@ class FakeSystem(System):
         self.files = files or {}
         self.links = links or {}
         self.scratch_files: dict[str, bytes] = {}
+        self.whole_reads: list[str] = []
         self.ports = ports or set()
         self.http = http or {}
         self.mtimes = mtimes or {}
@@ -70,11 +72,24 @@ class FakeSystem(System):
         return self.available is None or name in self.available
 
     def read_text(self, path: str) -> str | None:
+        self.whole_reads.append(path)
         return self.files.get(path)
 
+    def lines(self, path: str) -> Iterator[str]:
+        data: str | bytes | None = self.files.get(path)
+        if isinstance(data, bytes):
+            try:
+                data = gzip.decompress(data).decode("utf-8", "replace")
+            except (OSError, EOFError):
+                return
+        yield from (data or "").splitlines(keepends=True)
+
     def read_bytes(self, path: str) -> bytes | None:
-        text = self.files.get(path)
-        return None if text is None else text.encode("utf-8")
+        self.whole_reads.append(path)
+        data: str | bytes | None = self.files.get(path)
+        if isinstance(data, bytes):  # binary test files may be given as bytes
+            return data
+        return None if data is None else data.encode("utf-8")
 
     def exists(self, path: str) -> bool:
         prefix = path.rstrip("/") + "/"

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import ctypes
 import glob as _glob
+import gzip
 import http.client
 import os
 import re
@@ -18,6 +19,7 @@ import ssl
 import subprocess  # nosec B404
 import sys
 import tempfile
+import zlib
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -53,6 +55,7 @@ ALLOWED_COMMANDS: set[tuple[str, ...]] = {
     ("dpkg-query", "-W", "-f=${Package}\t${Version}\n"),
     ("apt-get", "check"),
     ("apt-get", "-s", "autoremove"),
+    ("apt-get", "-s", "upgrade"),
     ("apt", "list", "--upgradable"),
     ("apt", "list", "--installed"),
     ("apt-mark", "showhold"),
@@ -340,6 +343,19 @@ class System:
                 return fh.read()
         except OSError:
             return None
+
+    def lines(self, path: str) -> Iterator[str]:
+        """A text file's lines, read as they are needed (gzip when PATH ends in .gz);
+        none if it can't be read. For files too big to read whole, like APT's indexes."""
+        try:
+            if path.endswith(".gz"):
+                with gzip.open(path, "rt", encoding="utf-8", errors="replace") as fh:
+                    yield from fh
+            else:
+                with open(path, encoding="utf-8", errors="replace") as fh:
+                    yield from fh
+        except (OSError, EOFError, zlib.error):
+            return
 
     def exists(self, path: str) -> bool:
         return os.path.exists(path)
