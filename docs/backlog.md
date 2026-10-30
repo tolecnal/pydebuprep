@@ -24,17 +24,12 @@ with `SHA256SUMS`, and the SLSA provenance attestation verified with
 
 `v0.3.0` and `v0.3.1` (the apt solver log fix) released on 2026-10-29, both built
 and audited on all five releases, published with `SHA256SUMS` and a verified
-provenance attestation.
+provenance attestation. `v0.4.0`: tagged after this backlog entry merged; what it
+contains is in `debian/changelog`.
 
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't
-      match both. Changes waiting for the next changelog entry: new check
-      `systemd-critical-services`; apt-sources keyrings, signatures, metadata and
-      security archive findings; `convert`; `--todo`; the documentation site;
-      opt-in readiness probes (postgresql, mariadb/MySQL, docker), docker health states;
-      apt-upgradable security/kept-back/phased sections, dpkg-audit package states,
-      obsolete-packages third-party and origin-change findings;
-      python-venvs missing native libraries and broken entry points.
+      match both.
 - [ ] Decide whether to publish an APT repository as well, for example signed and
       served from GitHub Pages, so hosts can `apt install pydebuprep` and get
       updates. Today the package is published only as a release asset.
