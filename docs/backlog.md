@@ -24,8 +24,12 @@ with `SHA256SUMS`, and the SLSA provenance attestation verified with
 
 `v0.3.0` and `v0.3.1` (the apt solver log fix) released on 2026-10-29, both built
 and audited on all five releases, published with `SHA256SUMS` and a verified
-provenance attestation. `v0.4.0`: tagged after this backlog entry merged; what it
-contains is in `debian/changelog`.
+provenance attestation.
+
+`v0.4.0` released on 2026-10-30, built and audited on all five releases, published
+with `SHA256SUMS` and a verified provenance attestation; what it contains is in
+`debian/changelog`. Waiting for the next release: zsh describes `--no-todo` as
+turning `--todo` off (#25).
 
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't
