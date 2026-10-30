@@ -15,6 +15,7 @@ from pydebuprep import __version__, checks
 from pydebuprep.checks.base import Check, CommandFailed, Context, running_kernel
 from pydebuprep.config import (
     DEFAULT_CONFIG_PATH,
+    DEFAULT_TOKEN_FILE,
     Config,
     ConfigError,
     UploadSettings,
@@ -22,9 +23,18 @@ from pydebuprep.config import (
     load_config,
 )
 from pydebuprep.deps import MissingDependency
-from pydebuprep.model import CATEGORY_ORDER, CheckResult, Host, Report, Severity, compute_summary
+from pydebuprep.model import (
+    CATEGORY_ORDER,
+    CheckResult,
+    ConfigInfo,
+    Host,
+    Report,
+    Severity,
+    compute_summary,
+)
 from pydebuprep.osinfo import detect_os
 from pydebuprep.portal import CA_FILE_ENV, Connection, PortalError, read_token, upload_report
+from pydebuprep.remote_config import is_url, load_remote_config
 from pydebuprep.render import EXTENSIONS, FORMATS, render
 from pydebuprep.reportfile import ReportFileError, load_report
 from pydebuprep.runner import run_checks
@@ -44,6 +54,7 @@ from pydebuprep.state import (
     pending_reports,
     remove_pending,
     save_pending,
+    state_dir,
 )
 from pydebuprep.system import System
 
@@ -242,13 +253,24 @@ def default_config_path() -> str:
     return os.environ.get(CONFIG_ENV) or DEFAULT_CONFIG_PATH
 
 
-def _load_config(args: argparse.Namespace) -> Config:
+def _load_config(args: argparse.Namespace) -> tuple[Config, ConfigInfo | None]:
+    """The config, and where it came from when that was a URL."""
     if args.no_config:
-        return Config.defaults()
+        return Config.defaults(), None
     # A path named on the command line or in the environment must exist; only the
     # built-in default location is optional.
     explicit = args.config or os.environ.get(CONFIG_ENV) or None
-    return load_config(explicit, default_path=DEFAULT_CONFIG_PATH)
+    if explicit and is_url(explicit):
+        # The config isn't loaded yet, so its upload settings can't apply to fetching it.
+        return load_remote_config(
+            explicit,
+            token_file=args.token_file or DEFAULT_TOKEN_FILE,
+            conn=connection(args, UploadSettings()),
+            cache_dir=os.path.join(state_dir(), "configs"),
+            now=datetime.now(timezone.utc),
+            warn=_warn,
+        )
+    return load_config(explicit, default_path=DEFAULT_CONFIG_PATH), None
 
 
 def _check_settings(args: argparse.Namespace, config: Config) -> dict[str, dict[str, Any]]:
@@ -351,7 +373,7 @@ def _print(text: str) -> None:
 
 
 def cmd_report(args: argparse.Namespace, system: System) -> int:
-    config = _load_config(args)
+    config, source = _load_config(args)
     fmt = args.format or config.report.format
     min_severity = args.min_severity or config.report.min_severity
     snapshot_dir = args.snapshot_dir or config.report.snapshot_dir
@@ -392,6 +414,7 @@ def cmd_report(args: argparse.Namespace, system: System) -> int:
         baseline=baseline_info(*loaded) if loaded else None,
         summary=summary,
         results=_filter_for_display(results, Severity(min_severity)),
+        config=source,
     )
     path = resolve_output_path(output, output_dir, host.hostname, fmt, now)
     todo = config.report.todo if args.todo is None else args.todo
@@ -458,7 +481,7 @@ def _upload_body(path: str) -> bytes:
 
 
 def cmd_upload(args: argparse.Namespace) -> int:
-    settings = _load_config(args).upload
+    settings = _load_config(args)[0].upload
     if not settings.url:
         raise ToolError("no upload URL configured (upload: url: in the config file)")
     pending_dir = settings.pending_dir
@@ -531,7 +554,7 @@ def cmd_convert(args: argparse.Namespace) -> int:
 
 
 def cmd_snapshot(args: argparse.Namespace, system: System) -> int:
-    config = _load_config(args)
+    config, _ = _load_config(args)
     selected = checks.get_checks(
         skip=sorted(config.disabled), settings=_check_settings(args, config)
     )
@@ -569,8 +592,15 @@ def cmd_configtest(args: argparse.Namespace) -> int:
     if args.no_config:
         print("Config file ignored (--no-config); built-in defaults apply")
     else:
-        config = _load_config(args)
-        if config.path is None:
+        config, source = _load_config(args)
+        if source is not None and source.stale:
+            print(
+                f"Using the copy of {source.source} fetched on {source.fetched_at} "
+                "(the portal could not be reached)"
+            )
+        elif source is not None:
+            print(f"Using {source.source} (fetched now)")
+        elif config.path is None:
             print(f"Config file {default_config_path()} not found; built-in defaults apply")
         else:
             print(f"Using {config.path}")
