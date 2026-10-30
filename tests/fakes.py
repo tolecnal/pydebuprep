@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fnmatch
+import gzip
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -29,11 +30,16 @@ class FakeSystem(System):
         python: str = "3.13",
         strict: bool = True,
         links: dict[str, str] | None = None,
+        ports: set[tuple[str, int]] | None = None,
+        http: dict[str, int] | None = None,
     ) -> None:
         self.commands = commands or {}
         self.files = files or {}
         self.links = links or {}
         self.scratch_files: dict[str, bytes] = {}
+        self.whole_reads: list[str] = []
+        self.ports = ports or set()
+        self.http = http or {}
         self.mtimes = mtimes or {}
         self.disks = disks or {}
         self.root = root
@@ -66,13 +72,26 @@ class FakeSystem(System):
         return self.available is None or name in self.available
 
     def read_text(self, path: str) -> str | None:
+        self.whole_reads.append(path)
         return self.files.get(path)
 
     def read_range(self, path: str, offset: int, size: int) -> bytes | None:
-        data = self.read_bytes(path)
+        data: str | bytes | None = self.files.get(path)
+        if isinstance(data, str):
+            data = data.encode("utf-8")
         return None if data is None else data[offset : offset + size]
 
+    def lines(self, path: str) -> Iterator[str]:
+        data: str | bytes | None = self.files.get(path)
+        if isinstance(data, bytes):
+            try:
+                data = gzip.decompress(data).decode("utf-8", "replace")
+            except (OSError, EOFError):
+                return
+        yield from (data or "").splitlines(keepends=True)
+
     def read_bytes(self, path: str) -> bytes | None:
+        self.whole_reads.append(path)
         data: str | bytes | None = self.files.get(path)
         if isinstance(data, bytes):  # binary test files may be given as bytes
             return data
@@ -88,6 +107,12 @@ class FakeSystem(System):
 
     def readlink(self, path: str) -> str | None:
         return self.links.get(path)
+
+    def tcp_connect(self, host: str, port: int, timeout: float) -> str | None:
+        return None if (host, port) in self.ports else "Connection refused"
+
+    def http_get(self, url: str, timeout: float) -> tuple[int | None, str | None]:
+        return (self.http[url], None) if url in self.http else (None, "Connection refused")
 
     @contextmanager
     def scratch_dir(self) -> Iterator[str]:

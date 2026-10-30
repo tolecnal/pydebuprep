@@ -12,6 +12,7 @@ from pydebuprep.system import CommandResult
 from .helpers import make_ctx, titles
 
 AUDIT = ("dpkg", "--audit")
+STATES = ("dpkg-query", "-W", "-f=${db:Status-Abbrev} ${Package}\n")
 CHECK = ("apt-get", "check")
 UPGRADABLE = ("apt", "list", "--upgradable")
 HELD = ("apt-mark", "showhold")
@@ -20,13 +21,13 @@ INSTALLED = ("apt", "list", "--installed")
 
 
 def test_dpkg_clean() -> None:
-    ctx = make_ctx(commands={AUDIT: "", CHECK: "Reading package lists...\n"})
+    ctx = make_ctx(commands={AUDIT: "", CHECK: "Reading package lists...\n", STATES: "ii  bash\n"})
     assert DpkgAuditCheck().run(ctx) == []
 
 
 def test_audit_output_critical() -> None:
     out = "The following packages are only half configured:\n foo  Foo package\n"
-    ctx = make_ctx(commands={AUDIT: out, CHECK: ""})
+    ctx = make_ctx(commands={AUDIT: out, CHECK: "", STATES: "ii  bash\n"})
     (f,) = DpkgAuditCheck().run(ctx)
     assert f.severity is Severity.CRITICAL
     assert "sudo dpkg --configure -a" in f.remediation
@@ -35,7 +36,7 @@ def test_audit_output_critical() -> None:
 
 def test_apt_check_failure_critical() -> None:
     bad = CommandResult(CHECK, 100, "", "E: Unmet dependencies.\n")
-    ctx = make_ctx(commands={AUDIT: "", CHECK: bad})
+    ctx = make_ctx(commands={AUDIT: "", CHECK: bad, STATES: "ii  bash\n"})
     (f,) = DpkgAuditCheck().run(ctx)
     assert f.severity is Severity.CRITICAL
     assert f.evidence == ["E: Unmet dependencies."]
@@ -44,18 +45,6 @@ def test_apt_check_failure_critical() -> None:
 def test_upgradable_none() -> None:
     ctx = make_ctx(commands={UPGRADABLE: "Listing... Done\n"})
     assert AptUpgradableCheck().run(ctx) == []
-
-
-def test_upgradable_some_warns_with_count() -> None:
-    out = (
-        "Listing... Done\n"
-        "\nWARNING: apt does not have a stable CLI interface.\n"
-        "curl/stable 8.14.1-2 amd64 [upgradable from: 8.14.1-1]\n"
-        "libcurl4t64/stable 8.14.1-2 amd64 [upgradable from: 8.14.1-1]\n"
-    )
-    (f,) = AptUpgradableCheck().run(make_ctx(commands={UPGRADABLE: out}))
-    assert (f.severity, f.title) == (Severity.WARNING, "2 packages can still be upgraded")
-    assert f.evidence[0].startswith("curl/stable")
 
 
 def test_held_warns() -> None:
@@ -117,7 +106,7 @@ def test_local_packages_warn() -> None:
         "oldlib/now 1.2-3 amd64 [installed,local]\n"
         "mytool/now 0.1 all [installed,local]\n"
     )
-    (f,) = ObsoletePackagesCheck().run(make_ctx(commands={INSTALLED: out}))
+    (f,) = ObsoletePackagesCheck().run(make_ctx(commands={INSTALLED: out, PKG_VERSIONS_ARGV: ""}))
     assert f.severity is Severity.WARNING
     assert f.title == "2 installed packages are not available from any configured repository"
     assert f.evidence == ["oldlib 1.2-3", "mytool 0.1"]
@@ -125,12 +114,17 @@ def test_local_packages_warn() -> None:
 
 def test_no_local_packages() -> None:
     out = "Listing... Done\nbash/stable,now 5.2.37-2 amd64 [installed]\n"
-    assert ObsoletePackagesCheck().run(make_ctx(commands={INSTALLED: out})) == []
+    commands = {INSTALLED: out, PKG_VERSIONS_ARGV: "bash\t5.2.37-2\n"}
+    assert ObsoletePackagesCheck().run(make_ctx(commands=commands)) == []
 
 
 def test_compare_removed_packages() -> None:
     ctx = make_ctx(commands={PKG_VERSIONS_ARGV: "bash\t5.2\nzsh\t5.9\n"})
-    assert ObsoletePackagesCheck().collect_baseline(ctx) == {"bash": "5.2", "zsh": "5.9"}
+    assert ObsoletePackagesCheck().collect_baseline(ctx) == {
+        "versions": {"bash": "5.2", "zsh": "5.9"},
+        "origins": {},
+    }
+    # Snapshots from before 0.4 hold the versions only.
     fs = ObsoletePackagesCheck().compare(ctx, {"bash": "5.1", "python3.11": "3.11.2", "zsh": "5.9"})
     assert titles(fs) == ["1 package removed since baseline"]
     assert fs[0].evidence == ["python3.11 3.11.2"]

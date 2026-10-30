@@ -31,6 +31,9 @@ provenance attestation.
       match both. Changes waiting for the next changelog entry: new check
       `systemd-critical-services`; apt-sources keyrings, signatures, metadata and
       security archive findings; `convert`; `--todo`; the documentation site;
+      opt-in readiness probes (postgresql, mariadb/MySQL, docker), docker health states;
+      apt-upgradable security/kept-back/phased sections, dpkg-audit package states,
+      obsolete-packages third-party and origin-change findings;
       python-venvs missing native libraries and broken entry points.
 - [ ] Decide whether to publish an APT repository as well, for example signed and
       served from GitHub Pages, so hosts can `apt install pydebuprep` and get

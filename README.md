@@ -226,6 +226,8 @@ The package also installs the example as
 | `dmesg-errors`, `journal-errors` | `ignore` ([]): regular expressions for messages to leave out (see also `logs: ignore:`) |
 | `systemd-failed`, `systemd-timers` | `ignore_units` ([]): unit name patterns to leave out |
 | `systemd-critical-services` | `required_active` ([]), `required_enabled` ([]): units that must be running / enabled, on top of the built-in list; `builtin` (true): include ssh, cron and journald where installed; `ignore_units` ([]) |
+| `postgresql`, `mariadb` | `probe` (false): ask the server whether it answers (opt-in: connects as root, the server may log it); `credentials_file` (""): a `.pgpass` / MySQL option file for the probe's login |
+| `docker` | `probe` (false): connect to every published TCP port, and run `http_probes`; `http_probes` ([]): `CONTAINER=URL` items, localhost only, 2xx/3xx passes; `ignore_containers` ([]): name patterns to leave out |
 | `python-venvs` | `search_paths` (/opt, /srv, /usr/local, /root, /home, /var/www) and `max_depth` (5): where to look for virtualenvs; `exclude_paths` (\*/.cache/\*): ones to leave out |
 | `network` | `ignore_interfaces` (lo, veth\*, docker\*, br-\*, virbr\*, vnet\*, tap\*, cni\*, flannel\*, cali\*): left out of the baseline comparison |
 | `disk-space` | `include_remote` (false), `warning_pct` (25.0), `critical_pct` (10.0), `exclude_mounts` ([]), `important_mounts` (["/", "/var"]) and `min_free_mib` (2048): an absolute free-space floor for those mounts |
@@ -252,12 +254,12 @@ host never looks healthy just because a check couldn't look.
 | `os-release` | release | Supported release; upgrade path vs. the baseline |
 | `apt-autoremove` | packages | Packages `apt autoremove` would remove (simulated) |
 | `apt-held` | packages | Held packages |
-| `apt-upgradable` | packages | Upgrades still pending |
+| `apt-upgradable` | packages | Pending security updates, packages kept back, updates deferred by phasing, and other upgrades, separately |
 | `config-conflicts` | packages | `*.dpkg-dist`, `*.dpkg-new`, `*.ucf-dist`… left in `/etc` (critical for sshd/sudoers) |
 | `debsums` | packages | Package files that no longer match their checksums (root, needs `debsums`) |
-| `dpkg-audit` | packages | `dpkg --audit` and `apt-get check` |
+| `dpkg-audit` | packages | Packages unpacked but not configured, needing reinstalling, or waiting for triggers (separately); `dpkg --audit` and `apt-get check` |
 | `dpkg-rc` | packages | Removed packages with leftover config |
-| `obsolete-packages` | packages | Installed packages no repository provides any more |
+| `obsolete-packages` | packages | Installed packages no repository provides any more; packages from third-party repositories, by vendor; packages whose origin changed since the baseline |
 | `boot-space` | boot | Free space and inodes on `/boot` and the EFI partition |
 | `bootloader` | boot | `grub.cfg` references the newest kernel; UEFI boot entries |
 | `dkms` | boot | DKMS modules built for the running kernel |
@@ -272,10 +274,10 @@ host never looks healthy just because a check couldn't look.
 | `systemd-timers` | services | Enabled timers that aren't active |
 | `time-sync` | services | A time synchronisation service is running and the clock is synchronised (read from the kernel, no daemon queried); service changes since the baseline |
 | `bind` | applications | `named-checkconf` errors (root) |
-| `docker` | applications | Unhealthy or restarting containers; containers running before but not now. Only queried when `docker.service` is running, so the daemon is never started (root) |
-| `mariadb` | applications | Data directory not upgraded to the new server version (root) |
+| `docker` | applications | Containers failing their health check, restarting, or still starting it (each its own finding); containers running before but not now; opt-in probes of published ports and HTTP URLs. Only queried when `docker.service` is running, so the daemon is never started (root) |
+| `mariadb` | applications | MariaDB data directory not upgraded to the new server version; opt-in probe that MariaDB or MySQL answers a ping and a query (root) |
 | `postfix` | applications | `postconf -n` warnings and errors (`postfix check` isn't used: it creates directories) |
-| `postgresql` | applications | Clusters still on an older major version than the newest installed server, or left behind after migrating; clusters that should start but are down; clusters online before but not now |
+| `postgresql` | applications | Clusters still on an older major version than the newest installed server, or left behind after migrating; clusters that should start but are down; clusters online before but not now; opt-in probe that each online cluster accepts connections and answers a query |
 | `python-venvs` | applications | Virtualenvs whose Python no longer exists, or built for an older Python; compiled modules needing libraries that are missing (read from their ELF headers, never `ldd`); scripts whose interpreter doesn't exist |
 | `firewall` | network | ufw or nftables enabled but no rules loaded; rules lost since the baseline (root; only queries already-loaded kernel modules) |
 | `network` | network | Default route and DNS servers; interfaces, addresses, routes, DNS and the network manager (ifupdown, netplan, NetworkManager, systemd-networkd) compared with the baseline |

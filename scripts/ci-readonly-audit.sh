@@ -66,6 +66,19 @@ if [ -d /run/systemd/system ]; then
     if systemctl -q is-active docker.service; then
         AUDIT_EXPECT="$AUDIT_EXPECT docker"
     fi
-    export AUDIT_IGNORE AUDIT_EXPECT
+    # Every readiness probe on, so their commands are audited too (the services they ask
+    # may log the connection: that is accepted, pydebuprep itself must write nothing).
+    conf=/etc/pydebuprep-audit.conf
+    printf 'checks:\n  postgresql:\n    probe: true\n  mariadb:\n    probe: true\n' > "$conf"
+    printf '  docker:\n    probe: true\n    http_probes: ["%s"]\n' "${AUDIT_HTTP_PROBE:-none=http://127.0.0.1:1/}" >> "$conf"
+    if [ -n "${AUDIT_TOOLS_ONLY:-}" ]; then
+        # debsums reads every packaged file: minutes on a runner VM (containers cover it)
+        printf '  debsums:\n    enabled: false\n' >> "$conf"
+    else
+        admin=$(command -v mariadb-admin >/dev/null && echo mariadb-admin || echo mysqladmin)
+        AUDIT_EXPECT="$AUDIT_EXPECT pg_isready setpriv psql $admin mariadb"
+    fi
+    PYDEBUPREP_CONFIG=$conf
+    export AUDIT_IGNORE AUDIT_EXPECT PYDEBUPREP_CONFIG
 fi
 "$here/readonly-audit.sh" /tmp/audit

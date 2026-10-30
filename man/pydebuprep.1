@@ -288,7 +288,7 @@ for each check's options.
 (packages) Held packages
 .TP
 .B apt\-upgradable
-(packages) Upgrades still pending
+(packages) Pending security updates, packages kept back, updates deferred by phasing, and other upgrades, separately
 .TP
 .B config\-conflicts
 (packages) \fB\(**.dpkg\-dist\fR, \fB\(**.dpkg\-new\fR, \fB\(**.ucf\-dist\fR... left in \fB/etc\fR (critical for sshd/sudoers)
@@ -297,13 +297,13 @@ for each check's options.
 (packages) Package files that no longer match their checksums (root, needs \fBdebsums\fR)
 .TP
 .B dpkg\-audit
-(packages) \fBdpkg \-\-audit\fR and \fBapt\-get check\fR
+(packages) Packages unpacked but not configured, needing reinstalling, or waiting for triggers (separately); dpkg \-\-audit and apt\-get check
 .TP
 .B dpkg\-rc
 (packages) Removed packages with leftover config
 .TP
 .B obsolete\-packages
-(packages) Installed packages no repository provides any more
+(packages) Installed packages no repository provides any more; packages from third\-party repositories, by vendor; packages whose origin changed since the baseline
 .TP
 .B boot\-space
 (boot) Free space and inodes on \fB/boot\fR and the EFI partition
@@ -348,16 +348,16 @@ for each check's options.
 (applications) \fBnamed\-checkconf\fR errors (root)
 .TP
 .B docker
-(applications) Unhealthy or restarting containers; containers running before but not now. Only queried when \fBdocker.service\fR is running, so the daemon is never started (root)
+(applications) Containers failing their health check, restarting, or still starting it; containers running before but not now; opt\-in probes of published ports and HTTP URLs. Only queried when docker.service is running (root)
 .TP
 .B mariadb
-(applications) Data directory not upgraded to the new server version (root)
+(applications) MariaDB data directory not upgraded to the new server version; opt\-in probe that MariaDB or MySQL answers a ping and a query (root)
 .TP
 .B postfix
 (applications) \fBpostconf \-n\fR warnings and errors (\fBpostfix check\fR isn't used: it creates directories)
 .TP
 .B postgresql
-(applications) Clusters still on an older major version than the newest installed server, or left behind after migrating; clusters that should start but are down; clusters online before but not now
+(applications) Clusters still on an older major version, or left behind after migrating; clusters that should start but are down; clusters online before but not now; opt\-in probe that each online cluster accepts connections and answers a query
 .TP
 .B python\-venvs
 (applications) Virtualenvs whose Python no longer exists, or built for an older Python; compiled modules needing libraries that are missing (read from their ELF headers, never ldd); scripts whose interpreter doesn't exist

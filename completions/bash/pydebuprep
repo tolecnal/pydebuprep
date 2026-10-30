@@ -25,12 +25,15 @@ _pydebuprep_check_option() {
         local values=""
         case ${cur%%=*} in
         disk-space.include_remote) values="true false" ;;
+        docker.probe) values="true false" ;;
+        mariadb.probe) values="true false" ;;
+        postgresql.probe) values="true false" ;;
         systemd-critical-services.builtin) values="true false" ;;
         esac
         mapfile -t COMPREPLY < <(compgen -W "$values" -- "${cur#*=}")
         return
     fi
-    mapfile -t COMPREPLY < <(compgen -W "apt-lists-age.max_age_days= boot-space.critical_pct= boot-space.warning_pct= config-conflicts.critical_paths= config-conflicts.ignore_paths= debsums.timeout_seconds= disk-space.critical_pct= disk-space.exclude_mounts= disk-space.important_mounts= disk-space.include_remote= disk-space.min_free_mib= disk-space.warning_pct= dmesg-errors.ignore= journal-errors.ignore= network.ignore_interfaces= python-venvs.exclude_paths= python-venvs.max_depth= python-venvs.search_paths= systemd-critical-services.builtin= systemd-critical-services.ignore_units= systemd-critical-services.required_active= systemd-critical-services.required_enabled= systemd-failed.ignore_units= systemd-timers.ignore_units=" -- "$cur")
+    mapfile -t COMPREPLY < <(compgen -W "apt-lists-age.max_age_days= boot-space.critical_pct= boot-space.warning_pct= config-conflicts.critical_paths= config-conflicts.ignore_paths= debsums.timeout_seconds= disk-space.critical_pct= disk-space.exclude_mounts= disk-space.important_mounts= disk-space.include_remote= disk-space.min_free_mib= disk-space.warning_pct= dmesg-errors.ignore= docker.http_probes= docker.ignore_containers= docker.probe= journal-errors.ignore= mariadb.credentials_file= mariadb.probe= network.ignore_interfaces= postgresql.credentials_file= postgresql.probe= python-venvs.exclude_paths= python-venvs.max_depth= python-venvs.search_paths= systemd-critical-services.builtin= systemd-critical-services.ignore_units= systemd-critical-services.required_active= systemd-critical-services.required_enabled= systemd-failed.ignore_units= systemd-timers.ignore_units=" -- "$cur")
     compopt -o nospace 2>/dev/null
 }
 

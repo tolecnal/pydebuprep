@@ -137,8 +137,10 @@ jobs:
           path: dist
       - name: Verify checksums
         run: cd dist && sha256sum -c SHA256SUMS
-      - name: Start a container for the docker check to list
-        run: docker run -d --name audit-sleeper debian:trixie sleep infinity
+      - name: Start a web container for the docker check and its probes
+        run: >-
+          docker run -d --name audit-web -p 127.0.0.1:18080:8080
+          python:3.13-alpine python -m http.server 8080
       # debsums checks every file of the runner's ~2000 packages (minutes per run, more
       # under strace); the containers audit it on every release.
       - name: Leave debsums out on the runner
@@ -151,4 +153,5 @@ jobs:
       - name: Prove a root run changes nothing (strace, timestamps, systemd jobs)
         env:
           AUDIT_TOOLS_ONLY: "1"
+          AUDIT_HTTP_PROBE: "audit-web=http://127.0.0.1:18080/"
         run: sudo -E scripts/ci-readonly-audit.sh
