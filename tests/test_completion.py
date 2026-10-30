@@ -120,6 +120,10 @@ needs_bash_completion = pytest.mark.skipif(
         ("pydebuprep --no-color --", ["--format"], ["--version"]),
         # items already in the list aren't offered again
         ("pydebuprep report --skip apt-held,apt-h", [], ["apt-held,apt-held"]),
+        # --todo (0.4.0) in every place it's valid
+        ("pydebuprep --to", ["--todo"], []),
+        ("pydebuprep report --no-t", ["--no-todo"], []),
+        ("pydebuprep convert r.json --to", ["--todo"], []),
     ],
 )
 def test_bash_completes(line: str, expected: list[str], absent: list[str]) -> None:
@@ -231,6 +235,9 @@ needs_zsh = pytest.mark.skipif(not shutil.which("zsh"), reason="zsh not installe
         # --version is only valid as the first word
         ("report --vers", "pydebuprep report --vers"),
         ("--no-color --vers", "pydebuprep --no-color --vers"),
+        ("--to", "pydebuprep --todo"),
+        ("report --no-t", "pydebuprep report --no-todo"),
+        ("convert r.json --to", "pydebuprep convert r.json --todo"),
     ],
 )
 def test_zsh_completes(tmp_path: Path, line: str, expected: str) -> None:
@@ -320,6 +327,22 @@ def test_mutually_exclusive_flags_recorded() -> None:
     assert set(report["--output"].exclusive) == {"--output-dir"}
     assert set(report["--config"].exclusive) == {"--no-config"}
     assert report["--format"].exclusive == []
+    assert set(report["--todo"].exclusive) == {"--no-todo"}
+    assert set(report["--no-todo"].exclusive) == {"--todo"}
+
+
+def test_negated_flags_are_described_as_turning_the_option_off() -> None:
+    # A BooleanOptionalAction has one help text for --todo and --no-todo; the
+    # completion describes --no-todo by what it does instead.
+    for command in ("report", "convert"):
+        options = {o.flags[0]: o for o in completion_spec().commands[command].options}
+        assert options["--todo"].flags == ["--todo"]
+        assert options["--todo"].help.startswith("add a TODO checklist")
+        assert options["--no-todo"].flags == ["--no-todo"]
+        assert options["--no-todo"].help == "turn off --todo"
+    script = zsh_completion()
+    assert "--no-todo[turn off --todo]" in script
+    assert "--no-todo[add a TODO" not in script
 
 
 @needs_zsh
@@ -330,6 +353,7 @@ def test_mutually_exclusive_flags_recorded() -> None:
         ("report --output-dir /tmp --outp", "pydebuprep report --output-dir /tmp --outp"),
         ("--format=ji", "pydebuprep --format=jira"),
         ("report --min-severity=crit", "pydebuprep report --min-severity=critical"),
+        ("report --todo --no-t", "pydebuprep report --todo --no-t"),
     ],
 )
 def test_zsh_exclusions_and_equals_forms(tmp_path: Path, line: str, expected: str) -> None:
