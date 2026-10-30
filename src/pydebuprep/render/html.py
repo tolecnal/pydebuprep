@@ -8,6 +8,7 @@ from pydebuprep.render._common import (
     baseline_line,
     baseline_state,
     by_category,
+    config_line,
     has_baseline_section,
     host_line,
     summary_line,
@@ -75,7 +76,9 @@ def render(report: Report, *, todo: bool = False) -> str:
         f"<style>{STYLE}</style></head><body>",
         "<h1>pydebuprep report</h1>",
         f'<p class="meta">{escape(host_line(report))}<br>Generated: '
-        f"{escape(report.generated_at)}<br>{escape(baseline_line(report))}</p>",
+        f"{escape(report.generated_at)}<br>{escape(baseline_line(report))}"
+        + "".join(f"<br>{escape(line)}" for line in [config_line(report)] if line)
+        + "</p>",
         f"<h2>Summary</h2><p>{escape(summary_line(report))}</p>",
     ]
     for category, results in by_category(report):

@@ -17,6 +17,7 @@ from pydebuprep.model import (
     SCHEMA_VERSION,
     BaselineInfo,
     CheckResult,
+    ConfigInfo,
     Finding,
     Host,
     Report,
@@ -90,6 +91,15 @@ def report_from_dict(data: dict[str, Any]) -> Report:
         summary=_summary(_map(_field(data, "summary", ""), "summary"), "summary"),
         results=[_result(_map(r, f"results[{i}]"), f"results[{i}]") for i, r in enumerate(results)],
         schema_version=SCHEMA_VERSION,
+        config=None if data.get("config") is None else _config(_map(data["config"], "config")),
+    )
+
+
+def _config(d: dict[str, Any]) -> ConfigInfo:
+    return ConfigInfo(
+        source=_str(_field(d, "source", "config"), "config.source"),
+        fetched_at=_str(_field(d, "fetched_at", "config"), "config.fetched_at"),
+        stale=_bool(_field(d, "stale", "config"), "config.stale"),
     )
 
 

@@ -6,6 +6,7 @@ from pydebuprep.render._common import (
     baseline_line,
     baseline_state,
     by_category,
+    config_line,
     has_baseline_section,
     host_line,
     summary_line,
@@ -49,7 +50,9 @@ def _finding(f: Finding, indent: str, color: bool) -> list[str]:
 def render(report: Report, *, color: bool = False, todo: bool = False) -> str:
     title = "pydebuprep report"
     out = [title, "=" * len(title), host_line(report), f"Generated: {report.generated_at}"]
-    out += [baseline_line(report), "", f"Summary: {summary_line(report)}"]
+    out += [baseline_line(report)]
+    out += [line for line in [config_line(report)] if line]
+    out += ["", f"Summary: {summary_line(report)}"]
     for category, results in by_category(report):
         out += ["", category.upper(), "-" * len(category)]
         for r in results:
