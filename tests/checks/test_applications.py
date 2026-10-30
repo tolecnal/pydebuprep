@@ -165,12 +165,11 @@ def test_docker_unhealthy_and_restarting() -> None:
         + container("db", "restarting", "Restarting (1) 5 seconds ago")
         + "not json\n"
     )
-    (f,) = DockerCheck().run(docker_ctx(ps))
-    assert (f.severity, f.title) == (
-        Severity.WARNING,
-        "2 Docker containers are unhealthy or restarting",
-    )
-    assert f.evidence == ["db: Restarting (1) 5 seconds ago", "web: Up 2 hours (unhealthy)"]
+    fs = DockerCheck().run(docker_ctx(ps))  # "not json" is skipped
+    assert [(f.title, f.evidence) for f in fs] == [
+        ("1 Docker container fails its health check", ["web: Up 2 hours (unhealthy)"]),
+        ("1 Docker container keeps restarting", ["db: Restarting (1) 5 seconds ago"]),
+    ]
 
 
 def test_docker_not_running_is_skipped_without_starting_it() -> None:

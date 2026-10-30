@@ -29,11 +29,15 @@ class FakeSystem(System):
         python: str = "3.13",
         strict: bool = True,
         links: dict[str, str] | None = None,
+        ports: set[tuple[str, int]] | None = None,
+        http: dict[str, int] | None = None,
     ) -> None:
         self.commands = commands or {}
         self.files = files or {}
         self.links = links or {}
         self.scratch_files: dict[str, bytes] = {}
+        self.ports = ports or set()
+        self.http = http or {}
         self.mtimes = mtimes or {}
         self.disks = disks or {}
         self.root = root
@@ -82,6 +86,12 @@ class FakeSystem(System):
 
     def readlink(self, path: str) -> str | None:
         return self.links.get(path)
+
+    def tcp_connect(self, host: str, port: int, timeout: float) -> str | None:
+        return None if (host, port) in self.ports else "Connection refused"
+
+    def http_get(self, url: str, timeout: float) -> tuple[int | None, str | None]:
+        return (self.http[url], None) if url in self.http else (None, "Connection refused")
 
     @contextmanager
     def scratch_dir(self) -> Iterator[str]:

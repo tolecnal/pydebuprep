@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import ctypes
 import glob as _glob
+import http.client
 import os
 import re
 import shutil
 import socket
+import ssl
 
 # The only module that starts processes; every argv is checked against ALLOWED_COMMANDS.
 import subprocess  # nosec B404
@@ -20,6 +22,7 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 # Stop apt from taking locks or regenerating its binary caches (which it does
 # even for read-only queries when run as root), and from writing its solver log
@@ -133,6 +136,23 @@ SIGNATURE_PROGRAMS = ("sqv", "gpgv")
 KEYRING_DIRS = ("/etc/apt/", "/usr/share/keyrings/")
 APT_LISTS_DIR = "/var/lib/apt/lists/"
 
+# Readiness probes (opt-in): ask PostgreSQL and MariaDB/MySQL whether they answer. Only
+# these exact forms; the port, the PostgreSQL user and credential files are the variable
+# parts, each validated. The query is always SELECT 1.
+PG_SOCKET_DIR = "/var/run/postgresql"
+PSQL_FLAGS = ("psql", "-X", "-A", "-t", "-w")
+AS_POSTGRES = ("setpriv", "--reuid=postgres", "--regid=postgres", "--init-groups", "--")
+CLIENT_ENV = ("PG", "MYSQL")
+PG_USER = re.compile(r"[A-Za-z0-9_.-]+")
+CONNINFO = re.compile(
+    rf"host={PG_SOCKET_DIR} port=([0-9]{{1,5}}) dbname=postgres "
+    r"user=[A-Za-z0-9_.-]+ passfile=(/\S+)"
+)
+MYSQL_ADMIN = ("mariadb-admin", "mysqladmin")
+MYSQL_CLIENT = ("mariadb", "mysql")
+MYSQL_QUERY = ("-N", "-B", "-e", "SELECT 1", "information_schema")
+DEFAULTS_FILE = "--defaults-extra-file="
+
 DEFAULT_TIMEOUT = 30.0
 TIME_ERROR = 5  # adjtimex(): the clock is not synchronised
 
@@ -159,6 +179,8 @@ def _is_allowed(argv: tuple[str, ...]) -> bool:
         return True
     if argv and argv[0] in SIGNATURE_PROGRAMS:
         return _is_signature_check(argv)
+    if argv and argv[0] in ("pg_isready", "setpriv", "psql", *MYSQL_ADMIN, *MYSQL_CLIENT):
+        return _is_probe(argv)
     if argv[: len(SHOW_UNITS)] == SHOW_UNITS:
         units = argv[len(SHOW_UNITS) :]
         return 0 < len(units) <= MAX_UNITS and all(_plain_unit(u) for u in units)
@@ -196,6 +218,42 @@ def _is_signature_check(argv: tuple[str, ...]) -> bool:
         and "/" not in name
         and name.endswith("_InRelease")
     )
+
+
+def _port(text: str) -> bool:
+    return text.isdigit() and 0 < int(text) < 65536
+
+
+def _without_defaults_file(args: tuple[str, ...]) -> tuple[str, ...] | None:
+    """MySQL client arguments after an optional leading --defaults-extra-file=/path."""
+    if args and args[0].startswith(DEFAULTS_FILE):
+        return args[1:] if _normal_path(args[0][len(DEFAULTS_FILE) :]) else None
+    return args
+
+
+def _is_probe(argv: tuple[str, ...]) -> bool:
+    if argv[:3] == ("pg_isready", "-h", PG_SOCKET_DIR):
+        return len(argv) == 5 and argv[3] == "-p" and _port(argv[4])
+    if argv[: len(AS_POSTGRES)] == AS_POSTGRES:
+        rest = argv[len(AS_POSTGRES) :]
+        return (
+            rest[:7] == (*PSQL_FLAGS, "-h", PG_SOCKET_DIR)
+            and len(rest) == 13
+            and rest[7] == "-p"
+            and _port(rest[8])
+            and rest[9:] == ("-d", "postgres", "-c", "SELECT 1")
+        )
+    if argv[:6] == (*PSQL_FLAGS, "-d"):
+        match = CONNINFO.fullmatch(argv[6]) if len(argv) == 9 else None
+        return (
+            match is not None
+            and _port(match.group(1))
+            and _normal_path(match.group(2))
+            and argv[7:] == ("-c", "SELECT 1")
+        )
+    if argv[0] in MYSQL_ADMIN:
+        return _without_defaults_file(argv[1:]) == ("ping",)
+    return _without_defaults_file(argv[1:]) == MYSQL_QUERY
 
 
 def _plain_unit(name: str) -> bool:
@@ -244,7 +302,10 @@ class System:
     def run(self, argv: Sequence[str], timeout: float = DEFAULT_TIMEOUT) -> CommandResult:
         check_allowed(argv)
         args = tuple(argv)
-        env = {**os.environ, "LC_ALL": "C", "LANG": "C"}
+        # Client settings for PostgreSQL and MySQL (PGHOST, PGSSLKEYLOGFILE, MYSQL_PWD, ...)
+        # could redirect a probe or make a client write a file: never pass them on.
+        env = {k: v for k, v in os.environ.items() if not k.startswith(CLIENT_ENV)}
+        env.update(LC_ALL="C", LANG="C")
         try:
             # Fixed, allowlisted argv; never a shell.
             proc = subprocess.run(  # nosec B603
@@ -305,6 +366,49 @@ class System:
         with os.fdopen(os.open(path, flags, 0o600), "wb") as fh:
             fh.write(data)
         return path
+
+    def tcp_connect(self, host: str, port: int, timeout: float) -> str | None:
+        """Whether something answers on a TCP port: None if so, else why not.
+
+        Accepting the connection isn't enough: Docker's userland proxy accepts on every
+        published port and hangs up at once when nothing listens behind it. A working
+        service waits for the client (no data within a second) or greets it.
+        """
+        try:
+            with socket.create_connection((host, port), timeout=timeout) as sock:
+                sock.settimeout(min(timeout, 1.0))
+                try:
+                    if sock.recv(1) == b"":
+                        return "closed at once, nothing listens behind it"
+                except TimeoutError:
+                    pass  # waiting for us to speak: alive
+                return None
+        except OSError as exc:
+            return exc.strerror or str(exc) or type(exc).__name__
+
+    def http_get(self, url: str, timeout: float) -> tuple[int | None, str | None]:
+        """GET URL without following redirects or proxies: (status, None) or (None, error)."""
+        try:
+            parts = urlsplit(url)
+            host, port = parts.hostname or "", parts.port
+            target = (parts.path or "/") + (f"?{parts.query}" if parts.query else "")
+        except ValueError as exc:
+            return None, str(exc)
+        conn: http.client.HTTPConnection
+        if parts.scheme == "https":
+            # Probes only reach localhost, whose certificate rarely names "localhost":
+            # this checks that the service answers, not who it is.
+            context = ssl._create_unverified_context()  # nosec B323
+            conn = http.client.HTTPSConnection(host, port, timeout=timeout, context=context)
+        else:
+            conn = http.client.HTTPConnection(host, port, timeout=timeout)
+        try:
+            conn.request("GET", target)
+            return conn.getresponse().status, None
+        except (OSError, ValueError, http.client.HTTPException) as exc:
+            return None, str(exc) or type(exc).__name__
+        finally:
+            conn.close()
 
     def readlink(self, path: str) -> str | None:
         try:
