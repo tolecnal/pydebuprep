@@ -183,3 +183,86 @@ def test_lines_streams_plain_and_gzip_files(tmp_path: Path) -> None:
     assert list(system.lines(str(tmp_path / "packed.gz"))) == ["c\n", "d\n"]
     assert list(system.lines(str(tmp_path / "broken.gz"))) == []
     assert list(system.lines(str(tmp_path / "missing"))) == []
+
+
+def test_tcp_connect_and_http_get() -> None:
+    import http.server
+    import threading
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(204 if self.path == "/ok" else 500)
+            self.end_headers()
+
+        def log_message(self, *args: object) -> None:
+            pass
+
+    server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+    port = server.server_address[1]
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        system = System()
+        assert system.tcp_connect("127.0.0.1", port, 3.0) is None
+        assert system.http_get(f"http://127.0.0.1:{port}/ok", 3.0) == (204, None)
+        assert system.http_get(f"http://127.0.0.1:{port}/bad", 3.0) == (500, None)
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert system.tcp_connect("127.0.0.1", port, 3.0) is not None  # closed now
+    status, error = system.http_get(f"http://127.0.0.1:{port}/ok", 3.0)
+    assert status is None and error
+    status, error = system.http_get("https://127.0.0.1:1/", 1.0)
+    assert status is None and error
+
+
+def test_tcp_connect_fails_when_the_peer_hangs_up_at_once() -> None:
+    # Docker's userland proxy accepts every connection on a published port and closes it
+    # at once when nothing listens behind it; a working service waits or greets.
+    import threading
+
+    listener = socket.create_server(("127.0.0.1", 0))
+    port = listener.getsockname()[1]
+
+    def hang_up() -> None:
+        conn, _ = listener.accept()
+        conn.close()
+
+    threading.Thread(target=hang_up, daemon=True).start()
+    try:
+        error = System().tcp_connect("127.0.0.1", port, 3.0)
+    finally:
+        listener.close()
+    assert error is not None and "closed" in error
+
+
+def test_tcp_connect_accepts_a_greeting() -> None:
+    import threading
+
+    listener = socket.create_server(("127.0.0.1", 0))
+    port = listener.getsockname()[1]
+
+    def greet() -> None:
+        conn, _ = listener.accept()
+        conn.sendall(b"220 ready\r\n")
+        conn.close()
+
+    threading.Thread(target=greet, daemon=True).start()
+    try:
+        assert System().tcp_connect("127.0.0.1", port, 3.0) is None
+    finally:
+        listener.close()
+
+
+def test_client_environment_is_not_passed_to_commands(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(system, "ALLOWED_COMMANDS", system.ALLOWED_COMMANDS | {("env",)})
+    monkeypatch.setenv("PGSSLKEYLOGFILE", "/tmp/keys")
+    monkeypatch.setenv("MYSQL_PWD", "secret")
+    monkeypatch.setenv("KEEP_ME", "1")
+    out = System().run(["env"]).stdout
+    assert "KEEP_ME=1" in out
+    assert "PGSSLKEYLOGFILE" not in out and "MYSQL_PWD" not in out
+
+
+def test_http_get_with_a_bad_port_is_an_error() -> None:
+    status, error = System().http_get("http://localhost:99999/", 1.0)
+    assert status is None and error

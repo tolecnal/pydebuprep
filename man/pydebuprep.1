@@ -348,16 +348,16 @@ for each check's options.
 (applications) \fBnamed\-checkconf\fR errors (root)
 .TP
 .B docker
-(applications) Unhealthy or restarting containers; containers running before but not now. Only queried when \fBdocker.service\fR is running, so the daemon is never started (root)
+(applications) Containers failing their health check, restarting, or still starting it; containers running before but not now; opt\-in probes of published ports and HTTP URLs. Only queried when docker.service is running (root)
 .TP
 .B mariadb
-(applications) Data directory not upgraded to the new server version (root)
+(applications) MariaDB data directory not upgraded to the new server version; opt\-in probe that MariaDB or MySQL answers a ping and a query (root)
 .TP
 .B postfix
 (applications) \fBpostconf \-n\fR warnings and errors (\fBpostfix check\fR isn't used: it creates directories)
 .TP
 .B postgresql
-(applications) Clusters still on an older major version than the newest installed server, or left behind after migrating; clusters that should start but are down; clusters online before but not now
+(applications) Clusters still on an older major version, or left behind after migrating; clusters that should start but are down; clusters online before but not now; opt\-in probe that each online cluster accepts connections and answers a query
 .TP
 .B python\-venvs
 (applications) Virtualenvs whose Python no longer exists, or built for an older Python
