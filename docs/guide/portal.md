@@ -88,7 +88,8 @@ still apply:
 sudo pydebuprep --ca-file /etc/ssl/certs/internal-ca.pem ...
 ```
 
-or set `PYDEBUPREP_CA_FILE`, or `upload: ca_file:` in the config file. Redirects are
+or set `PYDEBUPREP_CA_FILE`, or `upload: ca_file:` in the config file. A proxy set in
+`https_proxy` is used, and hosts in `no_proxy` are reached directly. Redirects are
 never followed. `http://` URLs work only with `--allow-http`, which sends the token
 unencrypted: for test setups only.
 

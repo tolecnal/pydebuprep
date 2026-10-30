@@ -40,12 +40,6 @@ def portal() -> Iterator[Portal]:
         yield p
 
 
-@pytest.fixture(autouse=True)
-def _no_proxy(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY", "all_proxy"):
-        monkeypatch.delenv(name, raising=False)
-
-
 # --- the token -------------------------------------------------------------
 
 
@@ -251,6 +245,7 @@ def tls_portal(tmp_path: Path) -> Iterator[tuple[Portal, str]]:
         check=True, capture_output=True,
     )  # fmt: skip
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.load_cert_chain(cert, key)
     with running_portal(tls=context) as portal:
         portal.route("GET", CONFIG_PATH, Reply(200, b"report: {}\n"))
