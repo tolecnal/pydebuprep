@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable, Mapping
 from datetime import datetime
+from typing import Any
 
 from pydebuprep.config import Config, ConfigError, parse_config
 from pydebuprep.deps import require_yaml
@@ -30,7 +31,9 @@ from pydebuprep.state import (
     state_dir,
 )
 
-# Write paths and credentials: only the host's own config may set these.
+# Write paths and credentials: only the host's own config may set these. Any file a
+# remote config could name is out too: as root, opening /dev/watchdog arms a reboot,
+# /dev/zero exhausts memory and a FIFO hangs the run.
 REMOTE_FORBIDDEN = (
     ("report", "output_dir"),
     ("report", "snapshot_dir"),
@@ -38,6 +41,9 @@ REMOTE_FORBIDDEN = (
     ("upload", "ca_file"),
     ("upload", "pending_dir"),
 )
+
+
+CHECK_FORBIDDEN = "credentials_file"  # the probes' login files (postgresql, mariadb)
 
 
 def is_url(text: str) -> bool:
@@ -48,15 +54,23 @@ def _forbidden_keys(text: str, url: str) -> list[str]:
     yaml = require_yaml()
     try:
         data = yaml.safe_load(text)
-    except yaml.YAMLError:
+    except (yaml.YAMLError, RecursionError):
         return []  # parse_config reports it, with its location
     if not isinstance(data, dict):
         return []
-    return [
-        f"{url}: {section}.{key} can't be set by a config fetched from a URL"
+    keys = [
+        f"{section}.{key}"
         for section, key in REMOTE_FORBIDDEN
         if isinstance(data.get(section), dict) and key in data[section]
     ]
+    sections = data.get("checks")
+    check_sections: dict[Any, Any] = sections if isinstance(sections, dict) else {}
+    keys += [
+        f"checks.{check_id}.{CHECK_FORBIDDEN}"
+        for check_id, options in check_sections.items()
+        if isinstance(options, dict) and CHECK_FORBIDDEN in options
+    ]
+    return [f"{url}: {key} can't be set by a config fetched from a URL" for key in keys]
 
 
 def parse_remote(text: str, url: str) -> Config:
@@ -69,9 +83,8 @@ def parse_remote(text: str, url: str) -> Config:
     upload_url = config.upload.url
     if upload_url and not same_origin(upload_url, url):
         errors.append(f"{url}: upload.url must be on the same server as the config ({upload_url})")
-    baseline = config.report.baseline
-    if baseline not in ("auto", "none") and not os.path.isabs(baseline):
-        errors.append(f"{url}: report.baseline must be auto, none or an absolute path")
+    if config.report.baseline not in ("auto", "none"):
+        errors.append(f"{url}: report.baseline must be auto or none in a config fetched from a URL")
     if errors:
         raise ConfigError(errors)
     config.upload.pending_dir = os.path.join(state_dir(), "pending")

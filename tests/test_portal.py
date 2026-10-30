@@ -328,3 +328,39 @@ def test_connection_reset_while_reading(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr(portal_module, "_opener", lambda conn: Resetting())
     with pytest.raises(PortalError, match="Connection reset by peer"):
         upload_report("https://portal.example", TOKEN, Connection(), b"{}")
+
+
+def test_slow_trickle_hits_the_overall_timeout() -> None:
+    import threading
+
+    listener = socket.create_server(("127.0.0.1", 0))
+
+    def trickle() -> None:
+        conn, _ = listener.accept()
+        with conn:
+            conn.recv(65536)
+            conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 40\r\n\r\n")
+            for _ in range(40):
+                time.sleep(0.3)
+                try:
+                    conn.sendall(b"x")
+                except OSError:
+                    return
+
+    threading.Thread(target=trickle, daemon=True).start()
+    url = f"http://127.0.0.1:{listener.getsockname()[1]}{CONFIG_PATH}"
+    start = time.monotonic()
+    with listener, pytest.raises(PortalError, match="timed out after 1 s"):
+        fetch_config(url, TOKEN, Connection(allow_http=True, timeout=1.0))
+    assert time.monotonic() - start < 2.0
+
+
+def test_deeply_nested_upload_reply_is_not_a_crash(portal: Portal) -> None:
+    portal.route("POST", REPORTS_PATH, Reply(201, b"[" * 60000))
+    assert upload_report(portal.url, TOKEN, HTTP, b"{}") == portal.url
+
+
+def test_upload_needs_a_2xx_answer(portal: Portal) -> None:
+    portal.route("POST", REPORTS_PATH, Reply(304))
+    with pytest.raises(PortalError, match="HTTP 304"):
+        upload_report(portal.url, TOKEN, HTTP, b"{}")

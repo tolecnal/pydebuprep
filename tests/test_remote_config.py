@@ -22,6 +22,7 @@ from pydebuprep.remote_config import REMOTE_FORBIDDEN, is_url, load_remote_confi
 from pydebuprep.state import CachedConfig, load_cached_config, save_cached_config
 from test_cli import RootCrit, Warn, fake
 
+REAL_CHECKS = list(checks.ALL_CHECKS)  # before the registry fixture replaces it
 URL = "https://portal.example/api/v1/configs/web/default"
 PATH = "/api/v1/configs/web/default"
 TOKEN = "pdp_test_token"
@@ -93,11 +94,35 @@ def test_no_upload_url_means_no_upload() -> None:
     assert parse_remote("report:\n  format: json\n", URL).upload.url is None
 
 
-def test_baseline_must_be_absolute() -> None:
-    with pytest.raises(ConfigError, match=r"report\.baseline must be auto, none or an absolute"):
-        parse_remote("report:\n  baseline: snaps/x.json\n", URL)
-    for ok in ("auto", "none", "/var/lib/pydebuprep/snapshots/x.json"):
+@pytest.mark.parametrize("path", ["/dev/zero", "/dev/watchdog", "snaps/x.json",
+                                  "/var/lib/pydebuprep/snapshots/x.json"])  # fmt: skip
+def test_baseline_may_not_name_a_file(path: str) -> None:
+    # Opening a file is not harmless as root: /dev/zero exhausts memory, opening
+    # /dev/watchdog arms a reboot, a FIFO hangs the run.
+    with pytest.raises(ConfigError) as exc:
+        parse_remote(f"report:\n  baseline: {path}\n", URL)
+    assert exc.value.errors == [
+        f"{URL}: report.baseline must be auto or none in a config fetched from a URL"
+    ]
+    for ok in ("auto", "none"):
         assert parse_remote(f"report:\n  baseline: {ok}\n", URL).report.baseline == ok
+
+
+@pytest.mark.parametrize("check", ["postgresql", "mariadb"])
+def test_credentials_files_refused(monkeypatch: pytest.MonkeyPatch, check: str) -> None:
+    monkeypatch.setattr(checks, "ALL_CHECKS", REAL_CHECKS)
+    with pytest.raises(ConfigError) as exc:
+        parse_remote(f"checks:\n  {check}:\n    credentials_file: /dev/watchdog\n", URL)
+    assert exc.value.errors == [
+        f"{URL}: checks.{check}.credentials_file can't be set by a config fetched from a URL"
+    ]
+    config = parse_remote(f"checks:\n  {check}:\n    probe: true\n", URL)
+    assert config.check_settings[check] == {"probe": True}
+
+
+def test_deeply_nested_config_is_an_error_not_a_crash() -> None:
+    with pytest.raises(ConfigError, match="nested too deeply"):
+        parse_remote("a: " + "[" * 5000, URL)
 
 
 def test_check_options_and_pending_directory(monkeypatch: pytest.MonkeyPatch) -> None:

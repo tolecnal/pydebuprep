@@ -215,6 +215,8 @@ def parse_config(text: str, source: str) -> Config:
     yaml = require_yaml()
     try:
         data = yaml.safe_load(text)
+    except RecursionError:
+        raise ConfigError([f"{source}: nested too deeply"]) from None
     except yaml.YAMLError as exc:
         mark = getattr(exc, "problem_mark", None)
         where = f"line {mark.line + 1}, column {mark.column + 1}: " if mark else ""

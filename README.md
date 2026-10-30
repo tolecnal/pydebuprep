@@ -184,8 +184,8 @@ sudo pydebuprep upload        # resend reports kept after a failed upload
 A failed upload never fails the report: it is kept in
 `/var/lib/pydebuprep/pending/` for `pydebuprep upload`. A config fetched from a URL
 is saved, and used — with a note in the report's header — when the portal can't be
-reached; it may not set paths pydebuprep writes to, and uploads only go back to the
-server it came from. HTTPS only (`--allow-http` for tests), with `--ca-file` for an
+reached; it may not name files for pydebuprep to write or open, and uploads only go
+back to the server it came from. HTTPS only (`--allow-http` for tests), with `--ca-file` for an
 internal CA. The report and config formats are published as JSON Schemas in
 [`schema/`](schema/). See the [portal guide](https://pydebuprep.app/guide/portal/).
 

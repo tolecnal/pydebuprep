@@ -224,10 +224,17 @@ URL of a config served by a pydebuprep portal: it is fetched with the token (see
 validated like a local file, and saved in
 .IR /var/lib/pydebuprep/configs/ .
 If the portal can't be reached, the saved copy is used and the report says so; with
-no saved copy the run fails. A config from a URL may not set
-.BR report.output_dir ", " report.snapshot_dir ", " upload.token_file ", " upload.ca_file
+no saved copy the run fails. A config from a URL may not name a file:
+.BR report.output_dir ", " report.snapshot_dir ", " upload.token_file ", " upload.ca_file ,
+.B upload.pending_dir
+and the probes'
+.B credentials_file
+are refused,
+.B report.baseline
+must be
+.B auto
 or
-.BR upload.pending_dir ,
+.BR none ,
 and its
 .B upload.url
 must be on the same server.

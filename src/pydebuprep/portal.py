@@ -16,6 +16,7 @@ import re
 import socket
 import ssl
 import stat
+import threading
 import urllib.error
 import urllib.request
 from collections.abc import Mapping
@@ -139,6 +140,38 @@ def _request(
     headers: dict[str, str] | None = None,
     limit: int,
 ) -> tuple[int, Message, bytes]:
+    """_send, within conn.timeout for the whole request: a socket timeout covers one
+    read, so a server trickling a byte at a time would otherwise hold the run for ever.
+    On a timeout the request is abandoned in a daemon thread."""
+    outcome: list[Any] = []
+
+    def send() -> None:
+        try:
+            outcome.append(_send(method, url, token, conn, data=data, headers=headers, limit=limit))
+        except BaseException as exc:  # handed to the caller below
+            outcome.append(exc)
+
+    worker = threading.Thread(target=send, daemon=True)
+    worker.start()
+    worker.join(conn.timeout)
+    if not outcome:
+        raise PortalError(f"{url}: timed out after {conn.timeout:g} s")
+    if isinstance(outcome[0], BaseException):
+        raise outcome[0]
+    result: tuple[int, Message, bytes] = outcome[0]
+    return result
+
+
+def _send(
+    method: str,
+    url: str,
+    token: str,
+    conn: Connection,
+    *,
+    data: bytes | None = None,
+    headers: dict[str, str] | None = None,
+    limit: int,
+) -> tuple[int, Message, bytes]:
     request = urllib.request.Request(url, data=data, method=method)
     request.add_header("Authorization", f"Bearer {token}")
     request.add_header("User-Agent", f"pydebuprep/{__version__}")
@@ -195,7 +228,7 @@ def upload_report(base_url: str, token: str, conn: Connection, body: bytes) -> s
     """POST a JSON report; returns the portal's URL for it (or BASE_URL)."""
     check_url(base_url, conn.allow_http)
     url = base_url.rstrip("/") + REPORTS_PATH
-    _, _, reply = _request(
+    status, _, reply = _request(
         "POST",
         url,
         token,
@@ -204,8 +237,12 @@ def upload_report(base_url: str, token: str, conn: Connection, body: bytes) -> s
         headers={"Content-Type": "application/json", "Content-Encoding": "gzip"},
         limit=MAX_REPLY_BYTES,
     )
+    if not 200 <= status < 300:  # a 304 isn't "stored"; the kept report must stay
+        raise PortalError(f"{url}: HTTP {status}")
     try:
-        location = json.loads(reply).get("url")
-    except (ValueError, AttributeError):
+        # A short JSON object at most: a reply nested thousands deep would raise
+        # RecursionError, after the report was already printed.
+        location = json.loads(reply).get("url") if len(reply) <= 4096 else None
+    except (ValueError, AttributeError, RecursionError):
         location = None
     return location if isinstance(location, str) and location else base_url

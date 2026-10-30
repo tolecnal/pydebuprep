@@ -71,12 +71,13 @@ If the portal can't be reached:
 A config from a URL is written by someone other than the host's root, so it may
 only steer the read-only checks:
 
-- it can't set a path pydebuprep writes to or reads credentials from:
-  `report.output_dir`, `report.snapshot_dir`, `upload.token_file`, `upload.ca_file`
-  and `upload.pending_dir` are refused;
+- it can't name a file for pydebuprep to write or open: `report.output_dir`,
+  `report.snapshot_dir`, `upload.token_file`, `upload.ca_file`,
+  `upload.pending_dir` and the probes' `credentials_file` are refused, and
+  `report.baseline` must be `auto` or `none`. Even opening a file isn't harmless as
+  root: opening `/dev/watchdog` can reboot the host;
 - its `upload.url` must be on the same server as the config, so the token can't be
-  sent anywhere else;
-- a `report.baseline` must be `auto`, `none` or an absolute path.
+  sent anywhere else.
 
 ## HTTPS and certificates
 
