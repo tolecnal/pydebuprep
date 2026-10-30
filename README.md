@@ -278,7 +278,7 @@ host never looks healthy just because a check couldn't look.
 | `mariadb` | applications | MariaDB data directory not upgraded to the new server version; opt-in probe that MariaDB or MySQL answers a ping and a query (root) |
 | `postfix` | applications | `postconf -n` warnings and errors (`postfix check` isn't used: it creates directories) |
 | `postgresql` | applications | Clusters still on an older major version than the newest installed server, or left behind after migrating; clusters that should start but are down; clusters online before but not now; opt-in probe that each online cluster accepts connections and answers a query |
-| `python-venvs` | applications | Virtualenvs whose Python no longer exists, or built for an older Python |
+| `python-venvs` | applications | Virtualenvs whose Python no longer exists, or built for an older Python; compiled modules needing libraries that are missing (read from their ELF headers, never `ldd`); scripts whose interpreter doesn't exist |
 | `firewall` | network | ufw or nftables enabled but no rules loaded; rules lost since the baseline (root; only queries already-loaded kernel modules) |
 | `network` | network | Default route and DNS servers; interfaces, addresses, routes, DNS and the network manager (ifupdown, netplan, NetworkManager, systemd-networkd) compared with the baseline |
 | `apparmor` | security | AppArmor enabled, profiles in complain mode, denials this boot, profiles no longer enforced (root) |

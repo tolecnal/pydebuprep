@@ -24,6 +24,9 @@ apt-get install -y --no-install-recommends $tools
 apt-get install -y --no-install-recommends hello && apt-mark auto hello
 # A broken virtualenv for python-venvs to find.
 python3 -m venv /opt/audit-venv && rm -f /opt/audit-venv/bin/python
+# A working one with a compiled module, so its libraries are looked up (ldconfig -p).
+python3 -m venv /opt/audit-venv-ok
+cp /usr/lib/python3*/lib-dynload/_ssl.*.so /opt/audit-venv-ok/lib/python3*/site-packages/
 rm -f /var/cache/apt/*.bin
 
 if [ -d /run/systemd/system ]; then
@@ -42,7 +45,7 @@ if [ -d /run/systemd/system ]; then
     AUDIT_IGNORE="/var/log/ /var/lib/postgresql/ /var/lib/mysql/ /var/cache/bind/ \
 /var/spool/postfix/ /var/lib/systemd/ /var/lib/docker/ /var/lib/containerd/ \
 /home/runner/ /var/lib/waagent/ /tmp/ /var/tmp/ ${AUDIT_IGNORE:-}"
-    AUDIT_EXPECT="systemctl journalctl systemd-analyze"
+    AUDIT_EXPECT="systemctl journalctl systemd-analyze ldconfig"
     if [ -z "${AUDIT_TOOLS_ONLY:-}" ]; then
         AUDIT_EXPECT="$AUDIT_EXPECT sshd pg_lsclusters mariadbd postconf named-checkconf"
     else

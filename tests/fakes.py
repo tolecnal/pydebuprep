@@ -75,6 +75,12 @@ class FakeSystem(System):
         self.whole_reads.append(path)
         return self.files.get(path)
 
+    def read_range(self, path: str, offset: int, size: int) -> bytes | None:
+        data: str | bytes | None = self.files.get(path)
+        if isinstance(data, str):
+            data = data.encode("utf-8")
+        return None if data is None else data[offset : offset + size]
+
     def lines(self, path: str) -> Iterator[str]:
         data: str | bytes | None = self.files.get(path)
         if isinstance(data, bytes):
