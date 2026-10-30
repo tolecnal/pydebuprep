@@ -45,8 +45,8 @@ _pydebuprep_first() {
         '--skip=[do not run these checks]:skip:_pydebuprep_checks' \
         '--min-severity=[hide findings below this severity]:min-severity:(info warning critical)' \
         '--no-color[never colorize text output]' \
-        '(--no-todo --todo)--no-todo[add a TODO checklist of what needs fixing at the end of the report]' \
         '(--no-todo --todo)--todo[add a TODO checklist of what needs fixing at the end of the report]' \
+        '(--no-todo --todo)--no-todo[turn off --todo]' \
         '*--check-option=[set a check option, overriding the config file (repeatable)]:check-option:_pydebuprep_check_options' \
         '(--config --no-config -c)--config=[read settings from FILE]:config:_files' \
         '(--config --no-config -c)-c[read settings from FILE]:config:_files' \
@@ -70,8 +70,8 @@ _pydebuprep_report() {
         '--skip=[do not run these checks]:skip:_pydebuprep_checks' \
         '--min-severity=[hide findings below this severity]:min-severity:(info warning critical)' \
         '--no-color[never colorize text output]' \
-        '(--no-todo --todo)--no-todo[add a TODO checklist of what needs fixing at the end of the report]' \
         '(--no-todo --todo)--todo[add a TODO checklist of what needs fixing at the end of the report]' \
+        '(--no-todo --todo)--no-todo[turn off --todo]' \
         '*--check-option=[set a check option, overriding the config file (repeatable)]:check-option:_pydebuprep_check_options' \
         '(--config --no-config -c)--config=[read settings from FILE]:config:_files' \
         '(--config --no-config -c)-c[read settings from FILE]:config:_files' \
@@ -88,8 +88,8 @@ _pydebuprep_convert() {
         '(--output --output-dir -o)--output=[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
         '(--output --output-dir -o)-o[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
         '--no-color[never colorize text output]' \
-        '(--no-todo --todo)--no-todo[add a TODO checklist of what needs fixing at the end of the report]' \
         '(--no-todo --todo)--todo[add a TODO checklist of what needs fixing at the end of the report]' \
+        '(--no-todo --todo)--no-todo[turn off --todo]' \
         '1:file:_files'
 }
 

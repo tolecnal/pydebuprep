@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import argparse
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from pydebuprep import checks
 
@@ -98,6 +98,25 @@ def _option(action: argparse.Action, prog: str, exclusive: list[str]) -> OptionS
     )
 
 
+def _options(action: argparse.Action, prog: str, exclusive: list[str]) -> list[OptionSpec]:
+    """The completion entries for one argparse option. A --flag/--no-flag pair
+    (BooleanOptionalAction) shares one help text; the --no- form gets its own."""
+    option = _option(action, prog, exclusive)
+    if not isinstance(action, argparse.BooleanOptionalAction):
+        return [option]
+    negated = [f for f in option.flags if f.startswith("--no-")]
+    plain = [f for f in option.flags if f not in negated]
+    return [
+        replace(option, flags=plain, exclusive=[*exclusive, *negated]),
+        replace(
+            option,
+            flags=negated,
+            help=f"turn off {plain[0]}",
+            exclusive=[*exclusive, *plain],
+        ),
+    ]
+
+
 def _exclusions(parser: argparse.ArgumentParser) -> dict[argparse.Action, list[str]]:
     excluded: dict[argparse.Action, list[str]] = {}
     for group in parser._mutually_exclusive_groups:
@@ -124,8 +143,8 @@ def completion_spec() -> CompletionSpec:
                 excluded = _exclusions(sub)
                 for sub_action in sub._actions:
                     if sub_action.option_strings:
-                        options.append(
-                            _option(sub_action, parser.prog, excluded.get(sub_action, []))
+                        options.extend(
+                            _options(sub_action, parser.prog, excluded.get(sub_action, []))
                         )
                     elif sub_action.choices:
                         positional = [_safe(str(c)) for c in sub_action.choices]
@@ -135,7 +154,7 @@ def completion_spec() -> CompletionSpec:
                     name, helps.get(name, ""), options, positional, positional_file
                 )
         elif action.option_strings:
-            global_flags.append(_option(action, parser.prog, []))
+            global_flags.extend(_options(action, parser.prog, []))
     return CompletionSpec(
         commands=commands,
         global_flags=global_flags,
