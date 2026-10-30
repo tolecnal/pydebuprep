@@ -6,7 +6,6 @@ import argparse
 import copy
 import dataclasses
 import os
-import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,6 +30,7 @@ from pydebuprep.snapshot import (
     format_timestamp,
     load_snapshot,
 )
+from pydebuprep.state import UNSAFE_IN_FILE_NAME
 from pydebuprep.system import System
 
 EXIT_TOOL_ERROR = 3
@@ -44,7 +44,6 @@ COMMANDS = (
     "completion",
 )
 CONFIG_ENV = "PYDEBUPREP_CONFIG"
-UNSAFE_IN_FILE_NAME = re.compile(r"[^A-Za-z0-9._-]")
 
 
 class ToolError(Exception):
