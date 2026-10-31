@@ -102,6 +102,9 @@ def test_load_wrong_schema_raises(tmp_path: Path) -> None:
     p.write_text(json.dumps({"schema_version": "99", "checks": {}}))
     with pytest.raises(SnapshotError, match="schema"):
         load_snapshot(str(p))
+    p.write_text(json.dumps({"schema_version": "1", "checks": {}, "os": "bad"}))
+    with pytest.raises(SnapshotError, match="no checks section"):
+        load_snapshot(str(p))
 
 
 def test_load_missing_raises(tmp_path: Path) -> None:

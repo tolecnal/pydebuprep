@@ -98,6 +98,11 @@ def test_resolve_output_path(tmp_path: Path) -> None:
     assert resolve_output_path(str(new), None, "h", "json", FROZEN_NOW) == (
         tmp_path / "r-20261028T120000Z.json"
     )
+    dangling = tmp_path / "dangling.json"
+    dangling.symlink_to(tmp_path / "nonexistent")
+    assert resolve_output_path(str(dangling), None, "h", "json", FROZEN_NOW) == (
+        tmp_path / "dangling-20261028T120000Z.json"
+    )
 
 
 def test_output_file_existing_gets_timestamp(tmp_path: Path) -> None:

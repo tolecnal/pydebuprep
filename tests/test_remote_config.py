@@ -108,16 +108,26 @@ def test_baseline_may_not_name_a_file(path: str) -> None:
         assert parse_remote(f"report:\n  baseline: {ok}\n", URL).report.baseline == ok
 
 
-@pytest.mark.parametrize("check", ["postgresql", "mariadb"])
-def test_credentials_files_refused(monkeypatch: pytest.MonkeyPatch, check: str) -> None:
+@pytest.mark.parametrize(
+    ("check", "option", "value"),
+    [
+        ("postgresql", "credentials_file", "/dev/watchdog"),
+        ("mariadb", "credentials_file", "/dev/watchdog"),
+        ("python-venvs", "search_paths", "[/proc]"),
+        ("docker", "http_probes", "[web=http://127.0.0.1:8080/admin]"),
+    ],
+)
+def test_forbidden_check_options_refused(
+    monkeypatch: pytest.MonkeyPatch, check: str, option: str, value: str
+) -> None:
     monkeypatch.setattr(checks, "ALL_CHECKS", REAL_CHECKS)
     with pytest.raises(ConfigError) as exc:
-        parse_remote(f"checks:\n  {check}:\n    credentials_file: /dev/watchdog\n", URL)
+        parse_remote(f"checks:\n  {check}:\n    {option}: {value}\n", URL)
     assert exc.value.errors == [
-        f"{URL}: checks.{check}.credentials_file can't be set by a config fetched from a URL"
+        f"{URL}: checks.{check}.{option} can't be set by a config fetched from a URL"
     ]
-    config = parse_remote(f"checks:\n  {check}:\n    probe: true\n", URL)
-    assert config.check_settings[check] == {"probe": True}
+    config = parse_remote("checks:\n  postgresql:\n    probe: true\n", URL)
+    assert config.check_settings["postgresql"] == {"probe": True}
 
 
 def test_deeply_nested_config_is_an_error_not_a_crash() -> None:

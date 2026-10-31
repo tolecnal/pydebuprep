@@ -11,6 +11,7 @@ from pydebuprep.render._common import (
     config_line,
     has_baseline_section,
     host_line,
+    safe_url,
     summary_line,
     todo_items,
 )
@@ -60,6 +61,8 @@ def _finding(f: Finding) -> list[str]:
         out.append("<div>References:</div><ul>")
         out += [
             f'<li><a href="{escape(ref, quote=True)}">{escape(ref)}</a></li>'
+            if safe_url(ref)
+            else f"<li>{escape(ref)}</li>"
             for ref in f.references
         ]
         out.append("</ul>")

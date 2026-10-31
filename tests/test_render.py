@@ -120,16 +120,37 @@ def test_surrogate_escaped_paths_render_as_valid_utf8(fmt: str) -> None:
     assert "foo" in out
 
 
-@pytest.mark.parametrize("fmt", ["text", "markdown", "jira", "confluence"])
+@pytest.mark.parametrize("fmt", HUMAN_FORMATS)
 def test_terminal_control_sequences_stripped(fmt: str) -> None:
     r = make_sample_report()
     r.results[0].findings[0].evidence = ["\x1b]2;pwned\x07 evil \x9b31m"]
     r.results[0].findings[0].title = "title \x1b[2J"
+    assert r.baseline is not None
+    r.baseline.hostname = "base\x1b[31mhost"
     out = render(r, fmt)
     assert "\x1b" not in out
     assert "\x07" not in out
     assert "\x9b" not in out
     assert "evil" in out
+
+
+@pytest.mark.parametrize("fmt", ["html", "markdown", "jira", "confluence"])
+def test_unsafe_reference_urls_are_rendered_as_plain_text(fmt: str) -> None:
+    r = make_sample_report()
+    r.results[0].findings[0].references = [
+        "javascript:alert(1)",
+        "https://ok.example/a>{html}<script>",
+        "https://ok.example/{html}",
+    ]
+    out = render(r, fmt)
+    assert 'href="javascript:' not in out
+    assert "<javascript:" not in out
+    assert "[javascript:" not in out
+    assert "[https://ok.example/{html}]" not in out
+    if fmt in ("html", "markdown"):
+        assert "<script>" not in out
+    else:
+        assert r"\{html\}" in out
 
 
 def test_jira_markup() -> None:

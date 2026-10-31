@@ -84,12 +84,18 @@ def test_state_writes_only_through_write_private() -> None:
     assert "makedirs" not in text and "mkdir" not in text
 
 
-@pytest.mark.parametrize("module", ["config.py", "portal.py"])
-def test_config_and_portal_only_read(module: str) -> None:
+@pytest.mark.parametrize("module", ["config.py", "portal.py", "cli.py", "snapshot.py", "state.py"])
+def test_no_builtin_open_for_writing(module: str) -> None:
     text = (SRC / module).read_text()
     for call in re.findall(r"\bopen\([^)]*\)", text):
         assert not re.search(r"""["'][wxa+]""", call), call
-    assert "O_WRONLY" not in text and "O_CREAT" not in text
+
+
+def test_system_reads_only_regular_files_with_nonblock_and_nofollow() -> None:
+    text = (SRC / "system.py").read_text()
+    assert not re.search(r"(?<![.\w])open\(", text)
+    assert "stat.S_ISREG" in text
+    assert "os.O_NOFOLLOW" in text and "os.O_NONBLOCK" in text
 
 
 def test_registry_ids_unique_and_kebab() -> None:

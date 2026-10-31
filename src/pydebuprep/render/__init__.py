@@ -31,7 +31,7 @@ def _render(report: Report, fmt: str, color: bool, todo: bool) -> str:
     if fmt == "yaml":
         return yaml_.render(report, todo=todo)
     if fmt == "html":
-        return html.render(report, todo=todo)
+        return html.render(clean_report(report), todo=todo)
     if fmt == "markdown":
         return markdown.render(clean_report(report), todo=todo)
     if fmt == "jira":

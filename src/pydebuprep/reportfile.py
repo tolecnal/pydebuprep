@@ -25,6 +25,7 @@ from pydebuprep.model import (
     Status,
     Summary,
 )
+from pydebuprep.render._common import safe_url
 
 NOT_A_REPORT = (
     "not a pydebuprep report: expected a JSON or YAML report (from --format json or "
@@ -151,7 +152,7 @@ def _finding(d: dict[str, Any], path: str) -> Finding:
         detail=_str(d.get("detail", ""), f"{path}.detail"),
         evidence=_strings(d.get("evidence", []), f"{path}.evidence"),
         remediation=_strings(d.get("remediation", []), f"{path}.remediation"),
-        references=_strings(d.get("references", []), f"{path}.references"),
+        references=_references(d.get("references", []), f"{path}.references"),
     )
 
 
@@ -193,6 +194,14 @@ def _strings(value: Any, path: str) -> list[str]:
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
         raise ReportFileError(f"{path}: expected a list of strings")
     return list(value)
+
+
+def _references(value: Any, path: str) -> list[str]:
+    refs = _strings(value, path)
+    for i, ref in enumerate(refs):
+        if not safe_url(ref):
+            raise ReportFileError(f"{path}[{i}]: expected an http:// or https:// URL, got {ref!r}")
+    return refs
 
 
 def _enum(value: Any, enum: type[E], path: str) -> E:

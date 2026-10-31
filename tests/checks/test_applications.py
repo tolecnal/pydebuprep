@@ -242,11 +242,12 @@ def test_venvs_search_paths_and_depth_options() -> None:
     ]
 
 
-def test_venvs_max_depth_must_be_positive() -> None:
+def test_venvs_max_depth_bounds() -> None:
     import pytest
 
-    with pytest.raises(ValueError, match="max_depth must be at least 1"):
-        PythonVenvsCheck({"max_depth": 0})
+    for bad in (0, 21):
+        with pytest.raises(ValueError, match="max_depth must be between 1 and 20"):
+            PythonVenvsCheck({"max_depth": bad})
 
 
 def test_venvs_in_caches_are_skipped() -> None:

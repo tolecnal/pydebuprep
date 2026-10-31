@@ -30,8 +30,11 @@ provenance attestation.
 with `SHA256SUMS` and a verified provenance attestation; what it contains is in
 `debian/changelog`.
 
-`v0.5.0` (portal support in the CLI) is being released on 2026-10-31; what it
-contains is in `debian/changelog`.
+`v0.5.0` (portal support in the CLI) released on 2026-10-31, published with
+`SHA256SUMS` and a verified provenance attestation.
+
+`v0.6.0` (security hardening from an external review) is being released on
+2026-10-31; what it contains is in `debian/changelog`.
 
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't

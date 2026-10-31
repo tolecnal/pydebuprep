@@ -43,7 +43,11 @@ REMOTE_FORBIDDEN = (
 )
 
 
-CHECK_FORBIDDEN = "credentials_file"  # the probes' login files (postgresql, mariadb)
+CHECK_FORBIDDEN = (
+    "credentials_file",  # the probes' login files (postgresql, mariadb)
+    "search_paths",  # filesystem roots to walk (python-venvs)
+    "http_probes",  # arbitrary localhost HTTP GET paths (docker)
+)
 
 
 def is_url(text: str) -> bool:
@@ -66,9 +70,11 @@ def _forbidden_keys(text: str, url: str) -> list[str]:
     sections = data.get("checks")
     check_sections: dict[Any, Any] = sections if isinstance(sections, dict) else {}
     keys += [
-        f"checks.{check_id}.{CHECK_FORBIDDEN}"
+        f"checks.{check_id}.{forbidden}"
         for check_id, options in check_sections.items()
-        if isinstance(options, dict) and CHECK_FORBIDDEN in options
+        if isinstance(options, dict)
+        for forbidden in CHECK_FORBIDDEN
+        if forbidden in options
     ]
     return [f"{url}: {key} can't be set by a config fetched from a URL" for key in keys]
 

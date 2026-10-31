@@ -94,6 +94,10 @@ def report_dict() -> dict[str, Any]:
         (lambda d: d.update(generated_at=5), "generated_at: expected a string"),
         (lambda d: d.update(generated_at="yesterday"), "generated_at: not an ISO 8601 time"),
         (lambda d: d["results"][0].update(error=3), "results[0].error: expected a string"),
+        (
+            lambda d: d["results"][0]["findings"][0].update(references=["javascript:alert(1)"]),
+            "results[0].findings[0].references[0]: expected an http:// or https:// URL",
+        ),
     ],
 )
 def test_malformed_reports_name_the_field(change: Any, message: str) -> None:

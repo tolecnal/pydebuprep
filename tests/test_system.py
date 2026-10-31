@@ -238,6 +238,8 @@ def test_probe_commands_allowed(argv: tuple[str, ...]) -> None:
         ("mysqladmin", "--defaults-file=/etc/x.cnf", "ping"),
         ("mariadb", "-N", "-B", "-e", "DROP DATABASE x", "information_schema"),
         ("mariadb", "-N", "-B", "-e", "SELECT 1", "mysql"),
+        ("psql", "-N", "-B", "-e", "SELECT 1", "information_schema"),
+        ("setpriv", "-N", "-B", "-e", "SELECT 1", "information_schema"),
     ],
 )  # fmt: skip
 def test_probe_commands_rejected(argv: tuple[str, ...]) -> None:

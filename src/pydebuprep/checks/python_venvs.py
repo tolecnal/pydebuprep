@@ -9,6 +9,7 @@ from pydebuprep.checks.base import Check, Context, Option, count
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
 SEARCH_PATHS = ["/opt", "/srv", "/usr/local", "/root", "/home", "/var/www"]
+MAX_DEPTH = 20
 VERSION = re.compile(r"^version(?:_info)?\s*=\s*(\d+)\.(\d+)", re.MULTILINE)
 LDCONFIG = ("ldconfig", "-p")
 # Where the dynamic linker looks when a library isn't in its cache.
@@ -78,8 +79,8 @@ class PythonVenvsCheck(Check):
     )
 
     def validate(self) -> None:
-        if self.opt("max_depth") < 1:
-            raise ValueError("max_depth must be at least 1")
+        if not 1 <= self.opt("max_depth") <= MAX_DEPTH:
+            raise ValueError(f"max_depth must be between 1 and {MAX_DEPTH}")
 
     def run(self, ctx: Context) -> list[Finding]:
         system_python = ctx.system.python_version()

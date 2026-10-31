@@ -1,3 +1,26 @@
+pydebuprep (0.6.0) unstable; urgency=medium
+
+  * Security hardening from an external review:
+    - files are read only when they are regular files (never a FIFO or a
+      device), without following a final symlink, at most 16 MiB at a time;
+    - the portal token file must be a regular file, not a symlink;
+    - report files are created exclusively, mode 0600, never through a
+      symlink;
+    - a config fetched from a URL may no longer set python-venvs'
+      search_paths or docker's http_probes; python-venvs' max_depth is at
+      most 20;
+    - MARIADB*, APT_* and DOCKER_* environment variables are not passed to
+      the commands pydebuprep runs;
+    - control characters are stripped from every field of rendered reports,
+      from portal replies and from baseline warnings;
+    - finding references must be http(s) URLs, both in saved reports and
+      when rendered as links.
+  * Breaking: configs with max_depth above 20, fetched configs setting
+    search_paths or http_probes, and saved reports with non-URL references
+    are now refused.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Sat, 31 Oct 2026 13:06:36 +0100
+
 pydebuprep (0.5.0) unstable; urgency=medium
 
   * Optional upload to a pydebuprep portal: with `upload: url:` in the

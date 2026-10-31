@@ -74,6 +74,39 @@ Every pull request builds the site; merges to `main` publish it.
    pull request is audited with it. Some obvious commands write (`nginx -t`,
    `postfix check`, `ufw status`); don't use those.
 
+## Security guardrails
+
+pydebuprep runs as root and inspects directories where unprivileged users can create
+files and symlinks (`/home`, `/var/www`, `/tmp`), reads logs and journal entries
+written by other users, and can fetch configs from a remote portal. Architectural
+tests in `tests/test_allowlist.py` enforce these rules:
+
+- **One module touches the system.** Only `src/pydebuprep/system.py` may import
+  `subprocess` or call `os.walk`. Checks must read files, glob and run commands
+  exclusively through `ctx.system`.
+- **Opening files as root must refuse devices and FIFOs.** `System` opens files
+  through `_open_regular()`, which resolves symlinks, verifies `stat.S_ISREG` before
+  opening, passes `O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC`, and caps reads at
+  `MAX_READ_BYTES` (16 MiB). `portal.read_token()` likewise opens the token file with
+  `O_NOFOLLOW | O_NONBLOCK` and checks `stat.S_ISREG`. Never use bare `open()` on
+  paths that could be symlinks to `/dev/watchdog`, `/dev/zero` or a named pipe.
+- **Every file pydebuprep creates uses `O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC`
+  with mode `0600`.** Snapshots (`snapshot.py`), report files (`cli.py`), portal state
+  (`state.py`) and scratch files (`system.py`) are opened with `os.open` and
+  `CREATE_FLAGS`, never `open(..., "w")` or `open(..., "x")`.
+- **Remote configs may not name files, search roots or HTTP probe paths.** If you add
+  a config or check option that names a file to read or write, a directory tree to
+  walk, or a URL/path to request, add it to `REMOTE_FORBIDDEN` or `CHECK_FORBIDDEN`
+  in `src/pydebuprep/remote_config.py`. Bound integer depth/count options in
+  `Check.validate()`.
+- **Untrusted text is cleaned before rendering or printing to stderr.** Every
+  human-readable renderer (`text`, `html`, `markdown`, `jira`, `confluence`) receives
+  `clean_report(report)`, which strips C0/DEL/C1 control sequences from every string
+  field (including `host`, `baseline`, `config` and `generated_at`). Portal error
+  excerpts, upload locations and baseline warnings also pass through `clean()`.
+  `Finding.references` must be `http://` or `https://` URLs (`safe_url()`), enforced
+  both when loading reports (`reportfile.py`) and when rendering links.
+
 ## Releasing
 
 Bump the version in `debian/changelog` (`dch -v X.Y.Z`) and in

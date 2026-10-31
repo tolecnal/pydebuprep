@@ -12,6 +12,7 @@ from typing import Any
 
 from pydebuprep.checks.base import Check, CommandFailed, Context, running_kernel
 from pydebuprep.model import BaselineInfo
+from pydebuprep.render._common import clean
 
 DEFAULT_SNAPSHOT_DIR = "/var/lib/pydebuprep/snapshots"
 SCHEMA_VERSION = "1"
@@ -104,7 +105,7 @@ def load_snapshot(path: str) -> dict[str, Any]:
         raise SnapshotError(f"snapshot {path} is not valid JSON: {exc}") from exc
     if not isinstance(snap, dict) or snap.get("schema_version") != SCHEMA_VERSION:
         raise SnapshotError(f"snapshot {path} has an unsupported schema version")
-    if not isinstance(snap.get("checks"), dict):
+    if not isinstance(snap.get("checks"), dict) or not isinstance(snap.get("os", {}), dict):
         raise SnapshotError(f"snapshot {path} has no checks section")
     return snap
 
@@ -142,11 +143,11 @@ def baseline_warnings(snap: dict[str, Any], hostname: str, codename: str) -> lis
     warnings = []
     other = snap.get("hostname")
     if other and other != hostname:
-        warnings.append(f"baseline was taken on host {other}, not {hostname}")
+        warnings.append(f"baseline was taken on host {clean(str(other))}, not {clean(hostname)}")
     before = (snap.get("os") or {}).get("codename")
     if before and before == codename:
         warnings.append(
-            f"baseline was taken on the current release ({codename}); "
+            f"baseline was taken on the current release ({clean(codename)}); "
             "it may be a post-upgrade snapshot"
         )
     return warnings
