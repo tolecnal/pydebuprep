@@ -9,11 +9,13 @@ import ctypes
 import glob as _glob
 import gzip
 import http.client
+import io
 import os
 import re
 import shutil
 import socket
 import ssl
+import stat
 
 # The only module that starts processes; every argv is checked against ALLOWED_COMMANDS.
 import subprocess  # nosec B404
@@ -24,6 +26,7 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import BinaryIO
 from urllib.parse import urlsplit
 
 # Stop apt from taking locks or regenerating its binary caches (which it does
@@ -146,7 +149,7 @@ APT_LISTS_DIR = "/var/lib/apt/lists/"
 PG_SOCKET_DIR = "/var/run/postgresql"
 PSQL_FLAGS = ("psql", "-X", "-A", "-t", "-w")
 AS_POSTGRES = ("setpriv", "--reuid=postgres", "--regid=postgres", "--init-groups", "--")
-CLIENT_ENV = ("PG", "MYSQL")
+CLIENT_ENV = ("PG", "MYSQL", "MARIADB", "APT_", "DOCKER_")
 PG_USER = re.compile(r"[A-Za-z0-9_.-]+")
 CONNINFO = re.compile(
     rf"host={PG_SOCKET_DIR} port=([0-9]{{1,5}}) dbname=postgres "
@@ -159,6 +162,16 @@ DEFAULTS_FILE = "--defaults-extra-file="
 
 DEFAULT_TIMEOUT = 30.0
 TIME_ERROR = 5  # adjtimex(): the clock is not synchronised
+READ_FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC
+MAX_READ_BYTES = 16 << 20
+
+
+def _open_regular(path: str) -> BinaryIO:
+    """Open a regular file (following symlinks to a regular file, never a FIFO or device)."""
+    real = os.path.realpath(path)
+    if not stat.S_ISREG(os.lstat(real).st_mode):
+        raise OSError(f"{path}: not a regular file")
+    return os.fdopen(os.open(real, READ_FLAGS), "rb")
 
 
 class DisallowedCommandError(Exception):
@@ -257,7 +270,7 @@ def _is_probe(argv: tuple[str, ...]) -> bool:
         )
     if argv[0] in MYSQL_ADMIN:
         return _without_defaults_file(argv[1:]) == ("ping",)
-    return _without_defaults_file(argv[1:]) == MYSQL_QUERY
+    return argv[0] in MYSQL_CLIENT and _without_defaults_file(argv[1:]) == MYSQL_QUERY
 
 
 def _plain_unit(name: str) -> bool:
@@ -332,23 +345,23 @@ class System:
         return shutil.which(name) is not None
 
     def read_text(self, path: str) -> str | None:
-        try:
-            with open(path, encoding="utf-8", errors="replace") as fh:
-                return fh.read()
-        except OSError:
-            return None
+        data = self.read_bytes(path)
+        return None if data is None else data.decode("utf-8", errors="replace")
 
     def read_bytes(self, path: str) -> bytes | None:
         try:
-            with open(path, "rb") as fh:
-                return fh.read()
+            with _open_regular(path) as fh:
+                data = fh.read(MAX_READ_BYTES + 1)
         except OSError:
             return None
+        return data if len(data) <= MAX_READ_BYTES else None
 
     def read_range(self, path: str, offset: int, size: int) -> bytes | None:
         """SIZE bytes from OFFSET (fewer at the end of the file), or None if unreadable."""
+        if size < 0 or size > MAX_READ_BYTES:
+            return None
         try:
-            with open(path, "rb") as fh:
+            with _open_regular(path) as fh:
                 fh.seek(offset)
                 return fh.read(size)
         except (OSError, ValueError, OverflowError):
@@ -358,12 +371,13 @@ class System:
         """A text file's lines, read as they are needed (gzip when PATH ends in .gz);
         none if it can't be read. For files too big to read whole, like APT's indexes."""
         try:
-            if path.endswith(".gz"):
-                with gzip.open(path, "rt", encoding="utf-8", errors="replace") as fh:
-                    yield from fh
-            else:
-                with open(path, encoding="utf-8", errors="replace") as fh:
-                    yield from fh
+            with _open_regular(path) as raw:
+                if path.endswith(".gz"):
+                    with gzip.open(raw, "rt", encoding="utf-8", errors="replace") as fh:
+                        yield from fh
+                else:
+                    with io.TextIOWrapper(raw, encoding="utf-8", errors="replace") as fh:
+                        yield from fh
         except (OSError, EOFError, zlib.error):
             return
 

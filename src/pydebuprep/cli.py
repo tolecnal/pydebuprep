@@ -39,6 +39,7 @@ from pydebuprep.render import EXTENSIONS, FORMATS, render
 from pydebuprep.reportfile import ReportFileError, load_report
 from pydebuprep.runner import run_checks
 from pydebuprep.snapshot import (
+    CREATE_FLAGS,
     DEFAULT_SNAPSHOT_DIR,
     SnapshotError,
     baseline_info,
@@ -318,7 +319,7 @@ def resolve_output_path(
     if output is None:
         return None
     path = Path(output)
-    if path.exists():
+    if path.exists() or path.is_symlink():
         return path.with_name(f"{path.stem}-{stamp}{path.suffix}")
     return path
 
@@ -352,7 +353,8 @@ def _load_baseline(
 
 def _write(text: str, path: Path) -> None:
     try:
-        with open(path, "x", encoding="utf-8", errors="replace") as fh:
+        fd = os.open(path, CREATE_FLAGS, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8", errors="replace") as fh:
             fh.write(text)
     except OSError as exc:
         raise ToolError(f"cannot write {path}: {exc.strerror or exc}") from exc

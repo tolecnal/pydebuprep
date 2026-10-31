@@ -93,6 +93,16 @@ def test_unreadable_token_file(tmp_path: Path) -> None:
     (tmp_path / "token").mkdir()
     with pytest.raises(PortalError, match="cannot read"):
         read_token(str(tmp_path / "token"), {})
+    fifo = tmp_path / "fifo"
+    import os
+
+    os.mkfifo(fifo, 0o600)
+    with pytest.raises(PortalError, match="not a regular file"):
+        read_token(str(fifo), {})
+    link = tmp_path / "link"
+    link.symlink_to(tmp_path / "token")
+    with pytest.raises(PortalError, match="cannot read"):
+        read_token(str(link), {})
 
 
 # --- URLs ------------------------------------------------------------------

@@ -10,7 +10,7 @@ Only the latest release gets security fixes. Upgrade to it before reporting, if 
 
 | Version | Supported |
 |---|---|
-| 0.3.x (latest) | Yes |
+| 0.5.x (latest) | Yes |
 | Older | No |
 
 ## Reporting a vulnerability

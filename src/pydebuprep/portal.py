@@ -27,6 +27,7 @@ from urllib.parse import urlsplit
 
 from pydebuprep import __version__
 from pydebuprep.config import url_problem
+from pydebuprep.render._common import clean
 
 TOKEN_ENV = "PYDEBUPREP_TOKEN"  # nosec B105 - a variable name, not a token
 CA_FILE_ENV = "PYDEBUPREP_CA_FILE"
@@ -36,6 +37,7 @@ MAX_REPLY_BYTES = 1 << 16
 REPORTS_PATH = "/api/v1/reports"
 TOKEN = re.compile(r"[A-Za-z0-9._~+/=-]+")
 DEFAULT_PORTS = {"https": 443, "http": 80}
+TOKEN_OPEN_FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC
 
 
 class PortalError(Exception):
@@ -70,8 +72,11 @@ def read_token(token_file: str, env: Mapping[str, str]) -> str:
     if TOKEN_ENV in env:
         return _valid_token(env[TOKEN_ENV], TOKEN_ENV)
     try:
-        with open(token_file, "rb") as fh:
-            if stat.S_IMODE(os.fstat(fh.fileno()).st_mode) & 0o077:
+        with os.fdopen(os.open(token_file, TOKEN_OPEN_FLAGS), "rb") as fh:
+            mode = os.fstat(fh.fileno()).st_mode
+            if not stat.S_ISREG(mode):
+                raise PortalError(f"cannot read {token_file}: not a regular file")
+            if stat.S_IMODE(mode) & 0o077:
                 raise PortalError(
                     f"{token_file} is readable by other users; run: chmod 600 {token_file}"
                 )
@@ -127,7 +132,7 @@ def _opener(conn: Connection) -> urllib.request.OpenerDirector:
 
 
 def _excerpt(data: bytes) -> str:
-    return " ".join(data.decode("utf-8", "replace").split())[:200]
+    return " ".join(clean(data.decode("utf-8", "replace")).split())[:200]
 
 
 def _request(
@@ -245,4 +250,4 @@ def upload_report(base_url: str, token: str, conn: Connection, body: bytes) -> s
         location = json.loads(reply).get("url") if len(reply) <= 4096 else None
     except (ValueError, AttributeError, RecursionError):
         location = None
-    return location if isinstance(location, str) and location else base_url
+    return clean(location) if isinstance(location, str) and location else base_url

@@ -8,7 +8,16 @@ from dataclasses import dataclass, field
 from itertools import groupby
 from typing import Any
 
-from pydebuprep.model import CheckResult, Finding, Host, Report, Severity, Status
+from pydebuprep.model import (
+    BaselineInfo,
+    CheckResult,
+    ConfigInfo,
+    Finding,
+    Host,
+    Report,
+    Severity,
+    Status,
+)
 
 NO_BASELINE = "no baseline"
 NOT_APPLICABLE = "not applicable"
@@ -35,6 +44,15 @@ def valid_utf8(text: str) -> str:
 
 def clean(text: str) -> str:
     return CONTROL.sub("?", valid_utf8(text))
+
+
+def safe_url(url: str) -> bool:
+    """Whether URL is an http(s) link with no whitespace, control characters or angle brackets."""
+    return (
+        url.startswith(("https://", "http://"))
+        and not any(c.isspace() or c in "<>" for c in url)
+        and CONTROL.search(url) is None
+    )
 
 
 def _clean_finding(f: Finding) -> Finding:
@@ -64,8 +82,11 @@ def _clean_result(r: CheckResult) -> CheckResult:
 def clean_report(report: Report) -> Report:
     """A copy of the report that is safe to print to a terminal."""
     h = report.host
+    b = report.baseline
+    c = report.config
     return dataclasses.replace(
         report,
+        generated_at=clean(report.generated_at),
         host=Host(
             clean(h.hostname),
             clean(h.os_id),
@@ -74,7 +95,13 @@ def clean_report(report: Report) -> Report:
             clean(h.kernel),
             h.is_root,
         ),
+        baseline=None
+        if b is None
+        else BaselineInfo(
+            clean(b.path), clean(b.created_at), clean(b.os_version), clean(b.hostname)
+        ),
         results=[_clean_result(r) for r in report.results],
+        config=None if c is None else ConfigInfo(clean(c.source), clean(c.fetched_at), c.stale),
     )
 
 

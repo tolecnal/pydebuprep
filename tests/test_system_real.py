@@ -166,10 +166,17 @@ def test_write_scratch_refuses_other_directories(tmp_path: Path) -> None:
         system.write_scratch(scratch, "late", b"")  # removed already
 
 
-def test_read_bytes(tmp_path: Path) -> None:
+def test_read_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / "k.gpg").write_bytes(b"\x99\x00")
     assert System().read_bytes(str(tmp_path / "k.gpg")) == b"\x99\x00"
     assert System().read_bytes(str(tmp_path / "missing")) is None
+    fifo = tmp_path / "pipe"
+    os.mkfifo(fifo)
+    assert System().read_bytes(str(fifo)) is None
+    assert System().read_text(str(fifo)) is None
+    monkeypatch.setattr(system, "MAX_READ_BYTES", 4)
+    (tmp_path / "big").write_bytes(b"12345")
+    assert System().read_bytes(str(tmp_path / "big")) is None
 
 
 def test_read_range(tmp_path: Path) -> None:
@@ -177,6 +184,8 @@ def test_read_range(tmp_path: Path) -> None:
     assert System().read_range(str(tmp_path / "f"), 2, 3) == b"234"
     assert System().read_range(str(tmp_path / "f"), 8, 10) == b"89"
     assert System().read_range(str(tmp_path / "f"), -1, 3) is None
+    assert System().read_range(str(tmp_path / "f"), 0, -1) is None
+    assert System().read_range(str(tmp_path / "f"), 0, system.MAX_READ_BYTES + 1) is None
     assert System().read_range(str(tmp_path / "missing"), 0, 3) is None
 
 
@@ -265,10 +274,14 @@ def test_client_environment_is_not_passed_to_commands(monkeypatch: pytest.Monkey
     monkeypatch.setattr(system, "ALLOWED_COMMANDS", system.ALLOWED_COMMANDS | {("env",)})
     monkeypatch.setenv("PGSSLKEYLOGFILE", "/tmp/keys")
     monkeypatch.setenv("MYSQL_PWD", "secret")
+    monkeypatch.setenv("MARIADB_HOST", "evil.example")
+    monkeypatch.setenv("APT_CONFIG", "/tmp/apt.conf")
+    monkeypatch.setenv("DOCKER_HOST", "tcp://evil.example:2375")
     monkeypatch.setenv("KEEP_ME", "1")
     out = System().run(["env"]).stdout
     assert "KEEP_ME=1" in out
-    assert "PGSSLKEYLOGFILE" not in out and "MYSQL_PWD" not in out
+    for var in ("PGSSLKEYLOGFILE", "MYSQL_PWD", "MARIADB_HOST", "APT_CONFIG", "DOCKER_HOST"):
+        assert var not in out
 
 
 def test_http_get_with_a_bad_port_is_an_error() -> None:

@@ -11,6 +11,7 @@ from pydebuprep.render._common import (
     config_line,
     has_baseline_section,
     host_line,
+    safe_url,
     summary_line,
     todo_items,
 )
@@ -41,7 +42,7 @@ def _finding(f: Finding) -> list[str]:
         out += [f"  {i}. {esc(step)}" for i, step in enumerate(f.remediation, 1)]
     if f.references:
         out += ["", "  References:", ""]
-        out += [f"  - <{ref}>" for ref in f.references]
+        out += [f"  - <{ref}>" if safe_url(ref) else f"  - {esc(ref)}" for ref in f.references]
     out.append("")
     return out
 

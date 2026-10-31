@@ -18,6 +18,7 @@ from pydebuprep.render._common import (
     config_line,
     has_baseline_section,
     host_line,
+    safe_url,
     todo_items,
 )
 
@@ -49,7 +50,7 @@ def noformat(lines: list[str]) -> list[str]:
 
 
 def link(url: str) -> str:
-    return f"[{url}]" if not any(c in url for c in "[]|") else esc(url)
+    return f"[{url}]" if safe_url(url) and not any(c in url for c in "[]|{}") else esc(url)
 
 
 def finding_body(f: Finding) -> list[str]:
