@@ -23,7 +23,7 @@ workflow from a release tag, and not modified since. See
 ## Without the GitHub CLI
 
 ```sh
-VERSION=0.5.0
+VERSION=0.6.0
 base=https://github.com/tolecnal/pydebuprep/releases/download/v$VERSION
 wget $base/pydebuprep_${VERSION}_all.deb $base/SHA256SUMS
 sha256sum -c SHA256SUMS && sudo apt install ./pydebuprep_${VERSION}_all.deb
