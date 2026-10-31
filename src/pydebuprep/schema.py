@@ -42,7 +42,7 @@ def report_schema() -> dict[str, Any]:
             "detail": STRING,
             "evidence": STRINGS,
             "remediation": STRINGS,
-            "references": STRINGS,
+            "references": {"type": "array", "items": {"type": "string", "pattern": "^https?://"}},
         }
     )
     findings = {"type": "array", "items": {"$ref": "#/$defs/finding"}}

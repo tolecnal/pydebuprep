@@ -101,7 +101,7 @@ def test_unreadable_token_file(tmp_path: Path) -> None:
         read_token(str(fifo), {})
     link = tmp_path / "link"
     link.symlink_to(tmp_path / "token")
-    with pytest.raises(PortalError, match="cannot read"):
+    with pytest.raises(PortalError, match="is a symlink; set token_file to the file itself"):
         read_token(str(link), {})
 
 

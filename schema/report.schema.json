@@ -60,6 +60,7 @@
         },
         "references": {
           "items": {
+            "pattern": "^https?://",
             "type": "string"
           },
           "type": "array"

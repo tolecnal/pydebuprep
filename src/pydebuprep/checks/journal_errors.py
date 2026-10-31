@@ -6,6 +6,7 @@ from collections import Counter
 
 from pydebuprep.checks.base import Check, Context, Option, count, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
+from pydebuprep.patterns import patterns_problems
 
 JOURNAL = ("journalctl", "-p", "err", "-b", "--no-pager", "-o", "json")
 PERMISSION_HINTS = ("insufficient permissions", "not seeing messages from other users")
@@ -16,13 +17,11 @@ VARIABLE = re.compile(r"[0-9a-fA-F]*[0-9][0-9a-fA-F]*")
 
 
 def compile_patterns(patterns: list[str]) -> list[re.Pattern[str]]:
-    compiled = []
-    for pattern in patterns:
-        try:
-            compiled.append(re.compile(pattern))
-        except re.error as exc:
-            raise ValueError(f"invalid ignore pattern {pattern!r}: {exc}") from None
-    return compiled
+    """Compile ignore patterns; ValueError if any breaks the limits in pydebuprep.patterns."""
+    problems = patterns_problems(patterns)
+    if problems:
+        raise ValueError("ignore: " + "; ".join(problems))
+    return [re.compile(pattern) for pattern in patterns]
 
 
 def shared_patterns(ctx: Context) -> list[re.Pattern[str]]:

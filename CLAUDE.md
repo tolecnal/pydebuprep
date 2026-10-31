@@ -49,7 +49,8 @@ make coverage                          # pytest with 100% line AND branch covera
    - `System.read_text`, `read_bytes`, `read_range`, and `lines` must go through
      `_open_regular()`, which resolves symlinks, checks `stat.S_ISREG(os.lstat(real).st_mode)`
      *before* calling `os.open(real, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)`,
-     and bounds reads to `MAX_READ_BYTES` (16 MiB).
+     checks `os.fstat` again on the opened descriptor, and bounds reads to
+     `MAX_READ_BYTES` (16 MiB).
    - `portal.read_token()` must also open with `O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC`
      and verify `stat.S_ISREG` and mode `0600` (`st_mode & 0o077 == 0`).
 
@@ -62,7 +63,12 @@ make coverage                          # pytest with 100% line AND branch covera
    - `cli.resolve_output_path()` must check `path.exists() or path.is_symlink()` so a
      dangling symlink gets a timestamped filename rather than failing or being followed.
 
-4. **Remote configuration restrictions (`src/pydebuprep/remote_config.py`):**
+4. **Regular expressions from configs (`src/pydebuprep/patterns.py`):**
+   - Every pattern a config gives (`logs.ignore`, a check's `ignore`) goes through
+     `patterns_problems()`: at most 100 patterns, 200 characters each, and no repeated
+     part that itself repeats without bound (catastrophic backtracking).
+
+5. **Remote configuration restrictions (`src/pydebuprep/remote_config.py`):**
    - A config fetched via `--config https://…` is untrusted relative to root on the host.
    - It must never set write paths, credential paths, filesystem walk roots, or
      arbitrary HTTP probe targets.
@@ -72,7 +78,7 @@ make coverage                          # pytest with 100% line AND branch covera
    - Always bound numeric check options (such as `max_depth` or timeouts) in
      `Check.validate()`.
 
-5. **Untrusted input & output sanitization:**
+6. **Untrusted input & output sanitization:**
    - Log lines, unit names, package names, container statuses, snapshot fields, and
      portal responses can contain terminal escape sequences (CSI/OSC) or markup.
    - All human-readable renderers (`text`, `html`, `markdown`, `jira`, `confluence`)

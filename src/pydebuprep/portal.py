@@ -8,6 +8,7 @@ the token only ever goes to the server it was configured for.
 
 from __future__ import annotations
 
+import errno
 import gzip
 import http.client
 import json
@@ -86,6 +87,10 @@ def read_token(token_file: str, env: Mapping[str, str]) -> str:
             f"no upload token: set {TOKEN_ENV} or create {token_file} (mode 0600)"
         ) from None
     except OSError as exc:
+        if exc.errno == errno.ELOOP:  # O_NOFOLLOW met a symlink
+            raise PortalError(
+                f"{token_file} is a symlink; set token_file to the file itself"
+            ) from None
         raise PortalError(f"cannot read {token_file}: {exc.strerror or exc}") from None
     try:
         text = data.decode("ascii")

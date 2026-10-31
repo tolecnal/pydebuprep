@@ -14,6 +14,7 @@ from pydebuprep import checks
 from pydebuprep.checks.base import Option
 from pydebuprep.deps import require_yaml
 from pydebuprep.model import CATEGORY_ORDER, Severity
+from pydebuprep.patterns import patterns_problems
 from pydebuprep.render import FORMATS
 from pydebuprep.snapshot import DEFAULT_SNAPSHOT_DIR
 from pydebuprep.state import DEFAULT_PENDING_DIR
@@ -243,7 +244,9 @@ def parse_config(text: str, source: str) -> Config:
 LOGS_HELP = (
     "Regular expressions for log messages to leave out of both journal-errors and "
     "dmesg-errors, matched against the message text. Kernel messages appear in both, so "
-    "one pattern here covers them; use a check's own 'ignore' option for the rest."
+    "one pattern here covers them; use a check's own 'ignore' option for the rest. At most "
+    "100 patterns of 200 characters, and no repeated part that itself repeats, such as "
+    "'(a+)+'."
 )
 
 
@@ -258,11 +261,7 @@ def _log_ignore(data: Any, source: str, errors: list[str]) -> list[str]:
     if not isinstance(patterns, list) or not all(isinstance(p, str) for p in patterns):
         errors.append(f"{source}: logs.ignore: expected a list of regular expressions")
         return []
-    for pattern in patterns:
-        try:
-            re.compile(pattern)
-        except re.error as exc:
-            errors.append(f"{source}: logs.ignore: invalid pattern {pattern!r}: {exc}")
+    errors.extend(f"{source}: logs.ignore: {problem}" for problem in patterns_problems(patterns))
     return list(patterns)
 
 

@@ -144,3 +144,14 @@ def test_example_config_validates(validator: Any) -> None:
 )
 def test_bad_configs_fail(validator: Any, config: dict[str, Any]) -> None:
     assert not validator(config_schema()).is_valid(config)
+
+
+def test_references_must_be_web_links(validator: Any) -> None:
+    data = json.loads(render(make_sample_report(), "json"))
+    data["results"][0]["findings"][0]["references"] = ["javascript:alert(1)"]
+    assert not validator(report_schema()).is_valid(data)
+
+
+def test_the_package_is_typed() -> None:
+    assert (ROOT / "src" / "pydebuprep" / "py.typed").exists()
+    assert "py.typed" in (ROOT / "setup.cfg").read_text()
