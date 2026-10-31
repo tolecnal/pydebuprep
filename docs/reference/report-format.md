@@ -8,7 +8,7 @@ their meaning until the version changes. These two formats can be read back by
 ```json
 {
   "schema_version": "1",
-  "tool": {"name": "pydebuprep", "version": "0.4.0"},
+  "tool": {"name": "pydebuprep", "version": "0.5.0"},
   "generated_at": "2026-10-28T12:00:00+00:00",
   "host": {
     "hostname": "web1",
