@@ -16,6 +16,12 @@
 #                 audit. strace still covers every write by pydebuprep itself.
 #   AUDIT_EXPECT  space-separated programs `report` must have run, so a check that
 #                 silently skipped its command can't pass the audit unexercised.
+#   AUDIT_PORTAL_URL
+#                 a config URL on a stand-in portal (scripts/audit-portal-stub.py) that
+#                 refuses uploads: `report` is audited again with it, where it may write
+#                 only under /var/lib/pydebuprep/ (a saved copy of the config and the
+#                 report kept for `pydebuprep upload`), then again after the portal is
+#                 stopped (AUDIT_PORTAL_PID), when it must use the saved copy.
 #   AUDIT_UNATTRIBUTED
 #                 "fail" (default): changed files and PID 1 starting, stopping or
 #                 reloading anything during the run fail the audit, whoever caused
@@ -128,6 +134,27 @@ audit() {  # NAME ALLOWED_PREFIX COMMAND...
 
 audit report "" pydebuprep report --no-baseline --format json -o -
 audit snapshot /var/lib/pydebuprep/snapshots pydebuprep snapshot
+
+if [ -n "${AUDIT_PORTAL_URL:-}" ]; then
+    audit portal /var/lib/pydebuprep/ pydebuprep report --config "$AUDIT_PORTAL_URL" --allow-http --no-baseline --format json -o -
+    for kept in 'pending/*.json' 'configs/*.json'; do
+        # shellcheck disable=SC2086 # the glob is meant to expand
+        if ls /var/lib/pydebuprep/$kept >/dev/null 2>&1; then
+            echo "exercised: portal run wrote /var/lib/pydebuprep/$kept"
+        else
+            echo "NOT EXERCISED: the portal run wrote no /var/lib/pydebuprep/$kept"; status=1
+        fi
+    done
+    kill "$AUDIT_PORTAL_PID"
+    audit portal-offline /var/lib/pydebuprep/ pydebuprep report --config "$AUDIT_PORTAL_URL" --allow-http --no-baseline --format json -o -
+    if pydebuprep report --config "$AUDIT_PORTAL_URL" --allow-http --no-baseline --format json -o - 2>/dev/null \
+        | grep -q '"stale": true'; then
+        echo "exercised: with the portal down, the saved config was used"
+    else
+        echo "NOT EXERCISED: with the portal down, the report didn't use the saved config"
+        status=1
+    fi
+fi
 
 for program in ${AUDIT_EXPECT:-}; do
     if grep -Eq "execve\(\"[^\"]*/$program\", .*\) = 0$" "$out/report.strace"; then

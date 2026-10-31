@@ -120,6 +120,18 @@ class BaselineInfo:
 
 
 @dataclass
+class ConfigInfo:
+    """Where a config fetched from a URL came from; stale when a saved copy stood in."""
+
+    source: str
+    fetched_at: str
+    stale: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"source": self.source, "fetched_at": self.fetched_at, "stale": self.stale}
+
+
+@dataclass
 class Summary:
     critical: int
     warning: int
@@ -150,9 +162,10 @@ class Report:
     summary: Summary
     results: list[CheckResult]
     schema_version: str = SCHEMA_VERSION
+    config: ConfigInfo | None = None  # set only for a config fetched from a URL
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data = {
             "schema_version": self.schema_version,
             "tool": dict(self.tool),
             "generated_at": self.generated_at,
@@ -161,6 +174,9 @@ class Report:
             "summary": self.summary.to_dict(),
             "results": [r.to_dict() for r in self.results],
         }
+        if self.config is not None:
+            data["config"] = self.config.to_dict()
+        return data
 
 
 def truncate_evidence(lines: list[str], limit: int = EVIDENCE_LIMIT) -> list[str]:

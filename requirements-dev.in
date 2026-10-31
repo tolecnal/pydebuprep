@@ -8,3 +8,4 @@ flake8
 mypy
 types-PyYAML
 bandit
+jsonschema

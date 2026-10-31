@@ -78,3 +78,18 @@ def _no_host_config(
     empty = tmp_path_factory.mktemp("conf") / "pydebuprep.conf"
     empty.write_text("")
     monkeypatch.setenv("PYDEBUPREP_CONFIG", str(empty))
+    # ...nor a real token, CA bundle or state directory (pending uploads, cached configs).
+    monkeypatch.delenv("PYDEBUPREP_TOKEN", raising=False)
+    monkeypatch.delenv("PYDEBUPREP_CA_FILE", raising=False)
+    monkeypatch.setenv("PYDEBUPREP_STATE_DIR", str(tmp_path_factory.mktemp("state")))
+    # Debian package builds point the proxy at a dead port to keep tests offline;
+    # the tests' portals are on 127.0.0.1 and must be reached directly.
+    for name in (
+        "http_proxy",
+        "https_proxy",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "all_proxy",
+        "ALL_PROXY",
+    ):
+        monkeypatch.delenv(name, raising=False)

@@ -21,6 +21,9 @@ generated:
 	PYTHONPATH=src $(PYTHON) -m pydebuprep completion bash > completions/bash/pydebuprep
 	PYTHONPATH=src $(PYTHON) -m pydebuprep completion zsh > completions/zsh/_pydebuprep
 	PYTHONPATH=src $(PYTHON) -m pydebuprep example-config > examples/pydebuprep.conf
+	mkdir -p schema
+	PYTHONPATH=src $(PYTHON) -m pydebuprep.schema report > schema/report.schema.json
+	PYTHONPATH=src $(PYTHON) -m pydebuprep.schema config > schema/config.schema.json
 
 # Run as root with pydebuprep installed: proves report/snapshot change nothing else.
 audit:

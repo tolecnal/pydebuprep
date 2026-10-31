@@ -122,6 +122,11 @@ def test_load_explicit_missing_is_error(tmp_path: Path) -> None:
         load_config(str(tmp_path / "nope.conf"))
 
 
+def test_deeply_nested_config_is_an_error_not_a_crash() -> None:
+    with pytest.raises(ConfigError, match="nested too deeply"):
+        parse_config("a: " + "[" * 5000, "x.conf")
+
+
 def test_example_config_parses_to_defaults() -> None:
     text = example_config()
     cfg = parse_config(text, "example")

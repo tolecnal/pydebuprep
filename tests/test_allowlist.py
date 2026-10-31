@@ -68,16 +68,28 @@ def test_no_subprocess_outside_system() -> None:
 
 
 def test_open_only_where_writes_are_expected() -> None:
-    allowed = {"system.py", "snapshot.py", "cli.py", "config.py"}
+    allowed = {"system.py", "snapshot.py", "cli.py", "config.py", "state.py", "portal.py"}
     for path in _sources():
         if path.name not in allowed:
             assert not re.search(r"\bopen\(", path.read_text()), path
 
 
-def test_config_only_reads() -> None:
-    text = (SRC / "config.py").read_text()
+def test_state_writes_only_through_write_private() -> None:
+    # Pending uploads and cached configs: one function opens files for writing, with
+    # O_EXCL|O_NOFOLLOW, and renames them into place.
+    text = (SRC / "state.py").read_text()
+    assert len(re.findall(r"os\.O_WRONLY", text)) == 1
+    assert "O_EXCL | os.O_NOFOLLOW" in text
+    assert not re.search(r"""\bopen\([^)]*["'][wxa+]""", text)
+    assert "makedirs" not in text and "mkdir" not in text
+
+
+@pytest.mark.parametrize("module", ["config.py", "portal.py"])
+def test_config_and_portal_only_read(module: str) -> None:
+    text = (SRC / module).read_text()
     for call in re.findall(r"\bopen\([^)]*\)", text):
         assert not re.search(r"""["'][wxa+]""", call), call
+    assert "O_WRONLY" not in text and "O_CREAT" not in text
 
 
 def test_registry_ids_unique_and_kebab() -> None:

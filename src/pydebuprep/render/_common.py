@@ -115,6 +115,19 @@ def baseline_line(report: Report) -> str:
     return f"Baseline: {b.path} (taken {b.created_at} on {b.hostname}, OS {b.os_version})"
 
 
+def config_line(report: Report) -> str | None:
+    """Where a config fetched from a URL came from; None for a local config."""
+    c = report.config
+    if c is None:
+        return None
+    if c.stale:
+        return (
+            f"Config from {c.source} could not be fetched; used the copy fetched on "
+            f"{c.fetched_at} — it may not be the latest"
+        )
+    return f"Config: {c.source} (fetched {c.fetched_at})"
+
+
 def summary_line(report: Report) -> str:
     s = report.summary
     return (

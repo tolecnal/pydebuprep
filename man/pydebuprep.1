@@ -15,6 +15,9 @@ pydebuprep \- read\-only health report for Debian and Ubuntu after a release upg
 .RB [ \-\-todo \ |\  \-\-no\-todo ]
 .RB [ \-\-check\-option\ \fICHECK.OPTION=VALUE\fR ]
 .RB [ \-\-config\ \fIFILE\fR \ |\  \-\-no\-config ]
+.RB [ \-\-allow\-http ]
+.RB [ \-\-ca\-file\ \fIFILE\fR ]
+.RB [ \-\-token\-file\ \fIFILE\fR ]
 .br
 .B pydebuprep convert
 .I FILE
@@ -22,6 +25,13 @@ pydebuprep \- read\-only health report for Debian and Ubuntu after a release upg
 .RB [ \-\-output\-dir\ \fIDIR\fR \ |\  \-\-output\ \fIFILE\fR ]
 .RB [ \-\-no\-color ]
 .RB [ \-\-todo \ |\  \-\-no\-todo ]
+.br
+.B pydebuprep upload
+.RI [ FILE ...]
+.RB [ \-\-config\ \fIFILE\fR \ |\  \-\-no\-config ]
+.RB [ \-\-allow\-http ]
+.RB [ \-\-ca\-file\ \fIFILE\fR ]
+.RB [ \-\-token\-file\ \fIFILE\fR ]
 .br
 .B pydebuprep snapshot
 .RB [ \-\-snapshot\-dir\ \fIDIR\fR ]
@@ -33,6 +43,9 @@ pydebuprep \- read\-only health report for Debian and Ubuntu after a release upg
 .br
 .B pydebuprep configtest
 .RB [ \-\-config\ \fIFILE\fR \ |\  \-\-no\-config ]
+.RB [ \-\-allow\-http ]
+.RB [ \-\-ca\-file\ \fIFILE\fR ]
+.RB [ \-\-token\-file\ \fIFILE\fR ]
 .br
 .B pydebuprep example\-config
 .br
@@ -86,6 +99,16 @@ saved report. Text, HTML, Markdown, Jira and Confluence reports can't be read
 back, so keep a JSON or YAML copy. The file is validated field by field; an
 invalid one is rejected with the field at fault and exit status 3. Exits 0 on
 success, whatever the report's findings.
+.TP
+.BR upload " [" \fIFILE\fR ...]
+Send saved JSON or YAML reports to the portal named by
+.B upload: url:
+in the configuration file. Without
+.IR FILE s,
+send every report kept after a failed upload (in
+.BR "upload: pending_dir:" ),
+removing each one the portal accepts. Files you name are sent but never removed.
+Exits 0 if everything was sent, 3 otherwise.
 .TP
 .B snapshot
 Record a baseline before upgrading: OS release, kernel, active and enabled
@@ -193,9 +216,49 @@ Read settings from
 instead of
 .IR /etc/pydebuprep.conf .
 The file must exist.
+.I FILE
+may also be an
+.B https://
+URL of a config served by a pydebuprep portal: it is fetched with the token (see
+.BR \-\-token\-file ),
+validated like a local file, and saved in
+.IR /var/lib/pydebuprep/configs/ .
+If the portal can't be reached, the saved copy is used and the report says so; with
+no saved copy the run fails. A config from a URL may not name a file:
+.BR report.output_dir ", " report.snapshot_dir ", " upload.token_file ", " upload.ca_file ,
+.B upload.pending_dir
+and the probes'
+.B credentials_file
+are refused,
+.B report.baseline
+must be
+.B auto
+or
+.BR none ,
+and its
+.B upload.url
+must be on the same server.
 .TP
 .B \-\-no\-config
 Ignore any configuration file and use built\-in defaults.
+.TP
+.B \-\-allow\-http
+Allow
+.B http://
+portal URLs. The token is then sent unencrypted: for test setups only.
+.TP
+.BI \-\-ca\-file " FILE"
+Extra CA certificates to trust for the portal, besides the system's (default:
+.BR $PYDEBUPREP_CA_FILE ,
+then
+.BR "upload: ca_file:" ).
+.TP
+.BI \-\-token\-file " FILE"
+File holding the portal token, readable by root only (default:
+.BR "upload: token_file:" ,
+.IR /etc/pydebuprep/token ).
+.B $PYDEBUPREP_TOKEN
+takes precedence.
 .TP
 .BR \-v ", " \-\-verbose
 With
@@ -267,6 +330,19 @@ logs:
 Command\-line options override the file, which overrides built\-in defaults.
 Relative paths in the file are relative to the file's directory. Unknown keys,
 unknown checks and invalid values are errors.
+.PP
+An optional fourth section,
+.BR upload ,
+sends each report to a pydebuprep portal:
+.B url
+(the portal; null, the default, means no upload),
+.BR token_file ,
+.B ca_file
+(extra CA certificates, besides the system's) and
+.B pending_dir
+(where a report that failed to upload is kept for
+.BR "pydebuprep upload" ;
+null keeps nothing). A failed upload never changes the report or its exit status.
 .SH CHECKS
 Checks run in this order and are grouped by category in the report. Use
 .B list\-checks \-\-verbose
@@ -402,11 +478,34 @@ installed) and zsh.
 Default snapshot directory (mode 0700). Snapshots are JSON files (mode 0600)
 named after the UTC time they were taken; they are private because they contain
 cron command lines, network details and package lists.
+.TP
+.I /etc/pydebuprep/token
+The portal token (mode 0600; a file readable by other users is refused).
+.TP
+.I /var/lib/pydebuprep/pending/
+Reports that failed to upload, kept for
+.B pydebuprep upload
+(mode 0600).
+.TP
+.I /var/lib/pydebuprep/configs/
+Copies of configs fetched from a URL, used when the portal can't be reached.
 .SH ENVIRONMENT
 .TP
 .B PYDEBUPREP_CONFIG
-Path of the configuration file to read instead of
+Path or URL of the configuration file to read instead of
 .IR /etc/pydebuprep.conf .
+.TP
+.B PYDEBUPREP_TOKEN
+The portal token; takes precedence over the token file.
+.TP
+.B PYDEBUPREP_CA_FILE
+Extra CA certificates to trust for the portal, as
+.BR \-\-ca\-file .
+.TP
+.B PYDEBUPREP_STATE_DIR
+pydebuprep's own directory instead of
+.I /var/lib/pydebuprep
+(pending uploads and saved configs), for installations without the package.
 .TP
 .B NO_COLOR
 Disables colored text output.

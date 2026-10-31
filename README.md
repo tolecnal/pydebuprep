@@ -165,6 +165,30 @@ input. Text, HTML, Markdown, Jira and Confluence output can't be read back, so
 those are rejected. A damaged or hand-edited file is rejected with the field at
 fault (exit code 3); `convert` exits 0 on success whatever the report found.
 
+### Uploading to a portal
+
+Optionally, each report can go to a pydebuprep portal, which keeps the reports of
+many hosts in one place and serves the configs they run with. With a token in
+`/etc/pydebuprep/token` (mode 0600, or `PYDEBUPREP_TOKEN`):
+
+```yaml
+upload:
+  url: https://portal.example.com
+```
+
+```sh
+sudo pydebuprep --config https://portal.example.com/api/v1/configs/web/default
+sudo pydebuprep upload        # resend reports kept after a failed upload
+```
+
+A failed upload never fails the report: it is kept in
+`/var/lib/pydebuprep/pending/` for `pydebuprep upload`. A config fetched from a URL
+is saved, and used — with a note in the report's header — when the portal can't be
+reached; it may not name files for pydebuprep to write or open, and uploads only go
+back to the server it came from. HTTPS only (`--allow-http` for tests), with `--ca-file` for an
+internal CA. The report and config formats are published as JSON Schemas in
+[`schema/`](schema/). See the [portal guide](https://pydebuprep.app/guide/portal/).
+
 ### Pasting into Jira or Confluence
 
 `--format jira` produces Jira wiki markup: paste it into an issue or comment

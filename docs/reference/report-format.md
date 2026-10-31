@@ -91,10 +91,23 @@ returned. Findings hidden with `--min-severity` are still counted.
 **Findings**: `severity` (`critical`, `warning`, `info`), `title`, `detail`, and
 the lists `evidence`, `remediation` and `references`.
 
+**`config`** (only when the config came from a URL): `source` (the URL),
+`fetched_at`, and `stale` — `true` when the portal couldn't be reached and a copy
+saved earlier was used. See [Using a portal](../guide/portal.md).
+
 **`todo`** (only with `--todo`): the [TODO list](../guide/output-formats.md#a-todo-list-to-track-the-fixes),
 an array of `{"severity", "check", "title", "steps"}`. `severity` and `check` are
 `null` for the items that aren't findings (a check that failed to run, running as
 root, the confirmation run). `convert` accepts reports with or without it.
+
+## JSON Schemas
+
+The report and the configuration file are described by JSON Schemas (draft
+2020-12), generated from pydebuprep's code:
+[report.schema.json](https://pydebuprep.app/schema/report.schema.json) and
+[config.schema.json](https://pydebuprep.app/schema/config.schema.json). A tool can
+validate a report against the first; the second lists every setting, check and
+option with its type, default and description.
 
 ## Examples
 

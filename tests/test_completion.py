@@ -25,6 +25,7 @@ def test_spec_covers_every_command_and_option() -> None:
     assert set(spec.commands) == {
         "report",
         "convert",
+        "upload",
         "snapshot",
         "list-checks",
         "configtest",
@@ -39,6 +40,9 @@ def test_spec_covers_every_command_and_option() -> None:
     assert report["--output-dir"].kind == "dir"
     assert report["--check-option"].repeatable
     assert spec.commands["convert"].positional_file
+    assert not spec.commands["convert"].positional_repeat
+    assert spec.commands["upload"].positional_file
+    assert spec.commands["upload"].positional_repeat
     assert not spec.commands["report"].positional_file
     assert spec.check_ids == sorted(cls.id for cls in checks.ALL_CHECKS)
     expected = sorted(f"{cls.id}.{o.name}=" for cls in checks.ALL_CHECKS for o in cls.options)
@@ -114,6 +118,8 @@ needs_bash_completion = pytest.mark.skipif(
         ("pydebuprep configtest --", ["--config", "--no-config"], ["--format"]),
         ("pydebuprep list-checks --", ["--verbose"], []),
         ("pydebuprep completion ", ["bash", "zsh"], []),
+        ("pydebuprep up", ["upload"], []),
+        ("pydebuprep upload --", ["--allow-http", "--ca-file", "--token-file"], ["--format"]),
         # Subcommands are only valid as the first word.
         ("pydebuprep --no-color ", [], ["snapshot", "report"]),
         ("pydebuprep -o report --", ["--format"], []),
@@ -235,7 +241,7 @@ needs_zsh = pytest.mark.skipif(not shutil.which("zsh"), reason="zsh not installe
         # --version is only valid as the first word
         ("report --vers", "pydebuprep report --vers"),
         ("--no-color --vers", "pydebuprep --no-color --vers"),
-        ("--to", "pydebuprep --todo"),
+        ("--tod", "pydebuprep --todo"),
         ("report --no-t", "pydebuprep report --no-todo"),
         ("convert r.json --to", "pydebuprep convert r.json --todo"),
     ],
@@ -398,4 +404,20 @@ def test_convert_completes_file_names(tmp_path: Path) -> None:
     assert zsh_complete(tmp_path, "convert sav", cwd=work) == expected
     assert bash_pty_complete(tmp_path, "convert sav", with_bash_completion=False, cwd=work) == (
         expected
+    )
+
+
+@needs_zsh
+def test_upload_completes_several_file_names(tmp_path: Path) -> None:
+    work = tmp_path / "work"
+    work.mkdir()
+    (work / "first-report.json").write_text("{}")
+    (work / "second-report.json").write_text("{}")
+    expected = "pydebuprep upload first-report.json second-report.json"
+    assert zsh_complete(tmp_path, "upload first-report.json sec", cwd=work) == expected
+    assert (
+        bash_pty_complete(
+            tmp_path, "upload first-report.json sec", with_bash_completion=False, cwd=work
+        )
+        == expected
     )

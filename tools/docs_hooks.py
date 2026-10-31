@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -25,7 +26,9 @@ from pydebuprep.config import (  # noqa: E402
     DEFAULT_CONFIG_PATH,
     LOGS_HELP,
     REPORT_HELP,
+    UPLOAD_HELP,
     ReportSettings,
+    UploadSettings,
     _yaml_value,
     example_config,
 )
@@ -189,6 +192,18 @@ def config_reference() -> str:
         "|---|---|---|",
         f"| `ignore` | `[]` | {_cell(LOGS_HELP)} |",
         "",
+        "## `upload`",
+        "",
+        "Uploading each report to a pydebuprep portal; off unless `url` is set.",
+        "",
+        "| Key | Default | Description |",
+        "|---|---|---|",
+    ]
+    upload = UploadSettings()
+    for key, text in UPLOAD_HELP.items():
+        out.append(f"| `{key}` | `{_yaml_value(getattr(upload, key))}` | {_cell(text)} |")
+    out += [
+        "",
         "## `checks`",
         "",
         "One section per check, named by its ID. Every section accepts `enabled` "
@@ -279,6 +294,14 @@ def render_marker(kind: str, arg: str | None) -> str:
 
 def expand(markdown: str) -> str:
     return MARKER.sub(lambda m: render_marker(m.group(1), m.group(2)), markdown)
+
+
+def on_post_build(config: Any, **_: Any) -> None:
+    """Publish the JSON Schemas at the URLs their $id names (/schema/*.schema.json)."""
+    target = Path(config["site_dir"]) / "schema"
+    target.mkdir(parents=True, exist_ok=True)
+    for source in sorted((ROOT / "schema").glob("*.schema.json")):
+        shutil.copyfile(source, target / source.name)
 
 
 def on_page_markdown(markdown: str, **_: Any) -> str:

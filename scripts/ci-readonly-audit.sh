@@ -81,4 +81,18 @@ if [ -d /run/systemd/system ]; then
     PYDEBUPREP_CONFIG=$conf
     export AUDIT_IGNORE AUDIT_EXPECT PYDEBUPREP_CONFIG
 fi
+# A stand-in portal that serves a config and refuses uploads, so a report run fetches
+# and saves a config and keeps its report: those are the only writes it may make.
+install -d -m 0700 /etc/pydebuprep
+printf 'audit-token\n' > /tmp/audit-token && install -m 0600 /tmp/audit-token /etc/pydebuprep/token
+rm -f /tmp/audit-token /tmp/audit-portal-url
+python3 "$here/audit-portal-stub.py" /tmp/audit-portal-url &
+AUDIT_PORTAL_PID=$!
+tries=0
+while [ ! -s /tmp/audit-portal-url ]; do
+    tries=$((tries + 1)); [ "$tries" -le 100 ] || { echo "the stand-in portal didn't start"; exit 1; }
+    sleep 0.1
+done
+AUDIT_PORTAL_URL=$(cat /tmp/audit-portal-url)
+export AUDIT_PORTAL_URL AUDIT_PORTAL_PID
 "$here/readonly-audit.sh" /tmp/audit

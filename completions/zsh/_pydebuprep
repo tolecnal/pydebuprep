@@ -51,6 +51,9 @@ _pydebuprep_first() {
         '(--config --no-config -c)--config=[read settings from FILE]:config:_files' \
         '(--config --no-config -c)-c[read settings from FILE]:config:_files' \
         '(--config --no-config -c)--no-config[ignore any config file]' \
+        '--allow-http[allow http\:// portal URLs (the token is sent unencrypted; for test setups)]' \
+        '--ca-file=[extra CA certificates to trust for the portal]:ca-file: ' \
+        '--token-file=[file holding the portal token]:token-file: ' \
         '--version[show program'\''s version number and exit]'
 }
 
@@ -75,7 +78,10 @@ _pydebuprep_report() {
         '*--check-option=[set a check option, overriding the config file (repeatable)]:check-option:_pydebuprep_check_options' \
         '(--config --no-config -c)--config=[read settings from FILE]:config:_files' \
         '(--config --no-config -c)-c[read settings from FILE]:config:_files' \
-        '(--config --no-config -c)--no-config[ignore any config file]'
+        '(--config --no-config -c)--no-config[ignore any config file]' \
+        '--allow-http[allow http\:// portal URLs (the token is sent unencrypted; for test setups)]' \
+        '--ca-file=[extra CA certificates to trust for the portal]:ca-file: ' \
+        '--token-file=[file holding the portal token]:token-file: '
 }
 
 _pydebuprep_convert() {
@@ -101,7 +107,10 @@ _pydebuprep_snapshot() {
         '*--check-option=[set a check option, overriding the config file (repeatable)]:check-option:_pydebuprep_check_options' \
         '(--config --no-config -c)--config=[read settings from FILE]:config:_files' \
         '(--config --no-config -c)-c[read settings from FILE]:config:_files' \
-        '(--config --no-config -c)--no-config[ignore any config file]'
+        '(--config --no-config -c)--no-config[ignore any config file]' \
+        '--allow-http[allow http\:// portal URLs (the token is sent unencrypted; for test setups)]' \
+        '--ca-file=[extra CA certificates to trust for the portal]:ca-file: ' \
+        '--token-file=[file holding the portal token]:token-file: '
 }
 
 _pydebuprep_list_checks() {
@@ -118,7 +127,23 @@ _pydebuprep_configtest() {
         '(--help -h)-h[show this help message and exit]' \
         '(--config --no-config -c)--config=[read settings from FILE]:config:_files' \
         '(--config --no-config -c)-c[read settings from FILE]:config:_files' \
-        '(--config --no-config -c)--no-config[ignore any config file]'
+        '(--config --no-config -c)--no-config[ignore any config file]' \
+        '--allow-http[allow http\:// portal URLs (the token is sent unencrypted; for test setups)]' \
+        '--ca-file=[extra CA certificates to trust for the portal]:ca-file: ' \
+        '--token-file=[file holding the portal token]:token-file: '
+}
+
+_pydebuprep_upload() {
+    _arguments -s -S \
+        '(--help -h)--help[show this help message and exit]' \
+        '(--help -h)-h[show this help message and exit]' \
+        '(--config --no-config -c)--config=[read settings from FILE]:config:_files' \
+        '(--config --no-config -c)-c[read settings from FILE]:config:_files' \
+        '(--config --no-config -c)--no-config[ignore any config file]' \
+        '--allow-http[allow http\:// portal URLs (the token is sent unencrypted; for test setups)]' \
+        '--ca-file=[extra CA certificates to trust for the portal]:ca-file: ' \
+        '--token-file=[file holding the portal token]:token-file: ' \
+        '*:file:_files'
 }
 
 _pydebuprep_example_config() {
@@ -142,6 +167,7 @@ _pydebuprep() {
         'snapshot:record a pre-upgrade baseline'
         'list-checks:list available checks'
         'configtest:validate the config file and exit'
+        'upload:send saved JSON or YAML reports to the portal (default\: those kept after a failed upload)'
         'example-config:print an example config file with all defaults'
         'completion:print a shell completion script'
     )
