@@ -171,7 +171,12 @@ def _open_regular(path: str) -> BinaryIO:
     real = os.path.realpath(path)
     if not stat.S_ISREG(os.lstat(real).st_mode):
         raise OSError(f"{path}: not a regular file")
-    return os.fdopen(os.open(real, READ_FLAGS), "rb")
+    fd = os.open(real, READ_FLAGS)
+    # Checked again on what was opened: the path may have been swapped in between.
+    if not stat.S_ISREG(os.fstat(fd).st_mode):
+        os.close(fd)
+        raise OSError(f"{path}: not a regular file")
+    return os.fdopen(fd, "rb")
 
 
 class DisallowedCommandError(Exception):

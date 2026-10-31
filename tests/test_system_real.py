@@ -287,3 +287,17 @@ def test_client_environment_is_not_passed_to_commands(monkeypatch: pytest.Monkey
 def test_http_get_with_a_bad_port_is_an_error() -> None:
     status, error = System().http_get("http://localhost:99999/", 1.0)
     assert status is None and error
+
+
+def test_a_file_swapped_for_a_fifo_after_the_check_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fifo = tmp_path / "pipe"
+    os.mkfifo(fifo)
+    regular = os.lstat(__file__)
+    real_lstat = os.lstat
+    # The type check sees a regular file; by the time it is opened it is a FIFO.
+    monkeypatch.setattr(
+        system.os, "lstat", lambda p: regular if str(p) == str(fifo) else real_lstat(p)
+    )
+    assert System().read_bytes(str(fifo)) is None

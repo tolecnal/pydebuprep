@@ -86,7 +86,7 @@ tests in `tests/test_allowlist.py` enforce these rules:
   exclusively through `ctx.system`.
 - **Opening files as root must refuse devices and FIFOs.** `System` opens files
   through `_open_regular()`, which resolves symlinks, verifies `stat.S_ISREG` before
-  opening, passes `O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC`, and caps reads at
+  opening and again with `fstat` after, passes `O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC`, and caps reads at
   `MAX_READ_BYTES` (16 MiB). `portal.read_token()` likewise opens the token file with
   `O_NOFOLLOW | O_NONBLOCK` and checks `stat.S_ISREG`. Never use bare `open()` on
   paths that could be symlinks to `/dev/watchdog`, `/dev/zero` or a named pipe.
@@ -94,6 +94,10 @@ tests in `tests/test_allowlist.py` enforce these rules:
   with mode `0600`.** Snapshots (`snapshot.py`), report files (`cli.py`), portal state
   (`state.py`) and scratch files (`system.py`) are opened with `os.open` and
   `CREATE_FLAGS`, never `open(..., "w")` or `open(..., "x")`.
+- **Regular expressions from a config are limited** (`src/pydebuprep/patterns.py`):
+  at most 100 patterns of 200 characters, and none that repeats a part which itself
+  repeats without bound, so no pattern can backtrack for minutes over a log line.
+  Compile every pattern a config gives through `patterns_problems()`.
 - **Remote configs may not name files, search roots or HTTP probe paths.** If you add
   a config or check option that names a file to read or write, a directory tree to
   walk, or a URL/path to request, add it to `REMOTE_FORBIDDEN` or `CHECK_FORBIDDEN`

@@ -244,7 +244,9 @@ def parse_config(text: str, source: str) -> Config:
 LOGS_HELP = (
     "Regular expressions for log messages to leave out of both journal-errors and "
     "dmesg-errors, matched against the message text. Kernel messages appear in both, so "
-    "one pattern here covers them; use a check's own 'ignore' option for the rest."
+    "one pattern here covers them; use a check's own 'ignore' option for the rest. At most "
+    "100 patterns of 200 characters, and no repeated part that itself repeats, such as "
+    "'(a+)+'."
 )
 
 
