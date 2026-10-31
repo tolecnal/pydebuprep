@@ -1,3 +1,20 @@
+pydebuprep (0.7.0) unstable; urgency=medium
+
+  * Regular expressions from a config (logs.ignore and the journal-errors and
+    dmesg-errors ignore options) are limited: at most 100 patterns of at most
+    200 characters, and none that repeats a part which itself repeats without
+    bound, the shape behind catastrophic backtracking. A config from a portal
+    could otherwise make every host's run pin a CPU.
+  * Breaking: configs with such patterns, or more than 100 of them, are now
+    refused.
+  * Files are checked again after they are opened, so a path swapped for a
+    FIFO or a device in between is refused.
+  * A symlinked token file says so, and how to fix it.
+  * The published report schema requires references to be http(s) links.
+  * The package ships py.typed for type checkers.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Sat, 31 Oct 2026 16:34:01 +0100
+
 pydebuprep (0.6.0) unstable; urgency=medium
 
   * Security hardening from an external review:
