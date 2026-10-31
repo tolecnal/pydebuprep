@@ -1,3 +1,29 @@
+pydebuprep (0.5.0) unstable; urgency=medium
+
+  * Optional upload to a pydebuprep portal: with `upload: url:` in the
+    config file, each report is sent as JSON over HTTPS with a token read
+    from /etc/pydebuprep/token (mode 0600) or PYDEBUPREP_TOKEN. A failed
+    upload never fails the report; the JSON is kept in
+    /var/lib/pydebuprep/pending/ for later.
+  * New command `pydebuprep upload` resends kept reports, or report files
+    saved with --format json or yaml.
+  * --config accepts an HTTPS URL. A copy of the fetched config is saved
+    in /var/lib/pydebuprep/configs/ and used when the portal can't be
+    reached; the report's header then says the config may not be the
+    latest. A config from a URL can't name files to write or open, and
+    its upload URL must be on the same server.
+  * New options --ca-file, --token-file and --allow-http (test setups
+    only). Certificates are checked against the system's CAs; redirects
+    are never followed.
+  * JSON Schemas of the report and config formats, published at
+    https://pydebuprep.app/schema/.
+  * The package creates /var/lib/pydebuprep/pending and
+    /var/lib/pydebuprep/configs (mode 0700); the read-only audit now
+    covers report runs that upload and use a config from a URL.
+  * zsh completion describes --no-todo as turning --todo off.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Sat, 31 Oct 2026 09:04:48 +0100
+
 pydebuprep (0.4.0) unstable; urgency=medium
 
   * New check systemd-critical-services: units a host can't do without
