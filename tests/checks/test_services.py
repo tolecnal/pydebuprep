@@ -253,7 +253,7 @@ def test_journal_all_ignored_ok() -> None:
 def test_journal_invalid_regex_rejected() -> None:
     import pytest
 
-    with pytest.raises(ValueError, match="journal-errors: invalid ignore pattern"):
+    with pytest.raises(ValueError, match="journal-errors: ignore: invalid pattern"):
         JournalErrorsCheck({"ignore": ["("]})
 
 
