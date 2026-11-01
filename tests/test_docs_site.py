@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
 sys.path.insert(0, str(ROOT / "tools"))
 
-import docs_hooks  # noqa: E402
+import docs_build  # noqa: E402
 
 CHECK_IDS = sorted(cls.id for cls in checks.ALL_CHECKS)
 
@@ -70,7 +70,7 @@ def test_navigation_lists_every_page() -> None:
 
 def test_navigation_orders_checks_like_the_report() -> None:
     nav = [p for p in nav_pages(mkdocs_config()["nav"]) if p.startswith("checks/")]
-    order = [f"checks/{c.id}.md" for c in docs_hooks.check_classes()]
+    order = [f"checks/{c.id}.md" for c in docs_build.check_classes()]
     assert nav == ["checks/index.md", *order]
 
 
@@ -92,10 +92,10 @@ def test_every_allowlisted_command_is_documented_on_a_check_page() -> None:
 
 
 def test_every_command_and_config_key_is_in_the_reference() -> None:
-    cli = docs_hooks.cli_reference()
+    cli = docs_build.cli_reference()
     for command in COMMANDS:
         assert f"## `{command}`" in cli
-    reference = docs_hooks.config_reference()
+    reference = docs_build.config_reference()
     for key in config.REPORT_HELP:
         assert f"| `{key}` |" in reference
     assert "## `upload`" in reference
@@ -107,33 +107,33 @@ def test_every_command_and_config_key_is_in_the_reference() -> None:
 
 
 def test_checks_index_links_every_check() -> None:
-    index = docs_hooks.checks_index()
+    index = docs_build.checks_index()
     for check_id in CHECK_IDS:
         assert f"[`{check_id}`]({check_id}.md)" in index
 
 
 def test_facts_box() -> None:
-    debsums = docs_hooks.facts("debsums")
+    debsums = docs_build.facts("debsums")
     assert "| Needs root | yes (skipped without it) |" in debsums
     assert "| Needs programs | `debsums` |" in debsums
-    assert "| Compares with a snapshot | no |" in docs_hooks.facts("debsums")
-    assert "| Needs root | no |" in docs_hooks.facts("apt-sources")
-    assert "| Compares with a snapshot | yes |" in docs_hooks.facts("apt-sources")
-    assert "| Needs programs | none |" in docs_hooks.facts("apt-sources")
+    assert "| Compares with a snapshot | no |" in docs_build.facts("debsums")
+    assert "| Needs root | no |" in docs_build.facts("apt-sources")
+    assert "| Compares with a snapshot | yes |" in docs_build.facts("apt-sources")
+    assert "| Needs programs | none |" in docs_build.facts("apt-sources")
 
 
 def test_options_section() -> None:
-    disk = docs_hooks.options("disk-space")
+    disk = docs_build.options("disk-space")
     assert "| `min_free_mib` | `2048` |" in disk
     assert '    important_mounts: ["/", "/var"]' in disk
     assert "--check-option disk-space.include_remote=false" in disk
     assert "repeat it to give several items" in disk
-    venvs = docs_hooks.options("python-venvs")
+    venvs = docs_build.options("python-venvs")
     assert "--check-option python-venvs.search_paths=/opt" in venvs
-    critical = docs_hooks.options("systemd-critical-services")
+    critical = docs_build.options("systemd-critical-services")
     assert "--check-option systemd-critical-services.required_active=VALUE" in critical
-    assert "has no options" in docs_hooks.options("dkms")
-    assert "repeat it" not in docs_hooks.options("apt-lists-age")
+    assert "has no options" in docs_build.options("dkms")
+    assert "repeat it" not in docs_build.options("apt-lists-age")
 
 
 def test_expand_replaces_every_marker() -> None:
@@ -147,16 +147,49 @@ def test_expand_replaces_every_marker() -> None:
             "<!-- cli-reference -->",
         ]
     )
-    out = docs_hooks.on_page_markdown(page, page=None, config=None, files=None)
+    out = docs_build.expand(page)
     assert "<!--" not in out
     assert config.example_config().splitlines()[0] in out
 
 
 @pytest.mark.parametrize("marker", ["<!-- facts -->", "<!-- options -->", "<!-- facts: nope -->"])
 def test_bad_markers_fail_the_build(marker: str) -> None:
-    with pytest.raises(docs_hooks.DocsError):
-        docs_hooks.expand(marker)
+    with pytest.raises(docs_build.DocsError):
+        docs_build.expand(marker)
 
 
 def test_table_cells_are_escaped() -> None:
-    assert docs_hooks._cell("a|b\nc") == "a\\|b c"
+    assert docs_build._cell("a|b\nc") == "a\\|b c"
+
+
+def test_build_tree_expands_every_marker(tmp_path: Path) -> None:
+    docs_build.write_tree(tmp_path)
+    pages = sorted(tmp_path.rglob("*.md"))
+    assert len(pages) > 40
+    for page in pages:
+        assert not docs_build.MARKER.search(page.read_text()), page
+    assert "| Needs root |" in (tmp_path / "checks" / "disk-space.md").read_text()
+
+
+def test_build_tree_leaves_out_the_planning_notes(tmp_path: Path) -> None:
+    docs_build.write_tree(tmp_path)
+    assert not (tmp_path / "backlog.md").exists()
+    assert not (tmp_path / "superpowers").exists()
+
+
+def test_build_config_points_zensical_at_the_tree(tmp_path: Path) -> None:
+    path = docs_build.write_config(tmp_path / "zensical.yml", docs_dir="docs-src")
+    built = yaml.safe_load(path.read_text())
+    source = mkdocs_config()
+    assert built["docs_dir"] == "docs-src"
+    assert built["site_dir"] == "site"
+    assert "hooks" not in built and "exclude_docs" not in built
+    assert built["nav"] == source["nav"] and built["theme"] == source["theme"]
+
+
+def test_docs_are_built_with_zensical() -> None:
+    assert "zensical" in (ROOT / "requirements-docs.in").read_text()
+    assert "mkdocs-material" not in (ROOT / "requirements-docs.in").read_text()
+    for path in (ROOT / "Makefile", ROOT / ".github/workflows/docs.yml"):
+        text = path.read_text()
+        assert "tools/docs_build.py" in text and "zensical build --strict" in text, path

@@ -1,19 +1,25 @@
-"""MkDocs hooks: fill the generated parts of the documentation from pydebuprep's code.
+"""Prepare the documentation for Zensical: fill the generated parts from pydebuprep's code.
 
 Pages hold markers such as ``<!-- facts: disk-space -->``; each is replaced with
 Markdown built from the check registry, the config schema or the CLI parser, so the
-facts in the docs can't drift from the code. tests/test_docs_site.py tests this
-module and checks every page against the registry.
+facts in the docs can't drift from the code. Zensical runs no MkDocs hooks, so
+`python tools/docs_build.py` writes the expanded pages to build/docs-src and a config
+pointing at them to build/zensical.yml; `zensical build --strict -f build/zensical.yml`
+builds the site from there into build/site. tests/test_docs_site.py tests this module
+and checks every page against the registry.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shutil
 import sys
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
@@ -296,14 +302,47 @@ def expand(markdown: str) -> str:
     return MARKER.sub(lambda m: render_marker(m.group(1), m.group(2)), markdown)
 
 
-def on_post_build(config: Any, **_: Any) -> None:
-    """Publish the JSON Schemas at the URLs their $id names (/schema/*.schema.json)."""
-    target = Path(config["site_dir"]) / "schema"
-    target.mkdir(parents=True, exist_ok=True)
+BUILD = ROOT / "build"
+# Not part of the site: the project backlog and local planning notes.
+EXCLUDED = ("backlog.md", "superpowers")
+
+
+def write_tree(out: Path) -> Path:
+    """The pages in OUT with every marker expanded, and the JSON Schemas at the URLs
+    their $id names (/schema/*.schema.json)."""
+    if out.exists():
+        shutil.rmtree(out)
+    top = ROOT / "docs"
+    shutil.copytree(
+        top, out, ignore=lambda d, names: [n for n in names if Path(d) == top and n in EXCLUDED]
+    )
+    for page in out.rglob("*.md"):
+        page.write_text(expand(page.read_text(encoding="utf-8")), encoding="utf-8")
+    (out / "schema").mkdir(exist_ok=True)
     for source in sorted((ROOT / "schema").glob("*.schema.json")):
-        shutil.copyfile(source, target / source.name)
+        shutil.copyfile(source, out / "schema" / source.name)
+    return out
 
 
-def on_page_markdown(markdown: str, **_: Any) -> str:
-    """MkDocs hook: expand the markers on every page."""
-    return expand(markdown)
+def write_config(path: Path, docs_dir: str) -> Path:
+    """mkdocs.yml, which Zensical reads, pointed at the expanded pages in DOCS_DIR next
+    to PATH, and building into site/ next to it (Zensical keeps both inside the config
+    file's directory)."""
+    config: dict[str, Any] = yaml.safe_load((ROOT / "mkdocs.yml").read_text(encoding="utf-8"))
+    config.pop("hooks", None)
+    config.pop("exclude_docs", None)
+    config["docs_dir"] = docs_dir
+    config["site_dir"] = "site"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    return path
+
+
+def main() -> int:
+    write_tree(BUILD / "docs-src")
+    print(os.path.relpath(write_config(BUILD / "zensical.yml", "docs-src"), ROOT))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

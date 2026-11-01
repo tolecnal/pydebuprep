@@ -22,19 +22,19 @@ that refuses any command not on the allowlist.
 
 ## The documentation
 
-This site is built with [MkDocs](https://www.mkdocs.org/) and
-[Material for MkDocs](https://squidfunk.github.io/mkdocs-material/) from `docs/`:
+This site is built with [Zensical](https://zensical.org/) from `docs/` and
+`mkdocs.yml`, which Zensical reads:
 
 ```sh
 python3 -m venv .venv-docs
 .venv-docs/bin/pip install -r requirements-docs.txt
-.venv-docs/bin/mkdocs serve      # http://127.0.0.1:8000, reloads on change
-.venv-docs/bin/mkdocs build      # strict: fails on broken links or missing pages
+make docs          # strict: fails on broken links or missing pages; the site is in build/site/
+make docs-serve    # http://127.0.0.1:8000
 ```
 
 Facts that live in the code are generated, not written: each check page's
 "At a glance" box and options, the checks index, the configuration reference and the
-command-line reference come from `tools/docs_hooks.py`, which reads pydebuprep's
+command-line reference come from `tools/docs_build.py`, which reads pydebuprep's
 own registry, configuration schema and argument parser. `tests/test_docs_site.py`
 fails if a check has no page, a page has no check, the navigation misses one, or
 an allowlisted command isn't documented on any check page.
