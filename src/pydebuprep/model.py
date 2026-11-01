@@ -91,9 +91,11 @@ class Host:
     codename: str
     kernel: str
     is_root: bool
+    # pydebuprep's hash of /etc/machine-id (see identity.py); None when there is none.
+    machine_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "hostname": self.hostname,
             "os_id": self.os_id,
             "os_version": self.os_version,
@@ -101,6 +103,9 @@ class Host:
             "kernel": self.kernel,
             "is_root": self.is_root,
         }
+        if self.machine_id is not None:
+            data["machine_id"] = self.machine_id
+        return data
 
 
 @dataclass

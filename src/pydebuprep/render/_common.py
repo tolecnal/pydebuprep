@@ -94,6 +94,7 @@ def clean_report(report: Report) -> Report:
             clean(h.codename),
             clean(h.kernel),
             h.is_root,
+            None if h.machine_id is None else clean(h.machine_id),
         ),
         baseline=None
         if b is None
@@ -129,9 +130,10 @@ def by_category(report: Report) -> list[tuple[str, list[CheckResult]]]:
 def host_line(report: Report) -> str:
     h = report.host
     root = "" if h.is_root else " (not run as root: some checks skipped)"
+    machine = "" if h.machine_id is None else f" | Machine: {h.machine_id}"
     return (
         f"Host: {h.hostname} | OS: {h.os_id} {h.os_version} ({h.codename}) | "
-        f"Kernel: {h.kernel}{root}"
+        f"Kernel: {h.kernel}{machine}{root}"
     )
 
 

@@ -107,6 +107,10 @@
         "kernel": {
           "type": "string"
         },
+        "machine_id": {
+          "pattern": "^[0-9a-f]{32}$",
+          "type": "string"
+        },
         "os_id": {
           "type": "string"
         },
