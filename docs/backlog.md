@@ -1,6 +1,6 @@
 # Backlog
 
-What is still open, as of 2026-11-01. Remove items as they are done.
+What is still open, as of 2026-11-01 (after pydebuprep 0.8.0 and portal 0.3.0). Remove items as they are done.
 
 ## GitHub repository settings
 
@@ -43,8 +43,9 @@ published with `SHA256SUMS` and a verified provenance attestation.
 released on 2026-10-31, published with `SHA256SUMS` and a verified provenance
 attestation.
 
-`v0.8.0` (a hashed machine ID in reports; the nginx, apache and libvirt checks) is
-being released on 2026-11-01; what it contains is in `debian/changelog`.
+`v0.8.0` (a hashed machine ID in reports; the nginx, apache and libvirt checks)
+released on 2026-11-01, published with `SHA256SUMS` and a verified provenance
+attestation.
 
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't
@@ -59,15 +60,16 @@ rulesets as this repository: changes go through a pull request, and the tests, t
 Docker smoke test and the security checks (Bandit, ShellCheck, pip-audit, zizmor,
 CodeQL, dependency review) must pass; only admins create `v*` tags. Released `v0.1.0`
 on 2026-11-01: the image `ghcr.io/tolecnal/pydebuprep-portal`, public, with a
-verified provenance attestation.
+verified provenance attestation. `v0.2.0` (the sidebar layout) and `v0.3.0` (machine
+IDs, hosts by release, kernel and silence, full-text findings, CSV; built on pydebuprep
+0.8.0) followed the same day. Dependabot keeps its actions, Python dependencies and
+images current, like this repository's.
 
 - [ ] Before each release: bump `__version__`, the `CHANGELOG.md` heading and the
       image tag in `compose.yaml` together; the Release workflow refuses a tag that
       doesn't match the version.
-- [ ] Use the machine ID reports carry since pydebuprep 0.8.0: flag a host name that
-      two machines report (portal 0.3.0).
-- [ ] Held until needed: search beyond host name, findings and severity over time,
-      once people have used it a while.
+- [ ] When a pydebuprep release adds report fields, release a portal built on it
+      before hosts upgrade: a portal refuses fields its pydebuprep doesn't know.
 
 ## Checks not implemented yet
 
