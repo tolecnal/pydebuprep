@@ -100,7 +100,7 @@ def test_system_reads_only_regular_files_with_nonblock_and_nofollow() -> None:
 
 def test_registry_ids_unique_and_kebab() -> None:
     ids = [cls.id for cls in checks.ALL_CHECKS]
-    assert len(ids) == 37
+    assert len(ids) == 40
     assert len(set(ids)) == len(ids)
     for cls in checks.ALL_CHECKS:
         assert re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", cls.id), cls.id

@@ -7,6 +7,20 @@
     "checks": {
       "additionalProperties": false,
       "properties": {
+        "apache": {
+          "additionalProperties": false,
+          "description": "Apache configuration references",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
         "apparmor": {
           "additionalProperties": false,
           "description": "AppArmor",
@@ -446,6 +460,20 @@
             "null"
           ]
         },
+        "libvirt": {
+          "additionalProperties": false,
+          "description": "libvirt virtual machines",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
         "mariadb": {
           "additionalProperties": false,
           "description": "MariaDB and MySQL",
@@ -510,6 +538,20 @@
                 "type": "string"
               },
               "type": "array"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "nginx": {
+          "additionalProperties": false,
+          "description": "nginx configuration references",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
             }
           },
           "type": [

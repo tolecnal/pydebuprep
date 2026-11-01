@@ -10,7 +10,7 @@ isn't now, a PostgreSQL cluster still on the old version, an SSH configuration t
 would lock you out on the next restart.
 
 `systemctl --failed` and a look at the journal catch some of this. pydebuprep runs
-the rest of the post-upgrade checklist in one go — [37 checks](checks/index.md)
+the rest of the post-upgrade checklist in one go — [40 checks](checks/index.md)
 across packages, boot, services, applications, network, security and storage — and
 tells you what it found and how to fix it.
 

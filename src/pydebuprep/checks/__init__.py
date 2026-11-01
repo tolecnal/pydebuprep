@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from pydebuprep.checks.apache import ApacheCheck
 from pydebuprep.checks.apparmor import AppArmorCheck
 from pydebuprep.checks.apt_autoremove import AptAutoremoveCheck
 from pydebuprep.checks.apt_held import AptHeldCheck
@@ -29,9 +30,11 @@ from pydebuprep.checks.firewall import FirewallCheck
 from pydebuprep.checks.fstab import FstabCheck
 from pydebuprep.checks.journal_errors import JournalErrorsCheck
 from pydebuprep.checks.kernel_running import KernelRunningCheck
+from pydebuprep.checks.libvirt import LibvirtCheck
 from pydebuprep.checks.mariadb import MariaDbCheck
 from pydebuprep.checks.needrestart import NeedrestartCheck
 from pydebuprep.checks.network import NetworkCheck
+from pydebuprep.checks.nginx import NginxCheck
 from pydebuprep.checks.obsolete_packages import ObsoletePackagesCheck
 from pydebuprep.checks.os_release import OsReleaseCheck
 from pydebuprep.checks.postfix import PostfixCheck
@@ -81,6 +84,9 @@ ALL_CHECKS: list[type[Check]] = [
     PostfixCheck,
     BindCheck,
     DockerCheck,
+    NginxCheck,
+    ApacheCheck,
+    LibvirtCheck,
     PythonVenvsCheck,
 ]
 

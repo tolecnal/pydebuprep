@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fnmatch
 import gzip
+import posixpath
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -71,9 +72,22 @@ class FakeSystem(System):
     def which(self, name: str) -> bool:
         return self.available is None or name in self.available
 
+    def _target(self, path: str) -> str:
+        """Where PATH leads once the symlinks (in links) along it are followed, like the
+        real system."""
+        resolved = "/"
+        for part in path.strip("/").split("/"):
+            resolved = posixpath.join(resolved, part)
+            for _ in range(40):
+                if resolved not in self.links:
+                    break
+                link = self.links[resolved]
+                resolved = posixpath.normpath(posixpath.join(posixpath.dirname(resolved), link))
+        return resolved
+
     def read_text(self, path: str) -> str | None:
         self.whole_reads.append(path)
-        return self.files.get(path)
+        return self.files.get(self._target(path))
 
     def read_range(self, path: str, offset: int, size: int) -> bytes | None:
         data: str | bytes | None = self.files.get(path)
@@ -98,6 +112,7 @@ class FakeSystem(System):
         return None if data is None else data.encode("utf-8")
 
     def exists(self, path: str) -> bool:
+        path = self._target(path)
         prefix = path.rstrip("/") + "/"
         return (
             path in self.files
@@ -124,7 +139,13 @@ class FakeSystem(System):
         return path
 
     def glob(self, pattern: str) -> list[str]:
-        return sorted(f for f in (*self.files, *self.links) if fnmatch.fnmatch(f, pattern))
+        # Like the real glob, a * stays within one directory.
+        depth = pattern.count("/")
+        return sorted(
+            f
+            for f in (*self.files, *self.links)
+            if f.count("/") == depth and fnmatch.fnmatch(f, pattern)
+        )
 
     def mtime(self, path: str) -> float | None:
         return self.mtimes.get(path)
