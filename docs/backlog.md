@@ -1,6 +1,6 @@
 # Backlog
 
-What is still open, as of 2026-10-29. Remove items as they are done.
+What is still open, as of 2026-11-01. Remove items as they are done.
 
 ## GitHub repository settings
 
@@ -14,7 +14,8 @@ an advanced setup), and these rulesets next to the owner's `protet-main-branch`
 - `release tags: admins only, immutable`: only admins create `v*` tags, and they can't
   be moved or deleted.
 
-- [ ] Optional: secret scanning for non-provider patterns and validity checks.
+- [ ] Optional, on both repositories: secret scanning for non-provider patterns and
+      validity checks.
 
 ## Release
 
@@ -36,8 +37,9 @@ with `SHA256SUMS` and a verified provenance attestation; what it contains is in
 `v0.6.0` (security hardening from an external review) released on 2026-10-31,
 published with `SHA256SUMS` and a verified provenance attestation.
 
-`v0.7.0` (limits on config regular expressions, re-checked opens, a typed package) is
-being released on 2026-10-31; what it contains is in `debian/changelog`.
+`v0.7.0` (limits on config regular expressions, re-checked opens, a typed package)
+released on 2026-10-31, published with `SHA256SUMS` and a verified provenance
+attestation.
 
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't
@@ -45,6 +47,23 @@ being released on 2026-10-31; what it contains is in `debian/changelog`.
 - [ ] Decide whether to publish an APT repository as well, for example signed and
       served from GitHub Pages, so hosts can `apt install pydebuprep` and get
       updates. Today the package is published only as a release asset.
+
+## Portal
+
+[pydebuprep-portal](https://github.com/tolecnal/pydebuprep-portal) has the same
+rulesets as this repository: changes go through a pull request, and the tests, the
+Docker smoke test and the security checks (Bandit, ShellCheck, pip-audit, zizmor,
+CodeQL, dependency review) must pass; only admins create `v*` tags. Released `v0.1.0`
+on 2026-11-01: the image `ghcr.io/tolecnal/pydebuprep-portal`, public, with a
+verified provenance attestation.
+
+- [ ] Before each release: bump `__version__`, the `CHANGELOG.md` heading and the
+      image tag in `compose.yaml` together; the Release workflow refuses a tag that
+      doesn't match the version.
+- [ ] Held until needed: add `/etc/machine-id` to the report if two machines turn out
+      to report the same host name (they would share a history today).
+- [ ] Held until needed: search beyond host name, findings and severity over time,
+      once people have used it a while.
 
 ## Checks not implemented yet
 
