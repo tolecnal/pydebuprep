@@ -8,6 +8,10 @@ A host needs two things: a **token** from the portal, and either an **upload URL
 in its config file or a **config URL** to fetch its config from (a config served by
 the portal already contains the upload URL).
 
+The portal checks each report against the pydebuprep it is built on, so upgrade the
+portal first: reports from pydebuprep 0.8.0 carry a machine ID, which
+pydebuprep-portal 0.3.0 and newer accept and older portals refuse.
+
 ## The token
 
 The portal shows a token once, when it is created. Store it on the host so only root
