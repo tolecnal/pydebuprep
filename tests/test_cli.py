@@ -74,6 +74,16 @@ def test_json_format_parses(capsys: pytest.CaptureFixture[str]) -> None:
     assert data["summary"]["exit_code"] == rc == 2
     assert data["host"]["kernel"] == "6.12.0-1-amd64"
     assert data["host"]["codename"] == "trixie"
+    assert "machine_id" not in data["host"]  # the fake host has no /etc/machine-id
+
+
+def test_report_carries_the_hashed_machine_id(capsys: pytest.CaptureFixture[str]) -> None:
+    system = fake()
+    system.files["/etc/machine-id"] = "0123456789abcdef0123456789abcdef\n"
+    main(["report", "--format", "json", "--no-baseline"], system=system)
+    assert json.loads(capsys.readouterr().out)["host"]["machine_id"] == (
+        "97550a10b77649e0b7a4f6565cb35289"
+    )
 
 
 def test_output_dir_writes_timestamped_file(

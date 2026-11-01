@@ -24,7 +24,7 @@ A read-only health report for Debian and Ubuntu systems after a release upgrade
 guides.
 
 `systemctl --failed` and a look at `journalctl` catch some problems. pydebuprep
-runs the rest of the post-upgrade checklist in one go, with [37 checks](#checks):
+runs the rest of the post-upgrade checklist in one go, with [40 checks](#checks):
 
 - **packages:** APT sources still pointing at the old release, third-party
   repositories the upgrader disabled, half-configured packages, unmerged
@@ -73,7 +73,7 @@ sudo apt install ./pydebuprep_*_all.deb
 Without the GitHub CLI, download a specific version and skip the attestation check:
 
 ```sh
-VERSION=0.7.0
+VERSION=0.8.0
 wget https://github.com/tolecnal/pydebuprep/releases/download/v$VERSION/pydebuprep_${VERSION}_all.deb \
      https://github.com/tolecnal/pydebuprep/releases/download/v$VERSION/SHA256SUMS
 sha256sum -c SHA256SUMS && sudo apt install ./pydebuprep_${VERSION}_all.deb
@@ -297,9 +297,12 @@ host never looks healthy just because a check couldn't look.
 | `systemd-failed` | services | Failed units; services active or enabled before the upgrade that aren't now |
 | `systemd-timers` | services | Enabled timers that aren't active |
 | `time-sync` | services | A time synchronisation service is running and the clock is synchronised (read from the kernel, no daemon queried); service changes since the baseline |
+| `apache` | applications | Includes that point at missing files (dangling `mods-enabled`, `conf-enabled` and `sites-enabled` links), `LoadModule` files that are gone, `unix:` sockets (PHP-FPM `SetHandler`, `ProxyPass`) that don't exist (read from the files; `apachectl -t` isn't used: it writes) |
 | `bind` | applications | `named-checkconf` errors (root) |
 | `docker` | applications | Containers failing their health check, restarting, or still starting it (each its own finding); containers running before but not now; opt-in probes of published ports and HTTP URLs. Only queried when `docker.service` is running, so the daemon is never started (root) |
+| `libvirt` | applications | Domains set to start at boot that aren't running; disk images, devices and emulators that no longer exist (read from libvirt's files; `virsh` isn't used) (root) |
 | `mariadb` | applications | MariaDB data directory not upgraded to the new server version; opt-in probe that MariaDB or MySQL answers a ping and a query (root) |
+| `nginx` | applications | Includes that point at missing files (dangling `sites-enabled` and `modules-enabled` links), `load_module` files that are gone, `unix:` sockets in `*_pass` and upstream `server` lines that don't exist (read from the files; `nginx -t` isn't used: it writes) |
 | `postfix` | applications | `postconf -n` warnings and errors (`postfix check` isn't used: it creates directories) |
 | `postgresql` | applications | Clusters still on an older major version than the newest installed server, or left behind after migrating; clusters that should start but are down; clusters online before but not now; opt-in probe that each online cluster accepts connections and answers a query |
 | `python-venvs` | applications | Virtualenvs whose Python no longer exists, or built for an older Python; compiled modules needing libraries that are missing (read from their ELF headers, never `ldd`); scripts whose interpreter doesn't exist |
@@ -416,7 +419,7 @@ Bump the version in `debian/changelog` (`dch -v X.Y.Z`) and in
 `main` (release tags are protected: only maintainers can create them):
 
 ```sh
-git tag -a v0.7.0 -m "pydebuprep 0.7.0" && git push origin v0.7.0
+git tag -a v0.8.0 -m "pydebuprep 0.8.0" && git push origin v0.8.0
 ```
 
 The **Release** workflow builds the `.deb` once and lints it with lintian. It then
@@ -427,7 +430,7 @@ build-provenance attestation. To check a download:
 
 ```sh
 sha256sum -c SHA256SUMS
-gh attestation verify pydebuprep_0.7.0_all.deb --repo tolecnal/pydebuprep
+gh attestation verify pydebuprep_0.8.0_all.deb --repo tolecnal/pydebuprep
 ```
 
 Running the workflow by hand (workflow_dispatch) builds and verifies the package

@@ -1,4 +1,4 @@
-.TH PYDEBUPREP 1 "October 2026" "pydebuprep 0.7.0" "User Commands"
+.TH PYDEBUPREP 1 "November 2026" "pydebuprep 0.8.0" "User Commands"
 .SH NAME
 pydebuprep \- read\-only health report for Debian and Ubuntu after a release upgrade
 .SH SYNOPSIS
@@ -420,14 +420,23 @@ for each check's options.
 .B time\-sync
 (services) A time synchronisation service is running and the clock is synchronised (read from the kernel, no daemon queried); service changes since the baseline
 .TP
+.B apache
+(applications) Includes that point at missing files (dangling \fBmods\-enabled\fR, \fBconf\-enabled\fR and \fBsites\-enabled\fR links), \fBLoadModule\fR files that are gone, \fBunix:\fR sockets (PHP\-FPM \fBSetHandler\fR, \fBProxyPass\fR) that don't exist (read from the files; \fBapachectl \-t\fR isn't used: it writes)
+.TP
 .B bind
 (applications) \fBnamed\-checkconf\fR errors (root)
 .TP
 .B docker
 (applications) Containers failing their health check, restarting, or still starting it; containers running before but not now; opt\-in probes of published ports and HTTP URLs. Only queried when docker.service is running (root)
 .TP
+.B libvirt
+(applications) Domains set to start at boot that aren't running; disk images, devices and emulators that no longer exist (read from libvirt's files; \fBvirsh\fR isn't used) (root)
+.TP
 .B mariadb
 (applications) MariaDB data directory not upgraded to the new server version; opt\-in probe that MariaDB or MySQL answers a ping and a query (root)
+.TP
+.B nginx
+(applications) Includes that point at missing files (dangling \fBsites\-enabled\fR and \fBmodules\-enabled\fR links), \fBload_module\fR files that are gone, \fBunix:\fR sockets in \fB*_pass\fR and upstream \fBserver\fR lines that don't exist (read from the files; \fBnginx \-t\fR isn't used: it writes)
 .TP
 .B postfix
 (applications) \fBpostconf \-n\fR warnings and errors (\fBpostfix check\fR isn't used: it creates directories)

@@ -8,7 +8,7 @@ their meaning until the version changes. These two formats can be read back by
 ```json
 {
   "schema_version": "1",
-  "tool": {"name": "pydebuprep", "version": "0.7.0"},
+  "tool": {"name": "pydebuprep", "version": "0.8.0"},
   "generated_at": "2026-10-28T12:00:00+00:00",
   "host": {
     "hostname": "web1",
@@ -16,7 +16,8 @@ their meaning until the version changes. These two formats can be read back by
     "os_version": "13",
     "codename": "trixie",
     "kernel": "6.12.0-1-amd64",
-    "is_root": true
+    "is_root": true,
+    "machine_id": "97550a10b77649e0b7a4f6565cb35289"
   },
   "baseline": {
     "path": "/var/lib/pydebuprep/snapshots/20261027T100000Z.json",
@@ -69,7 +70,14 @@ their meaning until the version changes. These two formats can be read back by
 
 **`host`**: `hostname`, `os_id` (`debian`, `ubuntu`), `os_version` (`13`,
 `24.04`), `codename`, `kernel` (the running kernel), `is_root` (whether the report
-ran as root).
+ran as root), and `machine_id` when the host has an `/etc/machine-id`.
+
+`machine_id` tells apart two machines that report the same host name. It is not
+the machine ID itself, which is meant to stay on the machine, but the ID systemd
+derives from it for pydebuprep: the same value as
+`systemd-id128 machine-id -a e44561703c184c26a2c15fb541fc276a` prints on the host. It
+can't be turned back into `/etc/machine-id` or matched with IDs other programs
+derive. Reports from before 0.8.0 have no `machine_id`.
 
 **`baseline`**: `path`, `created_at`, `os_version` and `hostname` of the snapshot.
 

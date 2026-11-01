@@ -1,6 +1,6 @@
 # Checks
 
-pydebuprep runs 37 checks, in eight categories, in the order below. Each check's
+pydebuprep runs 40 checks, in eight categories, in the order below. Each check's
 page explains what it looks at, what it can report and what to do about it, which
 commands it runs, how it uses a snapshot, its options, and its limits.
 

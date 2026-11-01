@@ -11,6 +11,7 @@ from typing import Any
 
 from pydebuprep import checks
 from pydebuprep.config import LOGS_HELP, REPORT_HELP, SEVERITIES, UPLOAD_HELP
+from pydebuprep.identity import MACHINE_ID
 from pydebuprep.model import CATEGORY_ORDER, SCHEMA_VERSION, Severity, Status
 from pydebuprep.render import FORMATS
 
@@ -84,17 +85,20 @@ def report_schema() -> dict[str, Any]:
     schema["required"] = [
         "baseline", "generated_at", "host", "results", "schema_version", "summary", "tool",
     ]  # fmt: skip
+    host = _object(
+        {
+            "hostname": STRING,
+            "os_id": STRING,
+            "os_version": STRING,
+            "codename": STRING,
+            "kernel": STRING,
+            "is_root": {"type": "boolean"},
+        }
+    )
+    # Optional: reports from before 0.8.0, and hosts without /etc/machine-id, have none.
+    host["properties"]["machine_id"] = {"type": "string", "pattern": f"^{MACHINE_ID.pattern}$"}
     schema["$defs"] = {
-        "host": _object(
-            {
-                "hostname": STRING,
-                "os_id": STRING,
-                "os_version": STRING,
-                "codename": STRING,
-                "kernel": STRING,
-                "is_root": {"type": "boolean"},
-            }
-        ),
+        "host": host,
         "baseline": _object(
             {"path": STRING, "created_at": STRING, "os_version": STRING, "hostname": STRING}
         ),

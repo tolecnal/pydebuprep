@@ -114,9 +114,12 @@ nav:
           - systemd-timers: checks/systemd-timers.md
           - time-sync: checks/time-sync.md
       - Applications:
+          - apache: checks/apache.md
           - bind: checks/bind.md
           - docker: checks/docker.md
+          - libvirt: checks/libvirt.md
           - mariadb: checks/mariadb.md
+          - nginx: checks/nginx.md
           - postfix: checks/postfix.md
           - postgresql: checks/postgresql.md
           - python-venvs: checks/python-venvs.md

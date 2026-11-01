@@ -13,6 +13,7 @@ from enum import Enum
 from typing import Any, TypeVar
 
 from pydebuprep.deps import require_yaml
+from pydebuprep.identity import MACHINE_ID
 from pydebuprep.model import (
     SCHEMA_VERSION,
     BaselineInfo,
@@ -112,7 +113,14 @@ def _host(d: dict[str, Any], path: str) -> Host:
         codename=_str(_field(d, "codename", path), f"{path}.codename"),
         kernel=_str(_field(d, "kernel", path), f"{path}.kernel"),
         is_root=_bool(_field(d, "is_root", path), f"{path}.is_root"),
+        machine_id=_machine_id(d.get("machine_id"), f"{path}.machine_id"),
     )
+
+
+def _machine_id(value: Any, path: str) -> str | None:
+    if value is not None and not (isinstance(value, str) and MACHINE_ID.fullmatch(value)):
+        raise ReportFileError(f"{path}: expected 32 lower-case hexadecimal digits")
+    return value
 
 
 def _baseline(d: dict[str, Any], path: str) -> BaselineInfo:

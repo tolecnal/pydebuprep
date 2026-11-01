@@ -23,6 +23,7 @@ from pydebuprep.config import (
     load_config,
 )
 from pydebuprep.deps import MissingDependency
+from pydebuprep.identity import machine_id
 from pydebuprep.model import (
     CATEGORY_ORDER,
     CheckResult,
@@ -407,6 +408,7 @@ def cmd_report(args: argparse.Namespace, system: System) -> int:
         codename=osinfo.codename,
         kernel=kernel,
         is_root=system.is_root(),
+        machine_id=machine_id(system),
     )
     now = system.now()
     report = Report(
