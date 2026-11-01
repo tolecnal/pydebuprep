@@ -1,6 +1,6 @@
 name: Docs
 
-# Builds the documentation site (MkDocs, strict: broken links or missing pages fail)
+# Builds the documentation site (Zensical, strict: broken links or missing pages fail)
 # on every pull request, and publishes it to GitHub Pages from main.
 on:
   push:
@@ -31,13 +31,13 @@ jobs:
       - name: Install pinned documentation tools
         run: python -m pip install -r requirements-docs.txt
       - name: Build (strict)
-        env:
-          NO_MKDOCS_2_WARNING: "1"
-        run: mkdocs build
+        run: |
+          python tools/docs_build.py
+          python -m zensical build --strict -f build/zensical.yml
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         with:
-          path: site
+          path: build/site
 
   deploy:
     name: Publish to GitHub Pages

@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
 sys.path.insert(0, str(ROOT / "tools"))
 
-import docs_hooks  # noqa: E402
+import docs_build  # noqa: E402
 
 
 def man() -> str:
@@ -60,7 +60,7 @@ def test_report_format_documents_config_and_links_the_schemas() -> None:
 
 
 def test_schemas_are_published_with_the_site(tmp_path: Path) -> None:
-    docs_hooks.on_post_build(config={"site_dir": str(tmp_path)})
+    docs_build.write_tree(tmp_path)
     for name in ("report", "config"):
         published = tmp_path / "schema" / f"{name}.schema.json"
         source = ROOT / "schema" / f"{name}.schema.json"

@@ -7,14 +7,10 @@ repo_name: tolecnal/pydebuprep
 edit_uri: edit/main/docs/
 copyright: MIT licensed
 
-# Fill generated sections (check facts, config and CLI reference) from the code.
-hooks:
-  - tools/docs_hooks.py
-
-# Not part of the site: the project backlog and local planning notes.
-exclude_docs: |
-  backlog.md
-  superpowers/
+# Built with Zensical, which reads this file: `make docs`. tools/docs_build.py first
+# expands the generated sections (check facts, config and CLI reference) into
+# build/docs-src, leaving out the backlog and planning notes, and points a copy of this
+# file at it.
 
 strict: true
 validation:

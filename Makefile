@@ -39,7 +39,10 @@ clean:
 DOCS_PYTHON ?= $(if $(wildcard .venv-docs/bin/python),.venv-docs/bin/python,python3)
 
 docs:
-	NO_MKDOCS_2_WARNING=1 $(DOCS_PYTHON) -m mkdocs build
+	$(DOCS_PYTHON) tools/docs_build.py
+	$(DOCS_PYTHON) -m zensical build --strict -f build/zensical.yml
 
+# Serves the expanded pages: run `make docs-serve` again after changing a page.
 docs-serve:
-	NO_MKDOCS_2_WARNING=1 $(DOCS_PYTHON) -m mkdocs serve
+	$(DOCS_PYTHON) tools/docs_build.py
+	$(DOCS_PYTHON) -m zensical serve -f build/zensical.yml

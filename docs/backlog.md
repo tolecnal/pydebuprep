@@ -14,8 +14,10 @@ an advanced setup), and these rulesets next to the owner's `protet-main-branch`
 - `release tags: admins only, immutable`: only admins create `v*` tags, and they can't
   be moved or deleted.
 
-- [ ] Optional, on both repositories: secret scanning for non-provider patterns and
-      validity checks.
+Secret scanning for non-provider patterns and validity checks: asked for on
+2026-11-01, but GitHub doesn't turn them on for repositories of a personal account
+(they come with GitHub Secret Protection); the API accepts the change and nothing
+happens. Revisit if the repositories move to an organization.
 
 ## Release
 
@@ -44,9 +46,8 @@ attestation.
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't
       match both.
-- [ ] Decide whether to publish an APT repository as well, for example signed and
-      served from GitHub Pages, so hosts can `apt install pydebuprep` and get
-      updates. Today the package is published only as a release asset.
+- Decided on 2026-11-01: no APT repository for now; the package stays a release asset.
+  Revisit if hosts should get updates through `apt`.
 
 ## Portal
 
@@ -98,9 +99,10 @@ audit if one of them stops running.
 
 ## Decisions to revisit
 
-- The documentation site uses Material for MkDocs, which reaches end of life on
-  2027-05-05 (security fixes until then). Its successor, Zensical, reads the same
-  `mkdocs.yml`; evaluate moving before then.
+- The documentation site moved from Material for MkDocs (end of life 2027-05-05) to
+  Zensical on 2026-11-01, while Zensical is still at 0.0.x. Zensical runs no MkDocs
+  hooks, so `tools/docs_build.py` expands the generated sections first; if Zensical
+  gains its own extension mechanism, move the expansion there.
 
 - Container images in workflows track tags (`debian:bookworm`, `ubuntu:24.04`, ...)
   rather than digests, so builds get current security updates; Dependabot cannot
