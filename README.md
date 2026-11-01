@@ -426,7 +426,9 @@ The **Release** workflow builds the `.deb` once and lints it with lintian. It th
 installs it on Debian 12, Debian 13, and Ubuntu 22.04, 24.04 and 26.04, runs a
 smoke test, and runs the read-only audit on each. Only if all of that passes
 does it publish a GitHub Release with the `.deb`, a `SHA256SUMS` file and a
-build-provenance attestation. To check a download:
+build-provenance attestation. The release's notes start with the version's
+`debian/changelog` entry (preview them with `python3 scripts/release-notes.py X.Y.Z`).
+To check a download:
 
 ```sh
 sha256sum -c SHA256SUMS

@@ -123,3 +123,12 @@ git tag -a vX.Y.Z -m "pydebuprep X.Y.Z" && git push origin vX.Y.Z
 
 The Release workflow builds the package, audits it on every supported release, and
 publishes it with checksums and a provenance attestation only if everything passes.
+
+The release's notes are the version's `debian/changelog` entry, then how to verify the
+download, then GitHub's list of merged pull requests. Write the entry for someone
+deciding whether and how to upgrade (say what breaks, and what to upgrade first), and
+preview the notes before tagging:
+
+```sh
+python3 scripts/release-notes.py X.Y.Z
+```
