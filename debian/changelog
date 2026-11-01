@@ -1,3 +1,27 @@
+pydebuprep (0.8.0) unstable; urgency=medium
+
+  * Reports carry a machine ID, so a portal can tell apart two machines that
+    report the same host name: not /etc/machine-id itself, but the ID systemd
+    derives from it for pydebuprep (systemd-id128 machine-id -a
+    e44561703c184c26a2c15fb541fc276a prints the same). Left out when the host
+    has no machine ID.
+  * Upgrade a portal before its hosts: one built on pydebuprep 0.7.0 or older
+    refuses reports that carry a machine ID (pydebuprep-portal 0.3.0 takes
+    both).
+  * New check nginx: includes that point at missing files (dangling
+    sites-enabled and modules-enabled links), load_module files that are
+    gone, and unix: sockets in *_pass and upstream server lines that don't
+    exist, naming the sockets next to them (php7.4-fpm.sock after PHP became
+    8.2). Read from the files; nginx -t isn't used.
+  * New check apache: the same for Include, IncludeOptional, LoadModule and
+    unix: sockets (PHP-FPM SetHandler, ProxyPass). apachectl -t isn't used.
+  * New check libvirt: domains set to start at boot that aren't running, and
+    disk images, devices or emulators that no longer exist. Read from
+    libvirt's files; virsh isn't used.
+  * The documentation site is built with Zensical.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Sun, 01 Nov 2026 13:30:00 +0100
+
 pydebuprep (0.7.0) unstable; urgency=medium
 
   * Regular expressions from a config (logs.ignore and the journal-errors and

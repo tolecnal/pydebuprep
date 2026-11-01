@@ -41,6 +41,9 @@ published with `SHA256SUMS` and a verified provenance attestation.
 released on 2026-10-31, published with `SHA256SUMS` and a verified provenance
 attestation.
 
+`v0.8.0` (a hashed machine ID in reports; the nginx, apache and libvirt checks) is
+being released on 2026-11-01; what it contains is in `debian/changelog`.
+
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't
       match both.
@@ -60,8 +63,8 @@ verified provenance attestation.
 - [ ] Before each release: bump `__version__`, the `CHANGELOG.md` heading and the
       image tag in `compose.yaml` together; the Release workflow refuses a tag that
       doesn't match the version.
-- [ ] Held until needed: add `/etc/machine-id` to the report if two machines turn out
-      to report the same host name (they would share a history today).
+- [ ] Use the machine ID reports carry since pydebuprep 0.8.0: flag a host name that
+      two machines report (portal 0.3.0).
 - [ ] Held until needed: search beyond host name, findings and severity over time,
       once people have used it a while.
 
