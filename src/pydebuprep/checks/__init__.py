@@ -17,6 +17,7 @@ from pydebuprep.checks.bind import BindCheck
 from pydebuprep.checks.boot_space import BootSpaceCheck
 from pydebuprep.checks.boot_time import BootTimeCheck
 from pydebuprep.checks.bootloader import BootloaderCheck
+from pydebuprep.checks.certbot import CertbotCheck
 from pydebuprep.checks.config_conflicts import ConfigConflictsCheck
 from pydebuprep.checks.cron import CronCheck
 from pydebuprep.checks.debsums import DebsumsCheck
@@ -88,6 +89,7 @@ ALL_CHECKS: list[type[Check]] = [
     NginxCheck,
     ApacheCheck,
     PhpCheck,
+    CertbotCheck,
     LibvirtCheck,
     PythonVenvsCheck,
 ]

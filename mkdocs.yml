@@ -116,6 +116,7 @@ nav:
       - Applications:
           - apache: checks/apache.md
           - bind: checks/bind.md
+          - certbot: checks/certbot.md
           - docker: checks/docker.md
           - libvirt: checks/libvirt.md
           - mariadb: checks/mariadb.md

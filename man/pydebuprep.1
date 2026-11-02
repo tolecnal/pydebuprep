@@ -426,6 +426,9 @@ for each check's options.
 .B bind
 (applications) \fBnamed\-checkconf\fR errors (root)
 .TP
+.B certbot
+(applications) Renewals that will fail: certbot or its Python gone, \fBauthenticator\fR/\fBinstaller\fR plugins not installed for the Python that runs certbot; certificates within 28 days of expiring, which certbot should have renewed
+.TP
 .B docker
 (applications) Containers failing their health check, restarting, or still starting it; containers running before but not now; opt\-in probes of published ports and HTTP URLs. Only queried when docker.service is running (root)
 .TP

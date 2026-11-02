@@ -20,6 +20,8 @@ ROOT = Path(__file__).resolve().parent.parent
 OPTION_TESTS: dict[tuple[str, str], str] = {
     ("postgresql", "probe"): "checks.test_probes::test_pg_probe_off_by_default_runs_nothing",
     ("postgresql", "credentials_file"): "checks.test_probes::test_pg_credentials_file",
+    ("certbot", "cert_warning_days"): "checks.test_certbot::test_live_certificate_expiring",
+    ("certbot", "cert_critical_days"): "checks.test_certbot::test_live_certificate_expiring",
     ("apache", "cert_warning_days"): "checks.test_web_configs::test_apache_cert_options",
     ("apache", "cert_critical_days"): "checks.test_web_configs::test_apache_cert_options",
     ("nginx", "cert_warning_days"): "checks.test_web_configs::test_nginx_cert_options",

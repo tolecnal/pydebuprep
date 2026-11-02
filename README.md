@@ -24,7 +24,7 @@ A read-only health report for Debian and Ubuntu systems after a release upgrade
 guides.
 
 `systemctl --failed` and a look at `journalctl` catch some problems. pydebuprep
-runs the rest of the post-upgrade checklist in one go, with [41 checks](#checks):
+runs the rest of the post-upgrade checklist in one go, with [42 checks](#checks):
 
 - **packages:** APT sources still pointing at the old release, third-party
   repositories the upgrader disabled, half-configured packages, unmerged
@@ -254,7 +254,7 @@ The package also installs the example as
 | `docker` | `probe` (false): connect to every published TCP port, and run `http_probes`; `http_probes` ([]): `CONTAINER=URL` items, localhost only, 2xx/3xx passes; `ignore_containers` ([]): name patterns to leave out |
 | `python-venvs` | `search_paths` (/opt, /srv, /usr/local, /root, /home, /var/www) and `max_depth` (5): where to look for virtualenvs; `exclude_paths` (\*/.cache/\*): ones to leave out |
 | `network` | `ignore_interfaces` (lo, veth\*, docker\*, br-\*, virbr\*, vnet\*, tap\*, cni\*, flannel\*, cali\*): left out of the baseline comparison |
-| `nginx`, `apache` | `cert_warning_days` (28), `cert_critical_days` (14): how many days before a TLS certificate expires that it's a warning, and critical (1 to 365, critical below warning) |
+| `nginx`, `apache`, `certbot` | `cert_warning_days` (28), `cert_critical_days` (14): how many days before a TLS certificate expires that it's a warning, and critical (1 to 365, critical below warning) |
 | `disk-space` | `include_remote` (false), `warning_pct` (25.0), `critical_pct` (10.0), `exclude_mounts` ([]), `important_mounts` (["/", "/var"]) and `min_free_mib` (2048): an absolute free-space floor for those mounts |
 
 ### Exit codes
@@ -300,6 +300,7 @@ host never looks healthy just because a check couldn't look.
 | `time-sync` | services | A time synchronisation service is running and the clock is synchronised (read from the kernel, no daemon queried); service changes since the baseline |
 | `apache` | applications | Includes that point at missing files (dangling `mods-enabled`, `conf-enabled` and `sites-enabled` links), `LoadModule` files that are gone, `unix:` sockets (PHP-FPM `SetHandler`, `ProxyPass`) that don't exist, site files skipped for not ending in `.conf`; TLS certificates that expire or that OpenSSL refuses, small DH parameters, old protocols, server names a certificate doesn't cover (read from the files; `apachectl -t` isn't used: it writes) |
 | `bind` | applications | `named-checkconf` errors (root) |
+| `certbot` | applications | Renewals that will fail: certbot or its Python gone, `authenticator`/`installer` plugins not installed for the Python that runs certbot; certificates within 28 days of expiring, which certbot should have renewed |
 | `docker` | applications | Containers failing their health check, restarting, or still starting it (each its own finding); containers running before but not now; opt-in probes of published ports and HTTP URLs. Only queried when `docker.service` is running, so the daemon is never started (root) |
 | `libvirt` | applications | Domains set to start at boot that aren't running; disk images, devices and emulators that no longer exist (read from libvirt's files; `virsh` isn't used) (root) |
 | `mariadb` | applications | MariaDB data directory not upgraded to the new server version; opt-in probe that MariaDB or MySQL answers a ping and a query (root) |
