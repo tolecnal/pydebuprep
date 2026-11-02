@@ -4,8 +4,11 @@
 Reads an `strace -f` log of the syscalls listed in readonly-audit.sh and reports
 every call that could change persistent state. Allowed: temporary files and
 directories under /tmp that are deleted again before the run ends, anonymous O_TMPFILE
-files, writes to /dev/null and terminals, signal 0 (an existence probe), and the paths
-passed with --allow (the snapshot directory for `pydebuprep snapshot`). A failed call
+files, writes to /dev/null and terminals, signal 0 (an existence probe), the paths
+passed with --allow (the snapshot directory for `pydebuprep snapshot`), and the side
+effects agreed with the user (AGREED_WRITES, documented in docs/about/read-only.md under
+"Agreed side effects"): those only by the program they were agreed for, or a process it
+started. A failed call
 changed nothing and is ignored, except under a --strict prefix, where even an attempt
 to write is a violation (UEFI variables are immutable files, so a write there would
 fail rather than show up). Exit status 1 on any violation.
@@ -14,9 +17,11 @@ fail rather than show up). Exit status 1 on any violation.
 from __future__ import annotations
 
 import argparse
+import posixpath
 import re
 import sys
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 WRITE_FLAGS = re.compile(r"O_WRONLY|O_RDWR|O_CREAT|O_TRUNC|O_APPEND")
 HARMLESS = ("/dev/null", "/dev/tty", "/dev/pts/")
@@ -27,6 +32,49 @@ CALL = re.compile(r"(\w+)\((.*)\)\s+=\s+(-?\d+|\?)")
 QUOTED = re.compile(r'"((?:[^"\\]|\\.)*)"')
 # Calls whose first argument is a directory descriptor their (first) path is relative to.
 DIRFD_CALLS = ("openat", "openat2", "unlinkat", "mkdirat", "fchmodat", "fchownat", "mknodat")
+
+
+PROCESS_CALLS = ("clone", "clone3", "fork", "vfork")
+OPEN_CALLS = ("open", "openat", "openat2", "creat")
+
+
+@dataclass(frozen=True)
+class Agreed:
+    """A change PROGRAM (an executable's name), or a process it started, may make: CALLS
+    on paths matching PATH (every path of the call); for opens, only with FLAGS and
+    never truncating."""
+
+    program: str
+    calls: tuple[str, ...]
+    path: re.Pattern[str]
+    flags: re.Pattern[str] | None = None
+
+
+# Measured on Debian 13 and Ubuntu 24.04 (2026-11-02); agreeing to another is a code
+# change, reviewed like any other, never a setting.
+AGREED_WRITES = (
+    # nginx -t: opens its PID file (creating it, never writing it) and its logs for
+    # appending, and creates its temp directories (owned by www-data) if missing.
+    Agreed("nginx", OPEN_CALLS, re.compile(r"/run/nginx\.pid"), re.compile(r"O_RDWR\|O_CREAT")),
+    Agreed("nginx", OPEN_CALLS, re.compile(r"/var/log/.+"), re.compile(r"O_APPEND")),
+    Agreed(
+        "nginx",
+        ("mkdir", "mkdirat", "chown", "fchownat", "lchown"),
+        re.compile(r"/var/lib/nginx/(body|proxy|fastcgi|uwsgi|scgi)"),
+    ),
+    # apache2ctl -t: creates Apache's run and lock directories if missing (mkdir -p
+    # walks relative path components; the socket directory is made under a temporary
+    # name and renamed into place).
+    Agreed(
+        "apache2ctl",
+        ("mkdir", "mkdirat", "chmod", "fchmodat", "chown", "fchownat", "rename", "renameat",
+         "renameat2"),
+        re.compile(
+            r"(/var)?/run/apache2(/socks(\.\w+)?)?|(/var)?/run/lock/apache2(\.\w+)?"
+            r"|/var/lock/apache2(\.\w+)?|apache2|run|lock"
+        ),
+    ),
+)  # fmt: skip
 
 
 class Auditor:
@@ -40,6 +88,7 @@ class Auditor:
         self.run_pids: set[str] = set()  # every process and thread in the traced run
         self.signals: list[tuple[str, str]] = []  # (target pid, where), judged in finish()
         self.fds: dict[tuple[str, str], str] = {}  # (pid, fd) -> path it was opened as
+        self.lineage: dict[str, frozenset[str]] = {}  # pid -> programs it descends from
 
     def allowed(self, path: str) -> bool:
         return path.startswith(HARMLESS) or path.startswith(self.allow)
@@ -61,11 +110,18 @@ class Auditor:
         if rest.startswith("execve(") and rest.rstrip().endswith("= 0"):
             argv = re.search(r"\[(.*?)\]", rest)
             self.programs[pid] = argv.group(1).replace('"', "")[:80] if argv else rest[:80]
+            path = QUOTED.search(rest)
+            program = posixpath.basename(path.group(1)) if path else ""
+            self.lineage[pid] = self.lineage.get(pid, frozenset()) | {program}
             return
         call = CALL.match(rest)
         if not call:
             return
         name, args, result = call.groups()
+        if name in PROCESS_CALLS:
+            if result.isdigit():  # the child (or thread) inherits what its parent runs
+                self.lineage[result] = self.lineage.get(pid, frozenset())
+            return
         where = f"{self.programs.get(pid, f'pid {pid}')}: {name}({args[:160]})"
         targets = QUOTED.findall(args)
         if name in DIRFD_CALLS and targets and not targets[0].startswith("/"):
@@ -80,7 +136,20 @@ class Auditor:
             if self.strict_attempt(name, args, targets):
                 self.violations.append(f"{where} (failed attempt)")
             return
-        self.check(name, args, targets, where)
+        if not self.agreed(pid, name, args, targets):
+            self.check(name, args, targets, where)
+
+    def agreed(self, pid: str, name: str, args: str, targets: list[str]) -> bool:
+        """Whether this call is a side effect agreed for a program PID descends from."""
+        programs = self.lineage.get(pid, frozenset())
+        return any(
+            rule.program in programs
+            and name in rule.calls
+            and bool(targets)
+            and all(rule.path.fullmatch(t) for t in targets)
+            and (rule.flags is None or (bool(rule.flags.search(args)) and "O_TRUNC" not in args))
+            for rule in AGREED_WRITES
+        )
 
     def strict_attempt(self, name: str, args: str, targets: list[str]) -> bool:
         if not any(t.startswith(self.strict) for t in targets):

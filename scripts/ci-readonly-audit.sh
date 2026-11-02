@@ -13,7 +13,8 @@ rm -f /etc/apt/apt.conf.d/docker-clean
 echo "postfix postfix/main_mailer_type select Local only" | debconf-set-selections
 echo "postfix postfix/mailname string audit.example" | debconf-set-selections
 tools="strace debsums dkms needrestart efibootmgr nftables iptables ufw iproute2 python3-venv"
-services="openssh-server cron unattended-upgrades apparmor postgresql mariadb-server postfix bind9"
+services="openssh-server cron unattended-upgrades apparmor postgresql mariadb-server postfix bind9
+nginx apache2 ssl-cert"
 # AUDIT_TOOLS_ONLY=1 leaves the services out: CI runner VMs ship their own, conflicting
 # MySQL and PostgreSQL, and the containers cover the services anyway.
 [ -n "${AUDIT_TOOLS_ONLY:-}" ] || tools="$tools $services"
@@ -48,6 +49,7 @@ if [ -d /run/systemd/system ]; then
     AUDIT_EXPECT="systemctl journalctl systemd-analyze ldconfig"
     if [ -z "${AUDIT_TOOLS_ONLY:-}" ]; then
         AUDIT_EXPECT="$AUDIT_EXPECT sshd pg_lsclusters mariadbd postconf named-checkconf"
+        AUDIT_EXPECT="$AUDIT_EXPECT nginx apache2ctl"
     else
         # CI runner VMs: their own agents (Azure's, snapd, ...) keep writing and starting
         # things, so only what is traced to the run fails; the containers stay strict.

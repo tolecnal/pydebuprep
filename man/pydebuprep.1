@@ -72,7 +72,9 @@ and never restarts services. Each finding includes the commands to fix it, for
 you to review and run yourself. Every external command it runs is checked
 against a built\-in allowlist of read\-only commands, and every release is
 traced with strace on each supported release to prove that a run as root
-changes nothing.
+changes no system state or configuration. The few agreed side effects, such as
+the web servers' configuration tests opening their log files, are listed under
+\(lqAgreed side effects\(rq in the documentation and can be turned off.
 .PP
 Run it as root for complete results. Checks that need root are reported as
 skipped otherwise.
@@ -421,7 +423,7 @@ for each check's options.
 (services) A time synchronisation service is running and the clock is synchronised (read from the kernel, no daemon queried); service changes since the baseline
 .TP
 .B apache
-(applications) Includes that point at missing files (dangling \fBmods\-enabled\fR, \fBconf\-enabled\fR and \fBsites\-enabled\fR links), \fBLoadModule\fR files that are gone, \fBunix:\fR sockets (PHP\-FPM \fBSetHandler\fR, \fBProxyPass\fR) that don't exist (read from the files; \fBapachectl \-t\fR isn't used: it writes)
+(applications) Includes that point at missing files (dangling \fBmods\-enabled\fR, \fBconf\-enabled\fR and \fBsites\-enabled\fR links), \fBLoadModule\fR files that are gone, \fBunix:\fR sockets (PHP\-FPM \fBSetHandler\fR, \fBProxyPass\fR) that don't exist, site files skipped for not ending in \fB.conf\fR; TLS certificates that expire or that OpenSSL refuses, small DH parameters, old protocols, server names a certificate doesn't cover, and certificates served that differ from the files (from the files, a TLS probe, and as root \fBapache2ctl \-t\fR)
 .TP
 .B bind
 (applications) \fBnamed\-checkconf\fR errors (root)
@@ -439,7 +441,7 @@ for each check's options.
 (applications) MariaDB data directory not upgraded to the new server version; opt\-in probe that MariaDB or MySQL answers a ping and a query (root)
 .TP
 .B nginx
-(applications) Includes that point at missing files (dangling \fBsites\-enabled\fR and \fBmodules\-enabled\fR links), \fBload_module\fR files that are gone, \fBunix:\fR sockets in \fB*_pass\fR and upstream \fBserver\fR lines that don't exist (read from the files; \fBnginx \-t\fR isn't used: it writes)
+(applications) Includes that point at missing files (dangling \fBsites\-enabled\fR and \fBmodules\-enabled\fR links), \fBload_module\fR files that are gone, \fBunix:\fR sockets in \fB*_pass\fR and upstream \fBserver\fR lines that don't exist; TLS certificates that expire or that OpenSSL refuses, small DH parameters, old protocols, server names a certificate doesn't cover, and certificates served that differ from the files (from the files, a TLS probe, and as root \fBnginx \-t\fR)
 .TP
 .B php
 (applications) PHP extensions enabled before the upgrade (per SAPI: fpm, apache2, cli) that no PHP version enables now, and SAPIs that are gone; needs a snapshot

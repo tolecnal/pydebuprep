@@ -12,6 +12,7 @@ from pydebuprep.checks.base import CheckSkipped
 from pydebuprep.checks.nginx import NginxCheck
 from pydebuprep.checks.nginx import read_config as nginx_read_config
 from pydebuprep.model import Severity
+from pydebuprep.system import CommandResult
 
 # --- nginx -----------------------------------------------------------------------------
 
@@ -596,3 +597,124 @@ def test_apache_include_loops_end() -> None:
     ctx = apache_tls_ctx(files, links)
     assert ApacheCheck().run(ctx) == []
     assert apache_read_config(ctx).files.count("/etc/apache2/conf-enabled/loop.conf") == 1
+
+
+# --- configuration tests (nginx -t, apache2ctl -t) --------------------------------------
+
+NGINX_OK = "nginx: the configuration file /etc/nginx/nginx.conf syntax is ok\n" \
+    "nginx: configuration file /etc/nginx/nginx.conf test is successful\n"  # fmt: skip
+
+
+def with_config_test(ctx, argv: tuple[str, ...], result: CommandResult | None):  # type: ignore[no-untyped-def] # test helper
+    """CTX with the server's binary installed and ARGV answering RESULT."""
+    ctx.system.files[
+        {"nginx": "/usr/sbin/nginx", "apache2ctl": "/usr/sbin/apache2ctl"}[argv[0]]
+    ] = ""
+    if result is not None:
+        ctx.system.commands[argv] = result
+    return ctx
+
+
+def nginx_test(rc: int, stderr: str, **kw):  # type: ignore[no-untyped-def] # test helper
+    result = CommandResult(("nginx", "-t"), rc, "", stderr)
+    return NginxCheck(kw).run(with_config_test(nginx_ctx(), ("nginx", "-t"), result))
+
+
+def test_config_test_ok() -> None:
+    assert nginx_test(0, NGINX_OK) == []
+
+
+def test_config_test_error_is_critical() -> None:
+    stderr = (
+        'nginx: [emerg] unknown directive "foo" in /etc/nginx/sites-enabled/default:3\n'
+        "nginx: configuration file /etc/nginx/nginx.conf test failed\n"
+    )
+    [finding] = nginx_test(1, stderr)
+    assert (finding.severity, finding.title) == (
+        Severity.CRITICAL,
+        "nginx rejects its configuration",
+    )
+    assert finding.evidence == [
+        'nginx: [emerg] unknown directive "foo" in /etc/nginx/sites-enabled/default:3'
+    ]
+    assert any("sudo nginx -t" in r for r in finding.remediation)
+
+
+def test_config_test_error_without_known_lines_shows_the_output() -> None:
+    [finding] = nginx_test(1, "\n".join(f"line {n}" for n in range(15)))
+    assert finding.evidence == [f"line {n}" for n in range(10)]
+
+
+def test_config_test_warnings_info() -> None:
+    stderr = 'nginx: [warn] the "listen ... http2" directive is deprecated\n' + NGINX_OK
+    [finding] = nginx_test(0, stderr)
+    assert (finding.severity, finding.title) == (
+        Severity.INFO,
+        "nginx's configuration test gives warnings",
+    )
+    assert finding.evidence == ['nginx: [warn] the "listen ... http2" directive is deprecated']
+
+
+def test_config_test_needs_root() -> None:
+    ctx = with_config_test(
+        make_ctx(files={**nginx_ctx().system.files}, links=nginx_ctx().system.links, root=False),
+        ("nginx", "-t"),
+        None,
+    )
+    [finding] = NginxCheck().run(ctx)
+    assert (finding.severity, finding.title) == (
+        Severity.INFO,
+        "nginx's configuration test needs root; not run",
+    )
+    assert ctx.system.calls == []
+
+
+def test_config_test_off() -> None:
+    ctx = with_config_test(nginx_ctx(), ("nginx", "-t"), None)
+    assert NginxCheck({"config_test": False}).run(ctx) == []
+    assert ctx.system.calls == []
+
+
+def test_config_test_that_cannot_run_is_info() -> None:
+    result = CommandResult(("nginx", "-t"), -1, "", "", timed_out=True)
+    [finding] = NginxCheck().run(with_config_test(nginx_ctx(), ("nginx", "-t"), result))
+    assert (finding.severity, finding.title) == (
+        Severity.INFO,
+        "nginx's configuration test couldn't run",
+    )
+
+
+def test_apache_ah00558_is_info() -> None:
+    stderr = (
+        "AH00558: apache2: Could not reliably determine the server's fully qualified domain "
+        "name, using 127.0.1.1. Set the 'ServerName' directive globally to suppress this message\n"
+        "Syntax OK\n"
+    )
+    result = CommandResult(("apache2ctl", "-t"), 0, "", stderr)
+    [finding] = ApacheCheck().run(with_config_test(apache_ctx(), ("apache2ctl", "-t"), result))
+    assert (finding.severity, finding.title) == (
+        Severity.INFO,
+        "Apache's configuration test gives warnings",
+    )
+    assert finding.evidence == [stderr.splitlines()[0]]
+
+
+def test_apache_config_test_error() -> None:
+    stderr = (
+        "AH00526: Syntax error on line 3 of /etc/apache2/sites-enabled/app.conf:\n"
+        "Invalid command 'Foo', perhaps misspelled or defined by a module not included\n"
+        "Action '-t' failed.\n"
+    )
+    result = CommandResult(("apache2ctl", "-t"), 1, "", stderr)
+    [finding] = ApacheCheck().run(with_config_test(apache_ctx(), ("apache2ctl", "-t"), result))
+    assert (finding.severity, finding.title) == (
+        Severity.CRITICAL,
+        "Apache rejects its configuration",
+    )
+    assert finding.evidence == stderr.splitlines()
+    assert (
+        ApacheCheck({"config_test": False}).run(
+            with_config_test(apache_ctx(), ("apache2ctl", "-t"), result)
+        )
+        == []
+    )

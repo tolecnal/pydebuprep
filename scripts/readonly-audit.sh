@@ -33,7 +33,12 @@ set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 out=${1:-$(mktemp -d)}
 mkdir -p "$out"
-syscalls=execve,open,openat,openat2,creat,unlink,unlinkat,rename,renameat,renameat2,mkdir,mkdirat,rmdir,link,linkat,symlink,symlinkat,chmod,fchmod,fchmodat,chown,fchown,fchownat,lchown,truncate,ftruncate,utime,utimes,utimensat,futimesat,mknod,mknodat,mount,umount2,setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr,kill,tkill,tgkill,reboot,init_module,finit_module,delete_module,sethostname,setdomainname,settimeofday,clock_settime,adjtimex,clock_adjtime,swapon,swapoff,pivot_root,chroot,acct,quotactl,syslog,fallocate
+syscalls=execve,clone,clone3,fork,vfork,open,openat,openat2,creat,unlink,unlinkat,rename,renameat,renameat2,mkdir,mkdirat,rmdir,link,linkat,symlink,symlinkat,chmod,fchmod,fchmodat,chown,fchown,fchownat,lchown,truncate,ftruncate,utime,utimes,utimensat,futimesat,mknod,mknodat,mount,umount2,setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr,kill,tkill,tgkill,reboot,init_module,finit_module,delete_module,sethostname,setdomainname,settimeofday,clock_settime,adjtimex,clock_adjtime,swapon,swapoff,pivot_root,chroot,acct,quotactl,syslog,fallocate
+# Side effects agreed with the user (docs/about/read-only.md, "Agreed side effects"):
+# files the web servers' configuration tests may create. Listed, not counted; strace
+# (readonly-audit.py's AGREED_WRITES) still checks which program changed them, and how.
+# Fixed here on purpose: agreeing to another is a code change, not a setting.
+AGREED_PATHS="/var/lib/nginx/ /var/log/nginx/"
 status=0
 unattributed=${AUDIT_UNATTRIBUTED:-fail}
 systemd=
@@ -46,8 +51,9 @@ changed_between() {  # START END: changed after START and not after END (some fi
         2>/dev/null | grep -vx "$1" | grep -vx "$2" | grep -vx /tmp || true
 }
 
-ignored() {  # 1|0: print the stdin paths that are (1) or aren't (0) under AUDIT_IGNORE
-    awk -v want="$1" -v prefixes="${AUDIT_IGNORE:-}" '
+ignored() {  # 1|0 [PREFIXES]: print the stdin paths that are (1) or aren't (0) under
+    # PREFIXES (default: AUDIT_IGNORE)
+    awk -v want="$1" -v prefixes="${2-${AUDIT_IGNORE:-}}" '
         BEGIN { n = split(prefixes, p, " ") }
         NF { hit = 0
              for (i = 1; i <= n; i++) if (index($0, p[i]) == 1 || $0 "/" == p[i]) hit = 1
@@ -88,6 +94,12 @@ audit() {  # NAME ALLOWED_PREFIX COMMAND...
     sleep 1.1; end=$(mktemp)
     changed=$(changed_between "$marker" "$end" | grep -v "^${allow:-/nonexistent}" || true)
     rm -f "$marker" "$end"
+    agreed=$(printf '%s\n' "$changed" | ignored 1 "$AGREED_PATHS")
+    changed=$(printf '%s\n' "$changed" | ignored 0 "$AGREED_PATHS")
+    if [ -n "$agreed" ]; then
+        echo "Changed as agreed (docs/about/read-only.md, Agreed side effects), not counted:"
+        echo "$agreed"
+    fi
     noise=$(printf '%s\n' "$changed" | ignored 1)
     real=$(printf '%s\n' "$changed" | ignored 0)
     if [ -n "$noise" ]; then

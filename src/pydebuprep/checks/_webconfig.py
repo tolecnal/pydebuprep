@@ -15,8 +15,15 @@ from dataclasses import dataclass
 from typing import Any
 
 from pydebuprep.checks._listeners import listening_sockets, unit_listeners
-from pydebuprep.checks.base import Context
+from pydebuprep.checks.base import CommandFailed, Context, Option, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
+
+CONFIG_TEST_OPTION = Option(
+    "config_test", True,
+    "As root, run the server's own configuration test (nginx -t, apache2ctl -t); it may "
+    "create the server's PID file, log files and run directories (see Agreed side effects)",
+)  # fmt: skip
+CONFIG_TEST_LINES = 10
 
 # Configurations to follow at most, against include loops and enormous trees.
 MAX_FILES = 500
@@ -252,3 +259,51 @@ def web_compare(
                 )
             )
     return found
+
+
+def config_test_findings(
+    ctx: Context, server: str, argv: tuple[str, str], *,
+    error: re.Pattern[str], warning: re.Pattern[str],
+) -> list[Finding]:  # fmt: skip
+    """What the server's own configuration test (ARGV) says: CRITICAL when it fails,
+    with the lines matching ERROR (or the first lines); INFO for lines matching WARNING
+    when it passes. Root only: the test opens the server's logs and PID file."""
+    command = " ".join(argv)
+    if not ctx.is_root:
+        return [
+            Finding(
+                Severity.INFO,
+                f"{server}'s configuration test needs root; not run",
+                detail=f"`{command}` opens {server}'s log and run files, which only root may.",
+                remediation=["Run as root: sudo pydebuprep report"],
+            )
+        ]
+    try:
+        res = run_checked(ctx, argv, ok_codes=None)
+    except CommandFailed as exc:
+        return [
+            Finding(Severity.INFO, f"{server}'s configuration test couldn't run", detail=str(exc))
+        ]
+    lines = [line.strip() for line in (res.stdout + res.stderr).splitlines() if line.strip()]
+    if res.returncode != 0:
+        errors = [line for line in lines if error.search(line)] or lines
+        return [
+            Finding(
+                Severity.CRITICAL,
+                f"{server} rejects its configuration",
+                detail=f"{server} won't start or reload until it's fixed.",
+                evidence=truncate_evidence(errors[:CONFIG_TEST_LINES]),
+                remediation=[f"See the whole output: sudo {command}"],
+            )
+        ]
+    warnings = [line for line in lines if warning.search(line)]
+    if not warnings:
+        return []
+    return [
+        Finding(
+            Severity.INFO,
+            f"{server}'s configuration test gives warnings",
+            detail="The configuration works, but these may stop working in a later version.",
+            evidence=truncate_evidence(warnings[:CONFIG_TEST_LINES]),
+        )
+    ]

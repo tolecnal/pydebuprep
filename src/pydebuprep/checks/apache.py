@@ -18,8 +18,10 @@ from pydebuprep.checks._tls import (
     validate_cert_days,
 )
 from pydebuprep.checks._webconfig import (
+    CONFIG_TEST_OPTION,
     MAX_FILES,
     Ref,
+    config_test_findings,
     findings,
     had_listeners,
     include,
@@ -37,6 +39,11 @@ MAIN = f"{SERVER_ROOT}/apache2.conf"
 WORD = re.compile(r'"((?:\\.|[^"\\])*)"|(\S+)')
 ENABLED_DIRS = ("conf-enabled", "sites-enabled")  # Debian includes only *.conf from these
 VHOST_OPEN, VHOST_CLOSE = "<virtualhost", "</virtualhost"
+
+CONFIG_TEST = ("apache2ctl", "-t")
+CONFIG_TEST_BINARY = "/usr/sbin/apache2ctl"
+CONFIG_TEST_ERROR = re.compile(r".")
+CONFIG_TEST_WARNING = re.compile(r"\bAH\d{5}:")
 
 
 def directives(text: str) -> Iterator[tuple[str, list[str]]]:
@@ -216,7 +223,7 @@ class ApacheCheck(Check):
     id = "apache"
     title = "Apache configuration references"
     category = "applications"
-    options = (*CERT_OPTIONS, TLS_PROBE_OPTION)
+    options = (*CERT_OPTIONS, TLS_PROBE_OPTION, CONFIG_TEST_OPTION)
 
     def collect_baseline(self, ctx: Context) -> Any | None:
         if not ctx.system.exists(MAIN):
@@ -256,4 +263,8 @@ class ApacheCheck(Check):
         found += name_findings(ctx, "Apache", cfg.sites)
         if self.opt("tls_probe"):
             found += served_findings(ctx, "Apache", "apache2", cfg.sites)
+        if self.opt("config_test") and ctx.system.exists(CONFIG_TEST_BINARY):
+            found += config_test_findings(
+                ctx, "Apache", CONFIG_TEST, error=CONFIG_TEST_ERROR, warning=CONFIG_TEST_WARNING
+            )
         return found

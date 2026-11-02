@@ -144,3 +144,70 @@ def test_relative_unlink_outside_tmp_is_still_a_violation(tmp_path: Path) -> Non
     rc, out = audit(tmp_path, trace)
     assert rc == 1
     assert out.count("VIOLATION") == 2
+
+
+# --- side effects agreed with the user (docs/about/read-only.md, Agreed side effects) ---
+
+NGINX_T = '200 execve("/usr/sbin/nginx", ["nginx", "-t"], 0x7ffd /* 3 vars */) = 0\n'
+NGINX_WRITES = (
+    '{pid} openat(AT_FDCWD, "/run/nginx.pid", O_RDWR|O_CREAT, 0644) = 3\n'
+    '{pid} mkdir("/var/lib/nginx/body", 0700) = 0\n'
+    '{pid} chown("/var/lib/nginx/body", 33, -1) = 0\n'
+    '{pid} openat(AT_FDCWD, "/var/log/nginx/error.log", O_WRONLY|O_CREAT|O_APPEND, 0644) = 4\n'
+)
+APACHE_T = (
+    '300 execve("/usr/sbin/apache2ctl", ["apache2ctl", "-t"], 0x7ffd /* 3 vars */) = 0\n'
+    "300 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f) = 301\n"
+    '301 execve("/usr/bin/mkdir", ["mkdir", "-p", "/var/run/apache2"], 0x7ffd /* 3 vars */) = 0\n'
+    '301 mkdir("/var", 0777) = -1 EEXIST (File exists)\n'
+    '301 mkdir("apache2", 0777) = 0\n'
+    "300 vfork() = 302\n"
+    '302 mkdir("/var/run/apache2/socks.QLkiUB9GMN", 0700) = 0\n'
+    "302 clone3({flags=CLONE_VM|CLONE_VFORK, exit_signal=SIGCHLD}, 88) = 303\n"
+    '303 fchmodat(AT_FDCWD, "/var/run/apache2/socks.QLkiUB9GMN", 0755) = 0\n'
+    '303 fchownat(AT_FDCWD, "/var/run/apache2/socks.QLkiUB9GMN", 33, -1, 0) = 0\n'
+    '303 renameat2(AT_FDCWD, "/var/run/apache2/socks.QLkiUB9GMN", AT_FDCWD, "/var/run/apache2/socks", RENAME_NOREPLACE) = 0\n'
+    "300 fork() = 304\n"
+    '304 mkdir("/var/lock/apache2.lDX9CZuwm0", 0700) = 0\n'
+    '304 rename("/var/lock/apache2.lDX9CZuwm0", "/var/lock/apache2") = 0\n'
+)
+
+
+def test_agreed_nginx_writes_pass(tmp_path: Path) -> None:
+    code, out = audit(tmp_path, NGINX_T + NGINX_WRITES.format(pid=200))
+    assert code == 0, out
+
+
+def test_agreed_apache_writes_pass(tmp_path: Path) -> None:
+    code, out = audit(tmp_path, APACHE_T)
+    assert code == 0, out
+
+
+def test_agreed_writes_need_the_program(tmp_path: Path) -> None:
+    # The same writes by apt-mark (pid 100), or by a process that apache2ctl didn't start.
+    code, out = audit(tmp_path, NGINX_WRITES.format(pid=100))
+    assert code == 1 and out.count("VIOLATION") == 4, out
+    code, out = audit(tmp_path, '400 mkdir("/var/run/apache2/socks", 0700) = 0\n')
+    assert code == 1, out
+
+
+def test_truncating_a_log_fails(tmp_path: Path) -> None:
+    trace = (
+        NGINX_T
+        + '200 openat(AT_FDCWD, "/var/log/nginx/error.log", O_WRONLY|O_CREAT|O_TRUNC, 0644) = 3\n'
+    )
+    assert audit(tmp_path, trace)[0] == 1
+
+
+def test_other_paths_fail(tmp_path: Path) -> None:
+    for line in (
+        '200 openat(AT_FDCWD, "/etc/nginx/x", O_WRONLY|O_CREAT, 0644) = 3\n',
+        '200 openat(AT_FDCWD, "/run/nginx.pid", O_RDWR|O_CREAT|O_TRUNC, 0644) = 3\n',
+        '200 mkdir("/var/lib/nginx/other", 0700) = 0\n',
+        '200 unlink("/run/nginx.pid") = 0\n',
+    ):
+        assert audit(tmp_path, NGINX_T + line)[0] == 1, line
+
+
+def test_process_creation_is_not_a_change(tmp_path: Path) -> None:
+    assert audit(tmp_path, "100 clone(child_stack=NULL, flags=SIGCHLD) = 101\n")[0] == 0

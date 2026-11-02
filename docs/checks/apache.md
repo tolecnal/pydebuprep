@@ -34,7 +34,8 @@ For TLS, following includes where they stand, so a directive belongs to the
   level (RSA or DSA under 2048 bits, EC under 224 bits, MD5 or SHA-1 signatures);
 - DH parameters (`SSLOpenSSLConfCmd DHParameters`, or appended to the certificate
   file) have at least 2048 bits;
-- `SSLProtocol` enables TLSv1.2 or TLSv1.3;
+- `SSLProtocol` enables TLSv1.2 or TLSv1.3 (older ones next to them, as in the stock
+  `all -SSLv3`, are harmless and not reported);
 - the certificate of each virtual host with `SSLEngine on` covers its `ServerName`
   and `ServerAlias` names.
 
@@ -45,6 +46,10 @@ renewed but Apache wasn't reloaded, so it still serves the old one. It connects 
 where this host listens: a wildcard listen on loopback, a specific address only if the
 kernel lists it as listening. At most 50 connections, 5 seconds each; the certificate
 isn't verified, only compared. Apache logs each connection in its access log.
+
+As root, unless `config_test` is off, it also runs `apache2ctl -t`, Apache's own check of the
+whole configuration: syntax, directives modules no longer provide, and everything the
+file checks above can't see.
 
 ## Findings
 
@@ -61,11 +66,14 @@ isn't verified, only compared. Apache logs each connection in its access log.
 | critical | Apache uses keys or signatures OpenSSL refuses | Issue a new certificate with a 2048-bit or larger RSA key, or an EC key. |
 | critical | Apache uses DH parameters OpenSSL refuses | `openssl dhparam -out PATH 2048`. |
 | critical | Apache enables only TLS protocols OpenSSL refuses | `SSLProtocol -all +TLSv1.2 +TLSv1.3` |
-| warning | Apache enables TLS protocols OpenSSL refuses | Remove the old protocols from `SSLProtocol`; they're refused anyway. |
 | warning | Apache has certificates that don't cover their server names | Add the names to the certificate, or remove them from `ServerName`/`ServerAlias`. |
 | info | Apache's certificates were not checked (needs root) | Run as root. |
 | warning | Apache serves different certificates than its configuration names | `sudo systemctl reload apache2`. |
 | info | Apache: some TLS sites didn't answer the probe | The evidence says why; a site that doesn't answer on its address can't be compared. |
+| critical | Apache rejects its configuration | The evidence has the errors; `sudo apache2ctl -t` shows the whole output. Fix them before Apache is restarted or reloaded. |
+| info | Apache's configuration test gives warnings | Nothing breaks yet; deprecated directives may stop working in a later version. |
+| info | Apache's configuration test needs root; not run | Run as root. |
+| info | Apache's configuration test couldn't run | It timed out or failed to start; the detail says why. |
 
 ## Compared with a snapshot
 
@@ -93,11 +101,20 @@ for the unit's control group, to find the ports its processes hold:
 systemctl show --property=Id,Names,LoadState,ActiveState,SubState,UnitFileState,ConditionResult,ConditionTimestamp,TriggeredBy,Requires,BindsTo,ControlGroup -- apache2.service
 ```
 
-`apachectl -t` would check more, but it creates run and lock directories.
+As root, with `config_test` on (the default), it runs Apache's own configuration test:
+
+```sh
+apache2ctl -t
+```
+
+This is one of pydebuprep's [agreed side effects](../about/read-only.md#agreed-side-effects):
+`apache2ctl -t` creates `/run/apache2` (with `socks` in it) and `/run/lock/apache2` if
+they're missing, as Apache's own start-up would. Turn it off with `config_test: false`.
 
 ## Limitations
 
-- Only paths are checked, not the syntax or the meaning of the configuration.
+- Without root, or with `config_test` off, only paths are checked, not the syntax or
+  the meaning of the configuration.
 - Paths built from variables (`${APACHE_LOG_DIR}`) are left out, and so are sockets
   named in section tags such as `<Proxy "unix:...">`.
 - Directives inside `<IfModule>` and `<IfDefine>` are checked whether or not they

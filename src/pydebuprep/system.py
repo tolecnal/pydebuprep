@@ -60,6 +60,12 @@ ALLOWED_COMMANDS: set[tuple[str, ...]] = {
     ("apt-get", "check"),
     ("apt-get", "-s", "autoremove"),
     ("ldconfig", "-p"),  # prints /etc/ld.so.cache; never rebuilds it
+    # The web servers' own configuration tests. Side effects agreed with the user and
+    # listed in docs/about/read-only.md ("Agreed side effects"): nginx opens its PID
+    # file and logs (creating them if missing) and creates its temp directories;
+    # apache2ctl creates its run and lock directories. Checked by readonly-audit.py.
+    ("nginx", "-t"),
+    ("apache2ctl", "-t"),
     ("apt-get", "-s", "upgrade"),
     ("apt", "list", "--upgradable"),
     ("apt", "list", "--installed"),

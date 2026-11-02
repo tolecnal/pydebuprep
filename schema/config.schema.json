@@ -21,6 +21,11 @@
               "description": "Warn when a TLS certificate expires within this many days",
               "type": "integer"
             },
+            "config_test": {
+              "default": true,
+              "description": "As root, run the server's own configuration test (nginx -t, apache2ctl -t); it may create the server's PID file, log files and run directories (see Agreed side effects)",
+              "type": "boolean"
+            },
             "enabled": {
               "default": true,
               "type": "boolean"
@@ -597,6 +602,11 @@
               "default": 28,
               "description": "Warn when a TLS certificate expires within this many days",
               "type": "integer"
+            },
+            "config_test": {
+              "default": true,
+              "description": "As root, run the server's own configuration test (nginx -t, apache2ctl -t); it may create the server's PID file, log files and run directories (see Agreed side effects)",
+              "type": "boolean"
             },
             "enabled": {
               "default": true,
