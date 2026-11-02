@@ -225,40 +225,26 @@ def dhparam_findings(
 
 
 def protocol_findings(server: str, settings: Sequence[tuple[frozenset[str], str]]) -> list[Finding]:
-    """Protocol settings ((enabled protocols, where) pairs) that OpenSSL refuses."""
-    only: list[str] = []
-    some: list[str] = []
-    for protocols, where in settings:
-        refused = protocols & REFUSED_PROTOCOLS
-        if not refused:
-            continue
-        line = f"{' '.join(sorted(protocols))} {where}"
-        (only if refused == protocols else some).append(line)
-    fix = ["Enable TLSv1.2 and TLSv1.3 (for nginx: ssl_protocols TLSv1.2 TLSv1.3;)"]
-    found = []
-    if only:
-        found.append(
-            Finding(
-                Severity.CRITICAL,
-                f"{server} enables only TLS protocols OpenSSL refuses",
-                detail="OpenSSL no longer negotiates SSL, TLS 1.0 or TLS 1.1 by default, so "
-                "no client can connect.",
-                evidence=truncate_evidence(only),
-                remediation=fix,
-            )
+    """Protocol settings ((enabled protocols, where) pairs) that enable only protocols
+    OpenSSL refuses. Old protocols next to TLS 1.2 or later are harmless (OpenSSL
+    doesn't negotiate them) and in Ubuntu's stock configurations, so they're left out."""
+    only = [
+        f"{' '.join(sorted(protocols))} {where}"
+        for protocols, where in settings
+        if protocols and protocols <= REFUSED_PROTOCOLS
+    ]
+    if not only:
+        return []
+    return [
+        Finding(
+            Severity.CRITICAL,
+            f"{server} enables only TLS protocols OpenSSL refuses",
+            detail="OpenSSL no longer negotiates SSL, TLS 1.0 or TLS 1.1 by default, so "
+            "no client can connect.",
+            evidence=truncate_evidence(only),
+            remediation=["Enable TLSv1.2 and TLSv1.3 (for nginx: ssl_protocols TLSv1.2 TLSv1.3;)"],
         )
-    if some:
-        found.append(
-            Finding(
-                Severity.WARNING,
-                f"{server} enables TLS protocols OpenSSL refuses",
-                detail="OpenSSL no longer negotiates SSL, TLS 1.0 or TLS 1.1 by default; "
-                "listing them does nothing.",
-                evidence=truncate_evidence(some),
-                remediation=fix,
-            )
-        )
-    return found
+    ]
 
 
 def apache_protocols(words: Sequence[str]) -> frozenset[str]:

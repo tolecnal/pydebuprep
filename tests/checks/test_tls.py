@@ -184,11 +184,10 @@ def test_protocols() -> None:
         "nginx enables only TLS protocols OpenSSL refuses",
     )
     assert only.evidence == ["TLSv1 TLSv1.1 (ssl_protocols in a)"]
-    [some] = protocol_findings("nginx", [(mixed, "(b)")])
-    assert (some.severity, some.title) == (
-        Severity.WARNING,
-        "nginx enables TLS protocols OpenSSL refuses",
-    )
+    # Old protocols next to TLS 1.2+ are harmless (OpenSSL won't negotiate them) and in
+    # the stock configurations of Ubuntu's nginx and Apache, so they aren't reported.
+    stock = frozenset({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"})
+    assert protocol_findings("nginx", [(mixed, "(b)"), (stock, "(e)")]) == []
     assert protocol_findings("nginx", [(modern, "(c)"), (frozenset(), "(d)")]) == []
 
 

@@ -2,7 +2,8 @@
 
 pydebuprep is usually run as root, on a production server, right after the most
 disruptive thing that happens to it — a release upgrade. So the most important thing
-about it is that it **changes nothing**. That's enforced at three levels.
+about it is that it **changes no system state or configuration**. That's enforced at
+three levels, and the few [agreed side effects](#agreed-side-effects) are listed below.
 
 ## 1. It only runs allowlisted commands
 
@@ -24,7 +25,7 @@ Some commands that look read-only aren't, and pydebuprep uses alternatives:
 | `apt …` as plain | as root, apt takes locks, regenerates its binary caches, and writes its solver log | every apt command gets options that disable locking, the caches and the solver log |
 | `ufw status` | writes a lock file | ufw's configuration plus the loaded rules |
 | `postfix check` | creates missing directories | `postconf -n` |
-| `nginx -t`, `apache2ctl -t` | write PID files, caches and logs | not used; a broken config shows as a failed unit |
+| `nginx -t`, `apache2ctl -t` | open or create PID files, logs and run directories | run only as an [agreed side effect](#agreed-side-effects), and can be turned off |
 | `docker …` with only `docker.socket` active | would start the daemon | the check is skipped unless `docker.service` runs |
 | `nft list ruleset` without `nf_tables` loaded | would make the kernel load the module | rules are listed only for loaded modules |
 | `needrestart` | can restart services | only its list mode (`-r l`) |
@@ -61,7 +62,8 @@ with something to autoremove; 0.3.1 fixed it.
 ## What it does write
 
 The hard rule: pydebuprep **never changes the system's state or any file the
-operating system uses.** Within that, it writes only:
+operating system uses.** Within that, it writes only (besides the
+[agreed side effects](#agreed-side-effects) of other programs it runs):
 
 - **the snapshot file**, when you run `snapshot`;
 - **the report file you asked for** with `--output` or `--output-dir` (never
@@ -82,6 +84,25 @@ The audit holds pydebuprep to this: a scratch file that outlives the run, or a w
 anywhere else, fails it. It also runs a report against a stand-in portal, once with
 the portal up and once with it down, where writes outside `/var/lib/pydebuprep` fail
 it the same way.
+
+## Agreed side effects
+
+A few checks are worth more than the strict rule allows, so their side effects were
+agreed on one by one. None of them changes the system's configuration or state, or
+writes into a file another program uses. The web server checks' `config_test` and
+`tls_probe` are on by default and can be turned off; the database and container
+checks' `probe` is off unless turned on. The audit checks them: it allows exactly
+these writes, and only by the program they were agreed for.
+
+| What | Triggered by | What it writes or causes | Turn off with |
+|---|---|---|---|
+| nginx's configuration test, `nginx -t` | the [nginx](../checks/nginx.md) check, as root | opens `/run/nginx.pid`, creating it (empty) if nginx isn't running, without writing to it; opens the log files the configuration names for appending, creating missing ones, without writing to them; creates its temporary directories under `/var/lib/nginx` (`body`, `proxy`, `fastcgi`, `uwsgi`, `scgi`, owned by `www-data`) if they're missing | `checks: nginx: config_test: false` |
+| Apache's configuration test, `apache2ctl -t` | the [apache](../checks/apache.md) check, as root | creates `/run/apache2` (with `socks` in it) and `/run/lock/apache2` if they're missing, as Apache's start-up would | `checks: apache: config_test: false` |
+| TLS probe of this host's own sites | the [nginx](../checks/nginx.md) and [apache](../checks/apache.md) checks (`tls_probe`) | one TLS connection per site name, to loopback or an address this host listens on, at most 50; the web server logs each in its access log | `checks: nginx: tls_probe: false` (and the same for `apache`) |
+| Readiness probes of databases and containers | the [postgresql](../checks/postgresql.md), [mariadb](../checks/mariadb.md) and [docker](../checks/docker.md) checks, only with `probe: true` | a login and `SELECT 1`, or a TCP connection or HTTP request to a published port; the service may log it | off unless `probe: true` |
+
+Writes to the system journal or syslog that these cause are in the same class: a
+record that something looked, never a change of what is configured.
 
 ## What "read-only" can't cover
 

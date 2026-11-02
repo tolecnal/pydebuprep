@@ -78,11 +78,19 @@ ssh-server, the boot critical chain, the `/` and `/var` free-space floor, and th
 application checks postgresql, mariadb, postfix, bind, docker and python-venvs. Each
 passes `scripts/readonly-audit.sh` with the service installed.
 
+Done on 2026-11-02, for the next release: TLS certificates, crypto OpenSSL refuses and
+server names in the nginx and apache checks; their modules, configuration files and
+listeners compared with the snapshot; a probe comparing served certificates with the
+files; `nginx -t` and `apache2ctl -t` as the first agreed side effects (listed in
+docs/about/read-only.md); and the php and certbot checks.
+
+- [ ] The project still calls itself "read-only" while a few side effects are agreed
+      (docs/about/read-only.md, Agreed side effects). The maintainer expects to
+      rephrase that wholesale at some point; the docs now say "changes no system
+      state or configuration".
+
 - [ ] Dropped from the wish list, with reasons:
       - WireGuard/OpenVPN tunnels: covered by the network check's interface comparison;
-      - nginx and Apache config tests: `nginx -t` writes its PID file, cache directories
-        and logs; `apache2ctl -t` creates run directories. A broken config still shows
-        up in systemd-failed once the service fails to start;
       - `postfix check`: creates missing directories, so postfix uses `postconf -n`;
       - Podman, LXD (`lxc`) and libvirt (`virsh`) clients: they create configuration or
         storage directories on first use, or need a daemon that may not be running;

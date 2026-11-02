@@ -71,8 +71,11 @@ Every pull request builds the site; merges to `main` publish it.
 7. Prove it's read-only: run the new command under `scripts/readonly-audit.sh` as
    root with the service it inspects installed, and add that package to
    `scripts/ci-readonly-audit.sh` (and the command to `AUDIT_EXPECT` there) so every
-   pull request is audited with it. Some obvious commands write (`nginx -t`,
-   `postfix check`, `ufw status`); don't use those.
+   pull request is audited with it. Some obvious commands write (`postfix check`,
+   `ufw status`); don't use those. A side effect that's worth it (like `nginx -t`
+   opening its logs) needs the maintainer's explicit agreement, an entry in
+   `AGREED_WRITES` in `scripts/readonly-audit.py` and a row under
+   [Agreed side effects](read-only.md#agreed-side-effects).
 
 ## Security guardrails
 

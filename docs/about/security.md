@@ -20,7 +20,7 @@ packages that pass both checks.
 
 - Every command pydebuprep runs must match a complete entry in a read-only
   allowlist, and every pull request and release is traced to prove a root run
-  changes nothing. See [Read-only by design](read-only.md).
+  changes no system state or configuration. See [Read-only by design](read-only.md).
 - Reports may contain text from logs and files written by other users; the
   human-readable formats escape it and strip terminal control sequences. Saved
   reports read back by `convert` are validated field by field, and YAML is loaded
