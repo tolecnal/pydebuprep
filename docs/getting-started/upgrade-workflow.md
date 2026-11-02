@@ -67,6 +67,37 @@ until it's clean, or until what's left is expected. Settings in the
 [configuration file](../configuration/index.md) can silence findings that are
 expected on your systems.
 
+## Upgrading in several steps
+
+Ubuntu upgrades one LTS at a time (22.04 → 24.04 → 26.04), and Debian one release at
+a time. Repeat the workflow for each step: a snapshot before it, a report after it.
+
+```sh
+sudo pydebuprep snapshot   # on 22.04
+sudo do-release-upgrade    # to 24.04, then reboot
+sudo pydebuprep            # compares with the 22.04 snapshot
+sudo pydebuprep snapshot   # on 24.04, before the next step
+sudo do-release-upgrade    # to 26.04, then reboot
+sudo pydebuprep            # compares with the 24.04 snapshot
+```
+
+Each report compares with the newest snapshot, so it shows what that one step
+changed. Snapshot files are named by the time they were taken (UTC) and kept, so an
+older one can still be used with `--baseline FILE`.
+
+Take each snapshot as the last thing before the upgrade: anything you change after it
+shows up as a change. A report run after you took the next snapshot, but before you
+upgraded, warns that the snapshot was taken on the current release; that's expected
+then.
+
+pydebuprep is installed from a `.deb`, not from Ubuntu's archive, so
+`do-release-upgrade` may offer to remove it with the obsolete packages at the end.
+Keep it, or install it again after the upgrade: removing it keeps the snapshots
+(only purging it deletes `/var/lib/pydebuprep`).
+
+With a [portal](../guide/portal.md#snapshots-in-the-portal), each report's page says
+which snapshot it was compared with, and the host's page shows the steps as a chain.
+
 !!! tip "Run it as root"
     Several checks need root to read what they inspect (the firewall, AppArmor,
     `sshd -t`, Docker, debsums, …). Without root they are reported as *skipped*,
