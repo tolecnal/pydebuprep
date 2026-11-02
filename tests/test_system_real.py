@@ -379,3 +379,13 @@ def test_tls_peer_certificate_has_a_deadline() -> None:
         listener.close()
     assert der is None and error is not None and "timed out" in error
     assert time.monotonic() - start < 3
+
+
+def test_probe_context_requires_tls_1_2() -> None:
+    import ssl
+
+    from pydebuprep.system import probe_context
+
+    context = probe_context()
+    assert context.minimum_version is ssl.TLSVersion.TLSv1_2
+    assert context.verify_mode is ssl.CERT_NONE and not context.check_hostname

@@ -325,6 +325,19 @@ def _decode(data: bytes | str | None) -> str:
     return data.decode("utf-8", errors="replace")
 
 
+def probe_context() -> ssl.SSLContext:
+    """The TLS client context of the certificate probe: TLS 1.2 or later (a server that
+    offers only older protocols is reported from its configuration), nothing verified
+    (the certificate is compared, not trusted), and any key size accepted, so a weak
+    certificate can still be compared."""
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    context.set_ciphers("DEFAULT:@SECLEVEL=0")
+    return context
+
+
 class System:
     """Read-only access to the running system."""
 
@@ -434,10 +447,7 @@ class System:
             ipaddress.ip_address(host)
         except ValueError:
             raise ValueError(f"not an IP address: {host!r}") from None
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        context.check_hostname = False
-        context.verify_mode = ssl.CERT_NONE  # compared, not trusted (see above)
-        context.set_ciphers("DEFAULT:@SECLEVEL=0")
+        context = probe_context()
         try:
             with (
                 socket.create_connection((host, port), timeout=timeout) as sock,
