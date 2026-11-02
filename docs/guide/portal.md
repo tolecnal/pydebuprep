@@ -84,6 +84,20 @@ only steer the read-only checks:
 - its `upload.url` must be on the same server as the config, so the token can't be
   sent anywhere else.
 
+## Snapshots in the portal
+
+Snapshots stay on the host; the portal never sees them. A report says which snapshot
+it was compared with (when it was taken, on which release and host) and which of its
+findings are changes since then, and the portal (0.5.0 and newer) shows that:
+
+- a report's page says what it was compared with, such as "an upgrade from 22.04 to
+  24.04", and lists the changes since the snapshot apart from the problems found now;
+  it warns about a snapshot taken on the same release or on another host;
+- a host's page has a Snapshot column, so an
+  [upgrade in several steps](../getting-started/upgrade-workflow.md#upgrading-in-several-steps)
+  reads as a chain: `22.04 → 24.04`, then `24.04 → 26.04`;
+- search can keep only changes since the snapshot.
+
 ## HTTPS and certificates
 
 Uploads and configs use HTTPS, with certificates checked against the system's CAs.
