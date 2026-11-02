@@ -1,3 +1,32 @@
+pydebuprep (0.9.0) unstable; urgency=medium
+
+  * nginx and apache check the TLS certificates their configuration names:
+    expired or not yet valid, and expiring within 14 days, is critical;
+    within 28 days a warning (cert_critical_days, cert_warning_days). Keys,
+    signatures and DH parameters OpenSSL refuses, settings that enable only
+    TLS older than 1.2, and server names no certificate covers are reported
+    too. Certificates are read by pydebuprep itself; no new dependency.
+  * nginx and apache compare with the snapshot: modules, configuration files
+    and listening ports that were there before the upgrade. A new PHP
+    version (libphp7.4.so to libphp8.2.so) isn't counted as a loss. Apache
+    site files skipped for not ending in .conf are reported.
+  * A probe (tls_probe, on by default) compares the certificate each TLS
+    site serves with its file, catching a server that wasn't reloaded after
+    a renewal. It connects only to listeners owned by root on this host.
+  * As root, nginx -t and apache2ctl -t run (config_test, on by default):
+    the first agreed side effects, listed under "Agreed side effects" in the
+    documentation. nginx opens its PID file and logs and may create its temp
+    directories; apache2ctl may create its run and lock directories. The
+    read-only audit allows exactly these, and no writes into those files.
+  * New check php: extensions enabled before the upgrade that the newest
+    PHP doesn't enable, per SAPI, with the packages to install.
+  * New check certbot: renewals that will fail (plugins missing for the
+    Python that runs certbot, the interpreter or its virtualenv gone) and
+    certificates certbot should have renewed.
+  * The report format is unchanged: portal 0.4.0 takes these reports.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Mon, 02 Nov 2026 19:45:00 +0100
+
 pydebuprep (0.8.0) unstable; urgency=medium
 
   * Reports carry a machine ID, so a portal can tell apart two machines that
