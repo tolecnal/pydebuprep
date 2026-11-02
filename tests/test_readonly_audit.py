@@ -265,3 +265,54 @@ def test_other_writes_are_judged_where_the_file_was_opened(tmp_path: Path) -> No
     )
     code, out = audit(tmp_path, trace)
     assert code == 0, out
+
+
+# --- lineage and exercised programs from real strace interleavings ---------------------
+
+
+def test_child_acting_before_its_parents_fork_returns(tmp_path: Path) -> None:
+    # vfork: strace prints the parent's result after the child has exec'd and worked.
+    trace = (
+        '300 execve("/usr/sbin/apache2ctl", ["apache2ctl", "-t"], 0x7ffd /* 3 vars */) = 0\n'
+        "300 vfork( <unfinished ...>\n"
+        '301 execve("/usr/bin/mkdir", ["mkdir", "/var/run/apache2/socks.X"], 0x7ffd /* 3 vars */ <unfinished ...>\n'
+        "301 <... execve resumed>)           = 0\n"
+        '301 mkdir("/var/run/apache2/socks.X", 0700) = 0\n'
+        "300 <... vfork resumed>)            = 301\n"
+    )
+    code, out = audit(tmp_path, trace)
+    assert code == 0, out
+
+
+def test_fd_based_changes_resolve_to_the_opened_path(tmp_path: Path) -> None:
+    # Newer coreutils chown opens the directory and changes it through the descriptor.
+    chown = (
+        '303 openat(AT_FDCWD, "/run/apache2/socks.7Ep4fG7g7n", O_RDONLY|O_NOCTTY|O_NONBLOCK|O_DIRECTORY|O_NOFOLLOW) = 3\n'
+        "303 fchown(3, 33, -1) = 0\n"
+    )
+    code, out = audit(
+        tmp_path, APACHE_T + "300 clone(child_stack=NULL, flags=SIGCHLD) = 303\n" + chown
+    )
+    assert code == 0, out
+    code, out = audit(tmp_path, chown.replace("303 ", "100 "))  # apt-mark: not agreed
+    assert code == 1 and "/run/apache2/socks.7Ep4fG7g7n" in out, out
+    code, out = audit(tmp_path, "100 fchmod(7, 0777) = 0\n")  # an fd we never saw opened
+    assert code == 1 and "<fd 7>" in out, out
+
+
+def test_executed_lists_programs_from_split_lines(tmp_path: Path) -> None:
+    log = tmp_path / "t.strace"
+    log.write_text(
+        '1 execve("/usr/bin/systemctl", ["systemctl"], 0x1 /* 1 vars */ <unfinished ...>\n'
+        "1 <... execve resumed>)           = 0\n"
+        '2 execve("/usr/local/bin/nginx", ["nginx", "-t"], 0x1 /* 1 vars */) = -1 ENOENT (No such file)\n'
+        '2 execve("/usr/sbin/nginx", ["nginx", "-t"], 0x1 /* 1 vars */) = 0\n'
+        '3 execve("/usr/bin/missing", ["missing"], 0x1 /* 1 vars */) = -1 ENOENT (No such file)\n'
+    )
+    res = subprocess.run(
+        [sys.executable, str(SCRIPT), "--executed", str(log)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert res.returncode == 0 and res.stdout.split() == ["nginx", "systemctl"]

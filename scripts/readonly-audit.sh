@@ -168,8 +168,11 @@ if [ -n "${AUDIT_PORTAL_URL:-}" ]; then
     fi
 fi
 
+# strace splits calls into "<unfinished ...>" and "<... resumed>" lines when processes
+# interleave; readonly-audit.py joins them.
+ran=$(python3 "$here/readonly-audit.py" --executed "$out/report.strace")
 for program in ${AUDIT_EXPECT:-}; do
-    if grep -Eq "execve\(\"[^\"]*/$program\", .*\) = 0$" "$out/report.strace"; then
+    if printf '%s\n' "$ran" | grep -qx -- "$program"; then
         echo "exercised: $program"
     else
         echo "NOT EXERCISED: report never ran $program"; status=1
