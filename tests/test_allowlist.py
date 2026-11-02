@@ -100,7 +100,7 @@ def test_system_reads_only_regular_files_with_nonblock_and_nofollow() -> None:
 
 def test_registry_ids_unique_and_kebab() -> None:
     ids = [cls.id for cls in checks.ALL_CHECKS]
-    assert len(ids) == 40
+    assert len(ids) == 42
     assert len(set(ids)) == len(ids)
     for cls in checks.ALL_CHECKS:
         assert re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", cls.id), cls.id
@@ -125,3 +125,19 @@ def test_full_report_non_root_has_no_errors(capsys: pytest.CaptureFixture[str]) 
     system.root = False
     main(["report", "--format", "json", "--no-baseline"], system=system)
     assert '"status": "error"' not in capsys.readouterr().out
+
+
+def test_allowlist_has_exact_config_tests() -> None:
+    from pydebuprep.system import DisallowedCommandError, check_allowed
+
+    check_allowed(["nginx", "-t"])
+    check_allowed(["apache2ctl", "-t"])
+    for argv in (
+        ["nginx", "-t", "-c", "/tmp/x.conf"],
+        ["nginx", "-s", "reload"],
+        ["nginx", "-T"],
+        ["apache2ctl", "graceful"],
+        ["apache2ctl", "-t", "-f", "/tmp/x.conf"],
+    ):
+        with pytest.raises(DisallowedCommandError):
+            check_allowed(argv)

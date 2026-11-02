@@ -5,16 +5,20 @@
 #   source <(pydebuprep completion zsh)
 
 _pydebuprep_checks() {
-    _values -s , 'check' apache apparmor apt-autoremove apt-held apt-lists-age apt-sources apt-upgradable bind boot-space boot-time bootloader config-conflicts cron debsums disk-space dkms dmesg-errors docker dpkg-audit dpkg-rc firewall fstab journal-errors kernel-running libvirt mariadb needrestart network nginx obsolete-packages os-release postfix postgresql python-venvs ssh-server systemd-critical-services systemd-failed systemd-timers time-sync unattended-upgrades
+    _values -s , 'check' apache apparmor apt-autoremove apt-held apt-lists-age apt-sources apt-upgradable bind boot-space boot-time bootloader certbot config-conflicts cron debsums disk-space dkms dmesg-errors docker dpkg-audit dpkg-rc firewall fstab journal-errors kernel-running libvirt mariadb needrestart network nginx obsolete-packages os-release php postfix postgresql python-venvs ssh-server systemd-critical-services systemd-failed systemd-timers time-sync unattended-upgrades
 }
 
 _pydebuprep_check_options() {
     if [[ $PREFIX == *=* ]]; then
         local -a values
         case ${PREFIX%%=*} in
+        apache.config_test) values=(true false) ;;
+        apache.tls_probe) values=(true false) ;;
         disk-space.include_remote) values=(true false) ;;
         docker.probe) values=(true false) ;;
         mariadb.probe) values=(true false) ;;
+        nginx.config_test) values=(true false) ;;
+        nginx.tls_probe) values=(true false) ;;
         postgresql.probe) values=(true false) ;;
         systemd-critical-services.builtin) values=(true false) ;;
         esac
@@ -23,7 +27,7 @@ _pydebuprep_check_options() {
         return
     fi
     local -a opts
-    opts=(apt-lists-age.max_age_days= boot-space.critical_pct= boot-space.warning_pct= config-conflicts.critical_paths= config-conflicts.ignore_paths= debsums.timeout_seconds= disk-space.critical_pct= disk-space.exclude_mounts= disk-space.important_mounts= disk-space.include_remote= disk-space.min_free_mib= disk-space.warning_pct= dmesg-errors.ignore= docker.http_probes= docker.ignore_containers= docker.probe= journal-errors.ignore= mariadb.credentials_file= mariadb.probe= network.ignore_interfaces= postgresql.credentials_file= postgresql.probe= python-venvs.exclude_paths= python-venvs.max_depth= python-venvs.search_paths= systemd-critical-services.builtin= systemd-critical-services.ignore_units= systemd-critical-services.required_active= systemd-critical-services.required_enabled= systemd-failed.ignore_units= systemd-timers.ignore_units=)
+    opts=(apache.cert_critical_days= apache.cert_warning_days= apache.config_test= apache.tls_probe= apt-lists-age.max_age_days= boot-space.critical_pct= boot-space.warning_pct= certbot.cert_critical_days= certbot.cert_warning_days= config-conflicts.critical_paths= config-conflicts.ignore_paths= debsums.timeout_seconds= disk-space.critical_pct= disk-space.exclude_mounts= disk-space.important_mounts= disk-space.include_remote= disk-space.min_free_mib= disk-space.warning_pct= dmesg-errors.ignore= docker.http_probes= docker.ignore_containers= docker.probe= journal-errors.ignore= mariadb.credentials_file= mariadb.probe= network.ignore_interfaces= nginx.cert_critical_days= nginx.cert_warning_days= nginx.config_test= nginx.tls_probe= postgresql.credentials_file= postgresql.probe= python-venvs.exclude_paths= python-venvs.max_depth= python-venvs.search_paths= systemd-critical-services.builtin= systemd-critical-services.ignore_units= systemd-critical-services.required_active= systemd-critical-services.required_enabled= systemd-failed.ignore_units= systemd-timers.ignore_units=)
     compadd -S '' -a opts
 }
 

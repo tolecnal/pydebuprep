@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fakes import FakeSystem
@@ -27,3 +28,11 @@ def make_ctx(
 
 def titles(findings: list[Any]) -> list[str]:
     return [f.title for f in findings]
+
+
+TLS_DATA = Path(__file__).resolve().parent.parent / "data" / "tls"
+
+
+def tls_fixture(name: str) -> bytes:
+    """A file from tests/data/tls (made by scripts/make-test-certs.sh)."""
+    return (TLS_DATA / name).read_bytes()

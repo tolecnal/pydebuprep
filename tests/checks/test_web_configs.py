@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import pytest
 
-from checks.helpers import make_ctx, titles
+from checks.helpers import make_ctx, titles, tls_fixture
+from pydebuprep.checks._tls import TlsSite
 from pydebuprep.checks.apache import ApacheCheck
+from pydebuprep.checks.apache import read_config as apache_read_config
 from pydebuprep.checks.base import CheckSkipped
 from pydebuprep.checks.nginx import NginxCheck
+from pydebuprep.checks.nginx import read_config as nginx_read_config
 from pydebuprep.model import Severity
+from pydebuprep.system import CommandResult
 
 # --- nginx -----------------------------------------------------------------------------
 
@@ -279,3 +283,500 @@ def test_apache_reads_a_file_included_twice_once() -> None:
     ctx = apache_ctx(files={"/etc/apache2/apache2.conf": conf, "/run/app/web.sock": None})
     (f,) = ApacheCheck().run(ctx)
     assert len(f.evidence) == 1
+
+
+# --- nginx: TLS --------------------------------------------------------------------------
+
+TLS_SITE = """\
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl http2;
+    listen 80;
+    server_name www.example.org example.org;
+    include snippets/cert.conf;
+}
+"""
+
+
+def nginx_tls_ctx(files: dict[str, str | bytes | None] | None = None, **kw):  # type: ignore[no-untyped-def] # test helper
+    base: dict[str, str | bytes | None] = {
+        "/etc/nginx/sites-available/tls": TLS_SITE,
+        "/etc/nginx/snippets/cert.conf": "ssl_certificate /etc/ssl/good.pem;\n"
+        "ssl_certificate_key /etc/ssl/private/good.key;\n",
+        "/etc/ssl/good.pem": tls_fixture("good.pem"),
+    }
+    base.update(files or {})
+    links = {
+        "/etc/nginx/sites-enabled/tls": "/etc/nginx/sites-available/tls",
+        **kw.pop("links", {}),
+    }
+    return nginx_ctx(files=base, links=links)  # type: ignore[arg-type] # bytes files are fine
+
+
+def test_existing_nginx_findings_unchanged() -> None:
+    # The TLS site adds nothing to a healthy configuration.
+    assert NginxCheck().run(nginx_tls_ctx()) == []
+
+
+def test_server_block_collects_tls_site() -> None:
+    cfg = nginx_read_config(nginx_tls_ctx())
+    assert cfg.sites == [
+        TlsSite(
+            source="/etc/nginx/sites-enabled/tls",
+            names=("www.example.org", "example.org"),
+            certificates=("/etc/ssl/good.pem",),
+            listen=(("", 443), ("[::]", 443)),
+        )
+    ]
+    assert cfg.certificates == [
+        ("/etc/ssl/good.pem", "(ssl_certificate in /etc/nginx/snippets/cert.conf)")
+    ]
+    assert "/etc/nginx/snippets/cert.conf" in cfg.files
+
+
+def test_listen_forms() -> None:
+    site = """server { listen 10.0.0.1:8443 ssl; listen *:443 ssl; listen 192.0.2.1 ssl;
+        listen unix:/run/x.sock ssl; listen localhost:9443 ssl default_server;
+        ssl_certificate /etc/ssl/good.pem; }
+        server { listen 8443; ssl on; ssl_certificate /etc/ssl/good.pem; }
+        server { listen 8080; ssl_certificate /etc/ssl/good.pem; }
+    """
+    cfg = nginx_read_config(nginx_tls_ctx({"/etc/nginx/sites-available/tls": site}))
+    assert [s.listen for s in cfg.sites] == [
+        (("10.0.0.1", 8443), ("", 443), ("192.0.2.1", 80), ("localhost", 9443)),
+        (("", 8443),),
+    ]
+    assert cfg.sites[0].names == ()
+
+
+def test_http_level_certificate_is_inherited() -> None:
+    conf = NGINX_CONF.replace("http {", "http {\n    ssl_certificate /etc/ssl/good.pem;")
+    site = "server { listen 443 ssl; server_name a.example.net; }\n"
+    cfg = nginx_read_config(
+        nginx_tls_ctx({"/etc/nginx/nginx.conf": conf, "/etc/nginx/sites-available/tls": site})
+    )
+    assert [(s.names, s.certificates) for s in cfg.sites] == [
+        (("a.example.net",), ("/etc/ssl/good.pem",))
+    ]
+
+
+def test_tls_server_without_any_certificate_is_no_site() -> None:
+    site = "server { listen 443 ssl; server_name a.example.net; }\n"
+    assert nginx_read_config(nginx_tls_ctx({"/etc/nginx/sites-available/tls": site})).sites == []
+
+
+def test_snippet_in_two_servers_reported_once() -> None:
+    site = TLS_SITE + TLS_SITE.replace("www.example.org example.org", "crit.example.org")
+    files = {
+        "/etc/nginx/sites-available/tls": site,
+        "/etc/nginx/snippets/cert.conf": "ssl_certificate /etc/ssl/crit.pem;\n",
+        "/etc/ssl/crit.pem": tls_fixture("critical.pem"),
+    }
+    ctx = nginx_tls_ctx(files)
+    assert len(nginx_read_config(ctx).sites) == 2
+    found = NginxCheck().run(ctx)
+    expiring = next(f for f in found if "within 14 days" in f.title)
+    assert len(expiring.evidence) == 1
+
+
+def test_variable_and_data_certificates_skipped() -> None:
+    files = {
+        "/etc/nginx/snippets/cert.conf": "ssl_certificate $ssl_server_name.crt;\n"
+        "ssl_certificate data:$cert;\nssl_certificate engine:pkcs11:x;\n",
+    }
+    ctx = nginx_tls_ctx(files)
+    cfg = nginx_read_config(ctx)
+    assert cfg.certificates == [] and cfg.sites == []
+    assert NginxCheck().run(ctx) == []
+
+
+def test_nginx_reports_expiry_crypto_dhparam_protocols_names() -> None:
+    conf = NGINX_CONF.replace(
+        "http {", "http {\n    ssl_protocols TLSv1 TLSv1.1;\n    ssl_dhparam /etc/ssl/dh.pem;"
+    )
+    site = TLS_SITE.replace("www.example.org example.org", "other.org") + (
+        "server { listen 8443 ssl; ssl_certificate /etc/ssl/weak.pem; ssl_certificate /etc/ssl/soon.pem; }\n"
+    )
+    files = {
+        "/etc/nginx/nginx.conf": conf,
+        "/etc/nginx/sites-available/tls": site,
+        "/etc/ssl/dh.pem": tls_fixture("dh1024.pem"),
+        "/etc/ssl/weak.pem": tls_fixture("weak-rsa.pem"),
+        "/etc/ssl/soon.pem": tls_fixture("soon.pem"),
+    }
+    found = NginxCheck().run(nginx_tls_ctx(files))
+    assert titles(found) == [
+        "nginx has certificates expiring within 28 days",
+        "nginx uses keys or signatures OpenSSL refuses",
+        "nginx uses DH parameters OpenSSL refuses",
+        "nginx enables only TLS protocols OpenSSL refuses",
+        "nginx has certificates that don't cover their server names",
+    ]
+    assert found[1].evidence == [
+        "/etc/ssl/weak.pem: RSA 1024 bits (ssl_certificate in /etc/nginx/sites-enabled/tls)"
+    ]
+
+
+def test_nginx_cert_options() -> None:
+    with pytest.raises(ValueError, match="cert_critical_days"):
+        NginxCheck({"cert_critical_days": 30})
+    files = {"/etc/ssl/good.pem": tls_fixture("soon.pem")}
+    found = NginxCheck({"cert_warning_days": 20, "cert_critical_days": 10}).run(
+        nginx_tls_ctx(files)
+    )
+    assert not [t for t in titles(found) if "expiring" in t]  # 22 days left
+
+
+def test_nginx_odd_statements_are_ignored() -> None:
+    # Empty statements, a directive without arguments, a listen port that isn't a number
+    # and a certificate outside http (the mail module's) name no TLS site.
+    conf = NGINX_CONF + "mail { ssl_certificate /etc/ssl/mail.pem; }\n"
+    site = "server { ;; http2; listen 127.0.0.1:https ssl; ssl_certificate /etc/ssl/good.pem; }\n"
+    ctx = nginx_tls_ctx({"/etc/nginx/nginx.conf": conf, "/etc/nginx/sites-available/tls": site})
+    cfg = nginx_read_config(ctx)
+    assert cfg.sites == []
+    assert ("/etc/ssl/mail.pem", "(ssl_certificate in /etc/nginx/nginx.conf)") in cfg.certificates
+
+
+# --- apache: TLS -------------------------------------------------------------------------
+
+SSL_SITE = """\
+<IfModule mod_ssl.c>
+<VirtualHost *:443 [::]:443>
+    ServerName www.example.org:443
+    ServerAlias example.org a.example.net
+    SSLEngine on
+    SSLCertificateFile /etc/ssl/good.pem
+    SSLCertificateKeyFile /etc/ssl/private/good.key
+</VirtualHost>
+</IfModule>
+"""
+
+
+def apache_tls_ctx(
+    files: dict[str, str | bytes | None] | None = None, links: dict[str, str] | None = None
+):  # type: ignore[no-untyped-def] # test helper
+    base: dict[str, str | bytes | None] = {
+        "/etc/apache2/sites-available/ssl.conf": SSL_SITE,
+        "/etc/ssl/good.pem": tls_fixture("good.pem"),
+    }
+    base.update(files or {})
+    return apache_ctx(
+        files=base,  # type: ignore[arg-type] # bytes files are fine
+        links={
+            "/etc/apache2/sites-enabled/ssl.conf": "../sites-available/ssl.conf",
+            **(links or {}),
+        },
+    )
+
+
+def test_existing_apache_findings_unchanged() -> None:
+    assert ApacheCheck().run(apache_tls_ctx()) == []
+
+
+def test_virtualhost_collects_tls_site() -> None:
+    cfg = apache_read_config(apache_tls_ctx())
+    assert cfg.sites == [
+        TlsSite(
+            source="/etc/apache2/sites-enabled/ssl.conf",
+            names=("www.example.org", "example.org", "a.example.net"),
+            certificates=("/etc/ssl/good.pem",),
+            listen=(("", 443), ("[::]", 443)),
+        )
+    ]
+    assert cfg.certificates == [
+        ("/etc/ssl/good.pem", "(SSLCertificateFile in /etc/apache2/sites-enabled/ssl.conf)")
+    ]
+
+
+def test_virtualhost_forms() -> None:
+    site = """\
+<VirtualHost _default_:8443 10.0.0.1:443 *>
+    SSLEngine On
+    SSLCertificateFile ssl/good.pem
+</VirtualHost>
+<VirtualHost *:80>
+    ServerName plain.example.org
+    SSLCertificateFile /etc/ssl/good.pem
+</VirtualHost>
+<VirtualHost *:443>
+    SSLEngine on
+</VirtualHost>
+SSLCertificateFile /etc/ssl/global.pem
+SSLCertificateFile ${CERT}
+Listen 0.0.0.0:443 https
+Listen [::]:8443
+"""
+    cfg = apache_read_config(apache_tls_ctx({"/etc/apache2/sites-available/ssl.conf": site}))
+    assert [(s.listen, s.certificates) for s in cfg.sites] == [
+        ((("", 8443), ("10.0.0.1", 443)), ("/etc/apache2/ssl/good.pem",)),
+    ]
+    assert [p for p, _ in cfg.certificates] == [
+        "/etc/apache2/ssl/good.pem", "/etc/ssl/good.pem", "/etc/ssl/global.pem",
+    ]  # fmt: skip
+
+
+def test_apache_reports_tls_findings() -> None:
+    site = SSL_SITE.replace(
+        "ServerAlias example.org a.example.net", "ServerAlias other.org"
+    ).replace(
+        "SSLEngine on",
+        "SSLEngine on\n    SSLProtocol TLSv1 TLSv1.1\n"
+        "    SSLOpenSSLConfCmd DHParameters /etc/ssl/dh.pem\n"
+        "    SSLCertificateChainFile /etc/ssl/chain-sha1.pem",
+    )
+    files = {
+        "/etc/apache2/sites-available/ssl.conf": site,
+        "/etc/ssl/dh.pem": tls_fixture("dh1024.pem"),
+        "/etc/ssl/chain-sha1.pem": tls_fixture("sha1.pem"),
+    }
+    found = ApacheCheck().run(apache_tls_ctx(files))
+    assert titles(found) == [
+        "Apache uses keys or signatures OpenSSL refuses",
+        "Apache uses DH parameters OpenSSL refuses",
+        "Apache enables only TLS protocols OpenSSL refuses",
+        "Apache has certificates that don't cover their server names",
+    ]
+    assert found[-1].evidence == [
+        "other.org isn't covered by /etc/ssl/good.pem (/etc/apache2/sites-enabled/ssl.conf)"
+    ]
+
+
+def test_apache_dh_parameters_in_the_certificate_file() -> None:
+    files = {"/etc/ssl/good.pem": tls_fixture("good.pem") + tls_fixture("dh1024.pem")}
+    [finding] = ApacheCheck().run(apache_tls_ctx(files))
+    assert finding.title == "Apache uses DH parameters OpenSSL refuses"
+
+
+def test_apache_cert_options() -> None:
+    with pytest.raises(ValueError, match="cert_critical_days"):
+        ApacheCheck({"cert_warning_days": 10, "cert_critical_days": 10})
+    files = {"/etc/ssl/good.pem": tls_fixture("soon.pem")}
+    ctx = apache_tls_ctx(files)
+    assert "Apache has certificates expiring within 28 days" in titles(ApacheCheck().run(ctx))
+    found = ApacheCheck({"cert_warning_days": 20, "cert_critical_days": 10}).run(ctx)
+    assert not [t for t in titles(found) if "expiring" in t]
+
+
+def test_files_without_conf_are_skipped_and_reported() -> None:
+    files = {
+        "/etc/apache2/sites-available/old-site": "<VirtualHost *:80>\nProxyPass / unix:/run/gone.sock|http://x/\n</VirtualHost>\n",
+        "/etc/apache2/conf-available/legacy": "Alias /x /srv/x\n",
+    }
+    links = {
+        "/etc/apache2/sites-enabled/old-site": "../sites-available/old-site",
+        "/etc/apache2/conf-enabled/legacy": "../conf-available/legacy",
+    }
+    [finding] = ApacheCheck().run(apache_tls_ctx(files, links))
+    assert (finding.severity, finding.title) == (
+        Severity.WARNING,
+        "Apache ignores files in sites-enabled or conf-enabled",
+    )
+    assert finding.evidence == [
+        "/etc/apache2/conf-enabled/legacy",
+        "/etc/apache2/sites-enabled/old-site",
+    ]
+    assert any("a2dissite" in r or ".conf" in r for r in finding.remediation)
+
+
+def test_files_without_conf_read_by_a_wider_include_are_fine() -> None:
+    conf = APACHE_CONF.replace("sites-enabled/*.conf", "sites-enabled/*")
+    files = {
+        "/etc/apache2/apache2.conf": conf,
+        "/etc/apache2/sites-available/old-site": "ServerName x\n",
+    }
+    links = {"/etc/apache2/sites-enabled/old-site": "../sites-available/old-site"}
+    assert ApacheCheck().run(apache_tls_ctx(files, links)) == []
+
+
+def test_apache_include_loops_end() -> None:
+    files = {"/etc/apache2/conf-available/loop.conf": "Include conf-enabled/loop.conf\n"}
+    links = {"/etc/apache2/conf-enabled/loop.conf": "../conf-available/loop.conf"}
+    ctx = apache_tls_ctx(files, links)
+    assert ApacheCheck().run(ctx) == []
+    assert apache_read_config(ctx).files.count("/etc/apache2/conf-enabled/loop.conf") == 1
+
+
+# --- configuration tests (nginx -t, apache2ctl -t) --------------------------------------
+
+NGINX_OK = "nginx: the configuration file /etc/nginx/nginx.conf syntax is ok\n" \
+    "nginx: configuration file /etc/nginx/nginx.conf test is successful\n"  # fmt: skip
+
+
+def with_config_test(ctx, argv: tuple[str, ...], result: CommandResult | None):  # type: ignore[no-untyped-def] # test helper
+    """CTX with the server's binary installed and ARGV answering RESULT."""
+    ctx.system.files[
+        {"nginx": "/usr/sbin/nginx", "apache2ctl": "/usr/sbin/apache2ctl"}[argv[0]]
+    ] = ""
+    if result is not None:
+        ctx.system.commands[argv] = result
+    return ctx
+
+
+def nginx_test(rc: int, stderr: str, **kw):  # type: ignore[no-untyped-def] # test helper
+    result = CommandResult(("nginx", "-t"), rc, "", stderr)
+    return NginxCheck(kw).run(with_config_test(nginx_ctx(), ("nginx", "-t"), result))
+
+
+def test_config_test_ok() -> None:
+    assert nginx_test(0, NGINX_OK) == []
+
+
+def test_config_test_error_is_critical() -> None:
+    stderr = (
+        'nginx: [emerg] unknown directive "foo" in /etc/nginx/sites-enabled/default:3\n'
+        "nginx: configuration file /etc/nginx/nginx.conf test failed\n"
+    )
+    [finding] = nginx_test(1, stderr)
+    assert (finding.severity, finding.title) == (
+        Severity.CRITICAL,
+        "nginx rejects its configuration",
+    )
+    assert finding.evidence == [
+        'nginx: [emerg] unknown directive "foo" in /etc/nginx/sites-enabled/default:3'
+    ]
+    assert any("sudo nginx -t" in r for r in finding.remediation)
+
+
+def test_config_test_error_without_known_lines_shows_the_output() -> None:
+    [finding] = nginx_test(1, "\n".join(f"line {n}" for n in range(15)))
+    assert finding.evidence == [f"line {n}" for n in range(10)]
+
+
+def test_config_test_warnings_info() -> None:
+    stderr = 'nginx: [warn] the "listen ... http2" directive is deprecated\n' + NGINX_OK
+    [finding] = nginx_test(0, stderr)
+    assert (finding.severity, finding.title) == (
+        Severity.INFO,
+        "nginx's configuration test gives warnings",
+    )
+    assert finding.evidence == ['nginx: [warn] the "listen ... http2" directive is deprecated']
+
+
+def test_config_test_needs_root() -> None:
+    ctx = with_config_test(
+        make_ctx(files={**nginx_ctx().system.files}, links=nginx_ctx().system.links, root=False),
+        ("nginx", "-t"),
+        None,
+    )
+    [finding] = NginxCheck().run(ctx)
+    assert (finding.severity, finding.title) == (
+        Severity.INFO,
+        "nginx's configuration test needs root; not run",
+    )
+    assert ctx.system.calls == []
+
+
+def test_config_test_off() -> None:
+    ctx = with_config_test(nginx_ctx(), ("nginx", "-t"), None)
+    assert NginxCheck({"config_test": False}).run(ctx) == []
+    assert ctx.system.calls == []
+
+
+def test_config_test_that_cannot_run_is_info() -> None:
+    result = CommandResult(("nginx", "-t"), -1, "", "", timed_out=True)
+    [finding] = NginxCheck().run(with_config_test(nginx_ctx(), ("nginx", "-t"), result))
+    assert (finding.severity, finding.title) == (
+        Severity.INFO,
+        "nginx's configuration test couldn't run",
+    )
+
+
+def test_apache_ah00558_is_info() -> None:
+    stderr = (
+        "AH00558: apache2: Could not reliably determine the server's fully qualified domain "
+        "name, using 127.0.1.1. Set the 'ServerName' directive globally to suppress this message\n"
+        "Syntax OK\n"
+    )
+    result = CommandResult(("apache2ctl", "-t"), 0, "", stderr)
+    [finding] = ApacheCheck().run(with_config_test(apache_ctx(), ("apache2ctl", "-t"), result))
+    assert (finding.severity, finding.title) == (
+        Severity.INFO,
+        "Apache's configuration test gives warnings",
+    )
+    assert finding.evidence == [stderr.splitlines()[0]]
+
+
+def test_apache_config_test_error() -> None:
+    stderr = (
+        "AH00526: Syntax error on line 3 of /etc/apache2/sites-enabled/app.conf:\n"
+        "Invalid command 'Foo', perhaps misspelled or defined by a module not included\n"
+        "Action '-t' failed.\n"
+    )
+    result = CommandResult(("apache2ctl", "-t"), 1, "", stderr)
+    [finding] = ApacheCheck().run(with_config_test(apache_ctx(), ("apache2ctl", "-t"), result))
+    assert (finding.severity, finding.title) == (
+        Severity.CRITICAL,
+        "Apache rejects its configuration",
+    )
+    assert finding.evidence == stderr.splitlines()
+    assert (
+        ApacheCheck({"config_test": False}).run(
+            with_config_test(apache_ctx(), ("apache2ctl", "-t"), result)
+        )
+        == []
+    )
+
+
+def test_apache_macro_parameters_are_not_paths() -> None:
+    site = "<Macro SSL $domain>\nSSLCertificateFile /etc/ssl/@domain.pem\n" \
+        "SSLCertificateChainFile /etc/ssl/%domain.pem\n</Macro>\n"  # fmt: skip
+    cfg = apache_read_config(apache_tls_ctx({"/etc/apache2/sites-available/ssl.conf": site}))
+    assert cfg.certificates == []
+
+
+# --- limits ------------------------------------------------------------------------------
+
+
+def test_a_snippet_shared_by_many_servers_is_read_once() -> None:
+    # 0.8.0 counted files; counting reads would stop after ~500 servers sharing a snippet.
+    servers = "server { listen 443 ssl; server_name s.example.org; include snippets/cert.conf; }\n"
+    ctx = nginx_tls_ctx({"/etc/nginx/sites-available/tls": servers * 600})
+    cfg = nginx_read_config(ctx)
+    assert len(cfg.sites) == 600 and not cfg.truncated
+    assert ctx.system.whole_reads.count("/etc/nginx/snippets/cert.conf") <= 1  # type: ignore[attr-defined] # FakeSystem
+
+
+def test_apache_include_shared_by_many_vhosts_is_read_once() -> None:
+    vhost = "<VirtualHost *:443>\nServerName s.example.org\nSSLEngine on\nInclude conf-available/le.conf\n</VirtualHost>\n"
+    files = {
+        "/etc/apache2/sites-available/ssl.conf": vhost * 600,
+        "/etc/apache2/conf-available/le.conf": "SSLCertificateFile /etc/ssl/good.pem\n",
+    }
+    cfg = apache_read_config(apache_tls_ctx(files))
+    assert len(cfg.sites) == 600 and not cfg.truncated
+
+
+def test_too_many_files_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    import pydebuprep.checks.apache as apache_module
+    import pydebuprep.checks.nginx as nginx_module
+
+    monkeypatch.setattr(nginx_module, "MAX_FILES", 2)
+    monkeypatch.setattr(apache_module, "MAX_FILES", 2)
+    found = NginxCheck().run(nginx_ctx())
+    assert (found[-1].severity, found[-1].title) == (
+        Severity.INFO,
+        "nginx's configuration is too large to check completely",
+    )
+    found = ApacheCheck().run(apache_ctx())
+    assert found[-1].title == "Apache's configuration is too large to check completely"
+
+
+def test_too_many_statements_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    import pydebuprep.checks.apache as apache_module
+    import pydebuprep.checks.nginx as nginx_module
+
+    monkeypatch.setattr(nginx_module, "MAX_STATEMENTS", 5)
+    monkeypatch.setattr(apache_module, "MAX_STATEMENTS", 5)
+    assert nginx_read_config(nginx_ctx()).truncated
+    assert apache_read_config(apache_ctx()).truncated
+
+
+def test_dynamic_certificate_is_not_replaced_by_the_http_one() -> None:
+    conf = NGINX_CONF.replace("http {", "http {\n    ssl_certificate /etc/ssl/good.pem;")
+    site = (
+        "server { listen 443 ssl; server_name other.org; ssl_certificate $ssl_server_name.crt; }\n"
+    )
+    ctx = nginx_tls_ctx({"/etc/nginx/nginx.conf": conf, "/etc/nginx/sites-available/tls": site})
+    assert nginx_read_config(ctx).sites == []
+    assert NginxCheck().run(ctx) == []

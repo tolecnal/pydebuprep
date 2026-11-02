@@ -11,8 +11,28 @@
           "additionalProperties": false,
           "description": "Apache configuration references",
           "properties": {
+            "cert_critical_days": {
+              "default": 14,
+              "description": "Critical when a TLS certificate expires within this many days (below the warning)",
+              "type": "integer"
+            },
+            "cert_warning_days": {
+              "default": 28,
+              "description": "Warn when a TLS certificate expires within this many days",
+              "type": "integer"
+            },
+            "config_test": {
+              "default": true,
+              "description": "As root, run the server's own configuration test (nginx -t, apache2ctl -t); it may create the server's PID file, log files and run directories (see Agreed side effects)",
+              "type": "boolean"
+            },
             "enabled": {
               "default": true,
+              "type": "boolean"
+            },
+            "tls_probe": {
+              "default": true,
+              "description": "Connect to each TLS site on this host with its name (SNI) and compare the certificate it serves with the file",
               "type": "boolean"
             }
           },
@@ -166,6 +186,30 @@
           "additionalProperties": false,
           "description": "Bootloader configuration",
           "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "certbot": {
+          "additionalProperties": false,
+          "description": "certbot renewals",
+          "properties": {
+            "cert_critical_days": {
+              "default": 14,
+              "description": "Critical when a TLS certificate expires within this many days (below the warning)",
+              "type": "integer"
+            },
+            "cert_warning_days": {
+              "default": 28,
+              "description": "Warn when a TLS certificate expires within this many days",
+              "type": "integer"
+            },
             "enabled": {
               "default": true,
               "type": "boolean"
@@ -549,8 +593,28 @@
           "additionalProperties": false,
           "description": "nginx configuration references",
           "properties": {
+            "cert_critical_days": {
+              "default": 14,
+              "description": "Critical when a TLS certificate expires within this many days (below the warning)",
+              "type": "integer"
+            },
+            "cert_warning_days": {
+              "default": 28,
+              "description": "Warn when a TLS certificate expires within this many days",
+              "type": "integer"
+            },
+            "config_test": {
+              "default": true,
+              "description": "As root, run the server's own configuration test (nginx -t, apache2ctl -t); it may create the server's PID file, log files and run directories (see Agreed side effects)",
+              "type": "boolean"
+            },
             "enabled": {
               "default": true,
+              "type": "boolean"
+            },
+            "tls_probe": {
+              "default": true,
+              "description": "Connect to each TLS site on this host with its name (SNI) and compare the certificate it serves with the file",
               "type": "boolean"
             }
           },
@@ -576,6 +640,20 @@
         "os-release": {
           "additionalProperties": false,
           "description": "Operating system release",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "php": {
+          "additionalProperties": false,
+          "description": "PHP extensions",
           "properties": {
             "enabled": {
               "default": true,

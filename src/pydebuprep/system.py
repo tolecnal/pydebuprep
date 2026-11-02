@@ -10,6 +10,7 @@ import glob as _glob
 import gzip
 import http.client
 import io
+import ipaddress
 import os
 import re
 import shutil
@@ -59,6 +60,12 @@ ALLOWED_COMMANDS: set[tuple[str, ...]] = {
     ("apt-get", "check"),
     ("apt-get", "-s", "autoremove"),
     ("ldconfig", "-p"),  # prints /etc/ld.so.cache; never rebuilds it
+    # The web servers' own configuration tests. Side effects agreed with the user and
+    # listed in docs/about/read-only.md ("Agreed side effects"): nginx opens its PID
+    # file and logs (creating them if missing) and creates its temp directories;
+    # apache2ctl creates its run and lock directories. Checked by readonly-audit.py.
+    ("nginx", "-t"),
+    ("apache2ctl", "-t"),
     ("apt-get", "-s", "upgrade"),
     ("apt", "list", "--upgradable"),
     ("apt", "list", "--installed"),
@@ -318,6 +325,19 @@ def _decode(data: bytes | str | None) -> str:
     return data.decode("utf-8", errors="replace")
 
 
+def probe_context() -> ssl.SSLContext:
+    """The TLS client context of the certificate probe: TLS 1.2 or later (a server that
+    offers only older protocols is reported from its configuration), nothing verified
+    (the certificate is compared, not trusted), and any key size accepted, so a weak
+    certificate can still be compared."""
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    context.set_ciphers("DEFAULT:@SECLEVEL=0")
+    return context
+
+
 class System:
     """Read-only access to the running system."""
 
@@ -411,6 +431,32 @@ class System:
         with os.fdopen(os.open(path, flags, 0o600), "wb") as fh:
             fh.write(data)
         return path
+
+    def tls_peer_certificate(
+        self, host: str, port: int, server_name: str, timeout: float
+    ) -> tuple[bytes | None, str | None]:
+        """The certificate (DER) a TLS server at HOST:PORT serves for SERVER_NAME (SNI):
+        (der, None), or (None, error). HOST must be an IP address: the caller decides
+        which of this host's addresses to ask, and no name is ever looked up.
+
+        Nothing is verified: the point is to compare what is served with the file the
+        configuration names, including certificates OpenSSL would refuse, so the
+        security level is lowered for this one connection.
+        """
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            raise ValueError(f"not an IP address: {host!r}") from None
+        context = probe_context()
+        try:
+            with (
+                socket.create_connection((host, port), timeout=timeout) as sock,
+                context.wrap_socket(sock, server_hostname=server_name) as tls,
+            ):
+                der = tls.getpeercert(binary_form=True)
+        except (OSError, ValueError) as exc:  # ssl.SSLError is an OSError
+            return None, str(exc) or type(exc).__name__
+        return (der, None) if der else (None, "no certificate")
 
     def tcp_connect(self, host: str, port: int, timeout: float) -> str | None:
         """Whether something answers on a TCP port: None if so, else why not.

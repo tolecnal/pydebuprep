@@ -116,10 +116,12 @@ nav:
       - Applications:
           - apache: checks/apache.md
           - bind: checks/bind.md
+          - certbot: checks/certbot.md
           - docker: checks/docker.md
           - libvirt: checks/libvirt.md
           - mariadb: checks/mariadb.md
           - nginx: checks/nginx.md
+          - php: checks/php.md
           - postfix: checks/postfix.md
           - postgresql: checks/postgresql.md
           - python-venvs: checks/python-venvs.md

@@ -10,7 +10,7 @@ isn't now, a PostgreSQL cluster still on the old version, an SSH configuration t
 would lock you out on the next restart.
 
 `systemctl --failed` and a look at the journal catch some of this. pydebuprep runs
-the rest of the post-upgrade checklist in one go — [40 checks](checks/index.md)
+the rest of the post-upgrade checklist in one go — [42 checks](checks/index.md)
 across packages, boot, services, applications, network, security and storage — and
 tells you what it found and how to fix it.
 
@@ -29,8 +29,9 @@ with the commands to fix it, for **you** to review and run.
 
 That's enforced, not just promised: every external command it runs must match a
 built-in allowlist of read-only commands exactly, and every pull request and release
-is traced with strace on every supported release to prove a run as root changes
-nothing. See [Read-only by design](about/read-only.md).
+is traced with strace on every supported release to prove a run as root changes no
+system state or configuration. See [Read-only by design](about/read-only.md), which
+also lists the few [agreed side effects](about/read-only.md#agreed-side-effects).
 
 ## Where to go next
 

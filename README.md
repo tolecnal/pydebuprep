@@ -24,7 +24,7 @@ A read-only health report for Debian and Ubuntu systems after a release upgrade
 guides.
 
 `systemctl --failed` and a look at `journalctl` catch some problems. pydebuprep
-runs the rest of the post-upgrade checklist in one go, with [40 checks](#checks):
+runs the rest of the post-upgrade checklist in one go, with [42 checks](#checks):
 
 - **packages:** APT sources still pointing at the old release, third-party
   repositories the upgrader disabled, half-configured packages, unmerged
@@ -44,11 +44,14 @@ With a snapshot taken before the upgrade, it also reports what changed: services
 network interfaces and routes, firewall rules, containers and database clusters that
 were up before and aren't now.
 
-**It never changes anything.** It doesn't install or remove packages, doesn't run
-`apt update` or `update-grub`, and doesn't restart services. Every external command
-it runs is checked against a built-in allowlist of read-only commands, and every
-release is traced with strace on each supported release to prove a root run changes
-nothing. Each finding comes with the commands to fix it, for you to review and run
+**It never changes the system's configuration or state.** It doesn't install or remove
+packages, doesn't run `apt update` or `update-grub`, and doesn't restart services.
+Every external command it runs is checked against a built-in allowlist of read-only
+commands, and every release is traced with strace on each supported release to prove
+a root run changes no system state or configuration. The few
+[agreed side effects](https://pydebuprep.app/about/read-only/#agreed-side-effects),
+such as nginx's configuration test opening its log files, are listed and can be
+turned off. Each finding comes with the commands to fix it, for you to review and run
 yourself.
 
 ## Supported systems
@@ -254,6 +257,9 @@ The package also installs the example as
 | `docker` | `probe` (false): connect to every published TCP port, and run `http_probes`; `http_probes` ([]): `CONTAINER=URL` items, localhost only, 2xx/3xx passes; `ignore_containers` ([]): name patterns to leave out |
 | `python-venvs` | `search_paths` (/opt, /srv, /usr/local, /root, /home, /var/www) and `max_depth` (5): where to look for virtualenvs; `exclude_paths` (\*/.cache/\*): ones to leave out |
 | `network` | `ignore_interfaces` (lo, veth\*, docker\*, br-\*, virbr\*, vnet\*, tap\*, cni\*, flannel\*, cali\*): left out of the baseline comparison |
+| `nginx`, `apache`, `certbot` | `cert_warning_days` (28), `cert_critical_days` (14): how many days before a TLS certificate expires that it's a warning, and critical (1 to 365, critical below warning) |
+| `nginx`, `apache` | `config_test` (true): as root, run `nginx -t` / `apache2ctl -t` (an [agreed side effect](https://pydebuprep.app/about/read-only/#agreed-side-effects)) |
+| `nginx`, `apache` | `tls_probe` (true): connect to each TLS site on this host with its name and compare the certificate it serves with the file; the server logs each connection |
 | `disk-space` | `include_remote` (false), `warning_pct` (25.0), `critical_pct` (10.0), `exclude_mounts` ([]), `important_mounts` (["/", "/var"]) and `min_free_mib` (2048): an absolute free-space floor for those mounts |
 
 ### Exit codes
@@ -297,12 +303,14 @@ host never looks healthy just because a check couldn't look.
 | `systemd-failed` | services | Failed units; services active or enabled before the upgrade that aren't now |
 | `systemd-timers` | services | Enabled timers that aren't active |
 | `time-sync` | services | A time synchronisation service is running and the clock is synchronised (read from the kernel, no daemon queried); service changes since the baseline |
-| `apache` | applications | Includes that point at missing files (dangling `mods-enabled`, `conf-enabled` and `sites-enabled` links), `LoadModule` files that are gone, `unix:` sockets (PHP-FPM `SetHandler`, `ProxyPass`) that don't exist (read from the files; `apachectl -t` isn't used: it writes) |
+| `apache` | applications | Includes that point at missing files (dangling `mods-enabled`, `conf-enabled` and `sites-enabled` links), `LoadModule` files that are gone, `unix:` sockets (PHP-FPM `SetHandler`, `ProxyPass`) that don't exist, site files skipped for not ending in `.conf`; TLS certificates that expire or that OpenSSL refuses, small DH parameters, old protocols, server names a certificate doesn't cover, certificates served that differ from the files (from the files, a TLS probe, and as root `apache2ctl -t`) |
 | `bind` | applications | `named-checkconf` errors (root) |
+| `certbot` | applications | Renewals that will fail: certbot or its Python gone, `authenticator`/`installer` plugins not installed for the Python that runs certbot; certificates within 28 days of expiring, which certbot should have renewed |
 | `docker` | applications | Containers failing their health check, restarting, or still starting it (each its own finding); containers running before but not now; opt-in probes of published ports and HTTP URLs. Only queried when `docker.service` is running, so the daemon is never started (root) |
 | `libvirt` | applications | Domains set to start at boot that aren't running; disk images, devices and emulators that no longer exist (read from libvirt's files; `virsh` isn't used) (root) |
 | `mariadb` | applications | MariaDB data directory not upgraded to the new server version; opt-in probe that MariaDB or MySQL answers a ping and a query (root) |
-| `nginx` | applications | Includes that point at missing files (dangling `sites-enabled` and `modules-enabled` links), `load_module` files that are gone, `unix:` sockets in `*_pass` and upstream `server` lines that don't exist (read from the files; `nginx -t` isn't used: it writes) |
+| `nginx` | applications | Includes that point at missing files (dangling `sites-enabled` and `modules-enabled` links), `load_module` files that are gone, `unix:` sockets in `*_pass` and upstream `server` lines that don't exist; TLS certificates that expire or that OpenSSL refuses, small DH parameters, old protocols, server names a certificate doesn't cover, certificates served that differ from the files (from the files, a TLS probe, and as root `nginx -t`) |
+| `php` | applications | PHP extensions enabled before the upgrade (per SAPI: fpm, apache2, cli) that no PHP version enables now, and SAPIs that are gone; needs a snapshot |
 | `postfix` | applications | `postconf -n` warnings and errors (`postfix check` isn't used: it creates directories) |
 | `postgresql` | applications | Clusters still on an older major version than the newest installed server, or left behind after migrating; clusters that should start but are down; clusters online before but not now; opt-in probe that each online cluster accepts connections and answers a query |
 | `python-venvs` | applications | Virtualenvs whose Python no longer exists, or built for an older Python; compiled modules needing libraries that are missing (read from their ELF headers, never `ldd`); scripts whose interpreter doesn't exist |
@@ -390,7 +398,10 @@ host never looks healthy just because a check couldn't look.
    `strace`) as root with the service it inspects installed, and add that package
    to `scripts/ci-readonly-audit.sh` so every pull request is audited with it (and to
    `AUDIT_EXPECT` there, so the audit fails if the command never runs). Some obvious
-   commands write (`nginx -t`, `postfix check`, `ufw status`); don't use those.
+   commands write (`postfix check`, `ufw status`); don't use those. A side effect
+   that's worth it (like `nginx -t` opening its logs) needs the maintainer's explicit
+   agreement, an entry in `AGREED_WRITES` in `scripts/readonly-audit.py` and a row
+   under "Agreed side effects" in `docs/about/read-only.md`.
 
 ## Development
 
@@ -400,7 +411,7 @@ python3 -m venv .venv
 make lint test
 make coverage   # line and branch coverage, enforced at 100% (pyproject.toml)
 make generated  # after changing commands, flags, checks or options
-sudo make audit # with the package installed: strace proves a root run changes nothing
+sudo make audit # with the package installed: strace proves a root run changes no system state
 make deb        # needs: debhelper dh-python python3-all python3-setuptools python3-yaml python3-pytest
 ```
 
@@ -451,7 +462,7 @@ reporting, not a public issue.
 | Security / pip-audit | Known vulnerabilities in the pinned tools (`requirements-dev.txt`, `requirements-audit.txt`) |
 | Security / zizmor | GitHub Actions security: pinning, permissions, credentials, injection; results in the Security tab |
 | Security / Dependency review | New vulnerable dependencies in pull requests |
-| CI / Package | Builds the `.deb` on every pull request, push to `main` and weekly, installs it on every supported release and proves a root run changes nothing (`scripts/readonly-audit.sh`): in plain containers, in containers booted with systemd (services running, UEFI variables mounted), and on the Ubuntu runner VMs |
+| CI / Package | Builds the `.deb` on every pull request, push to `main` and weekly, installs it on every supported release and proves a root run changes no system state or configuration (`scripts/readonly-audit.sh`): in plain containers, in containers booted with systemd (services running, UEFI variables mounted), and on the Ubuntu runner VMs |
 | Release | For a release tag, runs the same packaging and audit jobs, then publishes the `.deb` with checksums and a provenance attestation |
 | Docs | Builds the documentation site on every pull request (strict: broken links fail), publishes it to GitHub Pages from `main` |
 

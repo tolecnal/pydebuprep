@@ -17,6 +17,7 @@ from pydebuprep.checks.bind import BindCheck
 from pydebuprep.checks.boot_space import BootSpaceCheck
 from pydebuprep.checks.boot_time import BootTimeCheck
 from pydebuprep.checks.bootloader import BootloaderCheck
+from pydebuprep.checks.certbot import CertbotCheck
 from pydebuprep.checks.config_conflicts import ConfigConflictsCheck
 from pydebuprep.checks.cron import CronCheck
 from pydebuprep.checks.debsums import DebsumsCheck
@@ -37,6 +38,7 @@ from pydebuprep.checks.network import NetworkCheck
 from pydebuprep.checks.nginx import NginxCheck
 from pydebuprep.checks.obsolete_packages import ObsoletePackagesCheck
 from pydebuprep.checks.os_release import OsReleaseCheck
+from pydebuprep.checks.php import PhpCheck
 from pydebuprep.checks.postfix import PostfixCheck
 from pydebuprep.checks.postgresql import PostgresqlCheck
 from pydebuprep.checks.python_venvs import PythonVenvsCheck
@@ -86,6 +88,8 @@ ALL_CHECKS: list[type[Check]] = [
     DockerCheck,
     NginxCheck,
     ApacheCheck,
+    PhpCheck,
+    CertbotCheck,
     LibvirtCheck,
     PythonVenvsCheck,
 ]

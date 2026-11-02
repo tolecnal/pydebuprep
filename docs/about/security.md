@@ -20,12 +20,18 @@ packages that pass both checks.
 
 - Every command pydebuprep runs must match a complete entry in a read-only
   allowlist, and every pull request and release is traced to prove a root run
-  changes nothing. See [Read-only by design](read-only.md).
+  changes no system state or configuration. See [Read-only by design](read-only.md).
 - Reports may contain text from logs and files written by other users; the
   human-readable formats escape it and strip terminal control sequences. Saved
   reports read back by `convert` are validated field by field, and YAML is loaded
   safely.
 - Snapshots are readable only by root (directory `0700`, files `0600`).
+- The nginx and apache checks connect to this host's own TLS sites to compare the
+  certificate served with the file configured. They connect only to loopback or to an
+  address and port the kernel lists as listening here, and only to listeners owned by
+  root (so not to a user's process holding a port a stopped server should have), never look a name up, and
+  don't verify the certificate: it's compared, not trusted, and a connection that
+  verified would fail on exactly the certificates worth reporting.
 - CodeQL, Bandit, ShellCheck, pip-audit and zizmor run on every change, and pull
   requests get a dependency review. Dependabot keeps pinned actions and tools up to
   date.

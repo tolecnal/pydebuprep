@@ -193,3 +193,18 @@ def test_docs_are_built_with_zensical() -> None:
     for path in (ROOT / "Makefile", ROOT / ".github/workflows/docs.yml"):
         text = path.read_text()
         assert "tools/docs_build.py" in text and "zensical build --strict" in text, path
+
+
+def test_read_only_page_lists_agreed_side_effects() -> None:
+    text = (DOCS / "about" / "read-only.md").read_text(encoding="utf-8")
+    section = text.split("## Agreed side effects", 1)[1].split("\n## ", 1)[0]
+    for needle in (
+        "`tls_probe`", "`config_test`", "`/run/nginx.pid`", "`/var/lib/nginx`",
+        "`/run/apache2`", "`/run/lock/apache2`", "`probe`",
+    ):  # fmt: skip
+        assert needle in section, needle
+    stale = re.compile(
+        r"`(nginx -t|apache2?ctl -t)` (isn't|is not) used|nginx -t`? would check more"
+    )
+    for page in [*DOCS.rglob("*.md"), ROOT / "README.md"]:
+        assert not stale.search(page.read_text(encoding="utf-8")), page

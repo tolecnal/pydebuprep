@@ -301,3 +301,91 @@ def test_a_file_swapped_for_a_fifo_after_the_check_is_refused(
         system.os, "lstat", lambda p: regular if str(p) == str(fifo) else real_lstat(p)
     )
     assert System().read_bytes(str(fifo)) is None
+
+
+TLS_DATA = Path(__file__).resolve().parent / "data" / "tls"
+
+
+def test_tls_peer_certificate_real() -> None:
+    import base64
+    import re
+    import socket
+    import ssl
+    import threading
+
+    server_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    server_ctx.load_cert_chain(TLS_DATA / "good.pem", TLS_DATA / "good.key")
+    seen: list[str | None] = []
+    server_ctx.sni_callback = lambda _sock, name, _ctx: seen.append(name)  # type: ignore[assignment,func-returns-value] # records the SNI
+    listener = socket.create_server(("127.0.0.1", 0))
+    port = listener.getsockname()[1]
+
+    def serve() -> None:
+        conn, _ = listener.accept()
+        try:
+            with server_ctx.wrap_socket(conn, server_side=True) as tls:
+                tls.recv(1)
+        except (OSError, ssl.SSLError):
+            pass
+
+    thread = threading.Thread(target=serve, daemon=True)
+    thread.start()
+    try:
+        der, error = System().tls_peer_certificate("127.0.0.1", port, "www.example.org", 5.0)
+    finally:
+        thread.join(5)
+        listener.close()
+    pem = (TLS_DATA / "good.pem").read_bytes()
+    body = re.search(rb"-----BEGIN CERTIFICATE-----(.*?)-----END", pem, re.S)
+    assert body and error is None
+    assert der == base64.b64decode(body.group(1))
+    assert seen == ["www.example.org"]
+    der, error = System().tls_peer_certificate("127.0.0.1", port, "www.example.org", 1.0)
+    assert der is None and error  # nothing listens any more
+
+
+def test_tls_peer_certificate_rejects_hostnames() -> None:
+    with pytest.raises(ValueError, match="IP address"):
+        System().tls_peer_certificate("localhost", 443, "www.example.org", 1.0)
+
+
+def test_tls_peer_certificate_has_a_deadline() -> None:
+    # A peer that trickles a byte now and then never lets the per-read timeout expire;
+    # the whole handshake still has to finish within the timeout.
+    import socket
+    import threading
+    import time
+
+    listener = socket.create_server(("127.0.0.1", 0))
+    port = listener.getsockname()[1]
+    stop = threading.Event()
+
+    def trickle() -> None:
+        conn, _ = listener.accept()
+        with conn:
+            conn.send(b"\x16\x03\x03\x40\x00")  # a handshake record of 16 KiB, then slowly
+            while not stop.wait(0.2):
+                try:
+                    conn.send(b"\x00")
+                except OSError:
+                    return
+
+    threading.Thread(target=trickle, daemon=True).start()
+    start = time.monotonic()
+    try:
+        der, error = System().tls_peer_certificate("127.0.0.1", port, "www.example.org", 1.0)
+    finally:
+        stop.set()
+        listener.close()
+    assert der is None and error is not None and "timed out" in error
+    assert time.monotonic() - start < 3
+
+
+def test_probe_context_requires_tls_1_2() -> None:
+    import ssl
+
+    from pydebuprep.system import probe_context
+
+    context = probe_context()
+    assert context.minimum_version is ssl.TLSVersion.TLSv1_2
+    assert context.verify_mode is ssl.CERT_NONE and not context.check_hostname
