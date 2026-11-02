@@ -254,6 +254,7 @@ The package also installs the example as
 | `docker` | `probe` (false): connect to every published TCP port, and run `http_probes`; `http_probes` ([]): `CONTAINER=URL` items, localhost only, 2xx/3xx passes; `ignore_containers` ([]): name patterns to leave out |
 | `python-venvs` | `search_paths` (/opt, /srv, /usr/local, /root, /home, /var/www) and `max_depth` (5): where to look for virtualenvs; `exclude_paths` (\*/.cache/\*): ones to leave out |
 | `network` | `ignore_interfaces` (lo, veth\*, docker\*, br-\*, virbr\*, vnet\*, tap\*, cni\*, flannel\*, cali\*): left out of the baseline comparison |
+| `nginx` | `cert_warning_days` (28), `cert_critical_days` (14): how many days before a TLS certificate expires that it's a warning, and critical (1 to 365, critical below warning) |
 | `disk-space` | `include_remote` (false), `warning_pct` (25.0), `critical_pct` (10.0), `exclude_mounts` ([]), `important_mounts` (["/", "/var"]) and `min_free_mib` (2048): an absolute free-space floor for those mounts |
 
 ### Exit codes
@@ -302,7 +303,7 @@ host never looks healthy just because a check couldn't look.
 | `docker` | applications | Containers failing their health check, restarting, or still starting it (each its own finding); containers running before but not now; opt-in probes of published ports and HTTP URLs. Only queried when `docker.service` is running, so the daemon is never started (root) |
 | `libvirt` | applications | Domains set to start at boot that aren't running; disk images, devices and emulators that no longer exist (read from libvirt's files; `virsh` isn't used) (root) |
 | `mariadb` | applications | MariaDB data directory not upgraded to the new server version; opt-in probe that MariaDB or MySQL answers a ping and a query (root) |
-| `nginx` | applications | Includes that point at missing files (dangling `sites-enabled` and `modules-enabled` links), `load_module` files that are gone, `unix:` sockets in `*_pass` and upstream `server` lines that don't exist (read from the files; `nginx -t` isn't used: it writes) |
+| `nginx` | applications | Includes that point at missing files (dangling `sites-enabled` and `modules-enabled` links), `load_module` files that are gone, `unix:` sockets in `*_pass` and upstream `server` lines that don't exist; TLS certificates that expire or that OpenSSL refuses, small DH parameters, old protocols, server names a certificate doesn't cover (read from the files; `nginx -t` isn't used: it writes) |
 | `postfix` | applications | `postconf -n` warnings and errors (`postfix check` isn't used: it creates directories) |
 | `postgresql` | applications | Clusters still on an older major version than the newest installed server, or left behind after migrating; clusters that should start but are down; clusters online before but not now; opt-in probe that each online cluster accepts connections and answers a query |
 | `python-venvs` | applications | Virtualenvs whose Python no longer exists, or built for an older Python; compiled modules needing libraries that are missing (read from their ELF headers, never `ldd`); scripts whose interpreter doesn't exist |

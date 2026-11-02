@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from checks.helpers import make_ctx, titles
+from checks.helpers import make_ctx, titles, tls_fixture
+from pydebuprep.checks._tls import TlsSite
 from pydebuprep.checks.apache import ApacheCheck
 from pydebuprep.checks.base import CheckSkipped
 from pydebuprep.checks.nginx import NginxCheck
+from pydebuprep.checks.nginx import read_config as nginx_read_config
 from pydebuprep.model import Severity
 
 # --- nginx -----------------------------------------------------------------------------
@@ -279,3 +281,156 @@ def test_apache_reads_a_file_included_twice_once() -> None:
     ctx = apache_ctx(files={"/etc/apache2/apache2.conf": conf, "/run/app/web.sock": None})
     (f,) = ApacheCheck().run(ctx)
     assert len(f.evidence) == 1
+
+
+# --- nginx: TLS --------------------------------------------------------------------------
+
+TLS_SITE = """\
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl http2;
+    listen 80;
+    server_name www.example.org example.org;
+    include snippets/cert.conf;
+}
+"""
+
+
+def nginx_tls_ctx(files: dict[str, str | bytes | None] | None = None, **kw):  # type: ignore[no-untyped-def] # test helper
+    base: dict[str, str | bytes | None] = {
+        "/etc/nginx/sites-available/tls": TLS_SITE,
+        "/etc/nginx/snippets/cert.conf": "ssl_certificate /etc/ssl/good.pem;\n"
+        "ssl_certificate_key /etc/ssl/private/good.key;\n",
+        "/etc/ssl/good.pem": tls_fixture("good.pem"),
+    }
+    base.update(files or {})
+    links = {
+        "/etc/nginx/sites-enabled/tls": "/etc/nginx/sites-available/tls",
+        **kw.pop("links", {}),
+    }
+    return nginx_ctx(files=base, links=links)  # type: ignore[arg-type] # bytes files are fine
+
+
+def test_existing_nginx_findings_unchanged() -> None:
+    # The TLS site adds nothing to a healthy configuration.
+    assert NginxCheck().run(nginx_tls_ctx()) == []
+
+
+def test_server_block_collects_tls_site() -> None:
+    cfg = nginx_read_config(nginx_tls_ctx())
+    assert cfg.sites == [
+        TlsSite(
+            source="/etc/nginx/sites-enabled/tls",
+            names=("www.example.org", "example.org"),
+            certificate="/etc/ssl/good.pem",
+            listen=(("", 443), ("[::]", 443)),
+        )
+    ]
+    assert cfg.certificates == [
+        ("/etc/ssl/good.pem", "(ssl_certificate in /etc/nginx/snippets/cert.conf)")
+    ]
+    assert "/etc/nginx/snippets/cert.conf" in cfg.files
+
+
+def test_listen_forms() -> None:
+    site = """server { listen 10.0.0.1:8443 ssl; listen *:443 ssl; listen 192.0.2.1 ssl;
+        listen unix:/run/x.sock ssl; listen localhost:9443 ssl default_server;
+        ssl_certificate /etc/ssl/good.pem; }
+        server { listen 8443; ssl on; ssl_certificate /etc/ssl/good.pem; }
+        server { listen 8080; ssl_certificate /etc/ssl/good.pem; }
+    """
+    cfg = nginx_read_config(nginx_tls_ctx({"/etc/nginx/sites-available/tls": site}))
+    assert [s.listen for s in cfg.sites] == [
+        (("10.0.0.1", 8443), ("", 443), ("192.0.2.1", 80), ("localhost", 9443)),
+        (("", 8443),),
+    ]
+    assert cfg.sites[0].names == ()
+
+
+def test_http_level_certificate_is_inherited() -> None:
+    conf = NGINX_CONF.replace("http {", "http {\n    ssl_certificate /etc/ssl/good.pem;")
+    site = "server { listen 443 ssl; server_name a.example.net; }\n"
+    cfg = nginx_read_config(
+        nginx_tls_ctx({"/etc/nginx/nginx.conf": conf, "/etc/nginx/sites-available/tls": site})
+    )
+    assert [(s.names, s.certificate) for s in cfg.sites] == [
+        (("a.example.net",), "/etc/ssl/good.pem")
+    ]
+
+
+def test_tls_server_without_any_certificate_is_no_site() -> None:
+    site = "server { listen 443 ssl; server_name a.example.net; }\n"
+    assert nginx_read_config(nginx_tls_ctx({"/etc/nginx/sites-available/tls": site})).sites == []
+
+
+def test_snippet_in_two_servers_reported_once() -> None:
+    site = TLS_SITE + TLS_SITE.replace("www.example.org example.org", "crit.example.org")
+    files = {
+        "/etc/nginx/sites-available/tls": site,
+        "/etc/nginx/snippets/cert.conf": "ssl_certificate /etc/ssl/crit.pem;\n",
+        "/etc/ssl/crit.pem": tls_fixture("critical.pem"),
+    }
+    ctx = nginx_tls_ctx(files)
+    assert len(nginx_read_config(ctx).sites) == 2
+    found = NginxCheck().run(ctx)
+    expiring = next(f for f in found if "within 14 days" in f.title)
+    assert len(expiring.evidence) == 1
+
+
+def test_variable_and_data_certificates_skipped() -> None:
+    files = {
+        "/etc/nginx/snippets/cert.conf": "ssl_certificate $ssl_server_name.crt;\n"
+        "ssl_certificate data:$cert;\nssl_certificate engine:pkcs11:x;\n",
+    }
+    ctx = nginx_tls_ctx(files)
+    cfg = nginx_read_config(ctx)
+    assert cfg.certificates == [] and cfg.sites == []
+    assert NginxCheck().run(ctx) == []
+
+
+def test_nginx_reports_expiry_crypto_dhparam_protocols_names() -> None:
+    conf = NGINX_CONF.replace(
+        "http {", "http {\n    ssl_protocols TLSv1 TLSv1.1;\n    ssl_dhparam /etc/ssl/dh.pem;"
+    )
+    site = TLS_SITE.replace("www.example.org example.org", "other.org") + (
+        "server { listen 8443 ssl; ssl_certificate /etc/ssl/weak.pem; ssl_certificate /etc/ssl/soon.pem; }\n"
+    )
+    files = {
+        "/etc/nginx/nginx.conf": conf,
+        "/etc/nginx/sites-available/tls": site,
+        "/etc/ssl/dh.pem": tls_fixture("dh1024.pem"),
+        "/etc/ssl/weak.pem": tls_fixture("weak-rsa.pem"),
+        "/etc/ssl/soon.pem": tls_fixture("soon.pem"),
+    }
+    found = NginxCheck().run(nginx_tls_ctx(files))
+    assert titles(found) == [
+        "nginx has certificates expiring within 28 days",
+        "nginx uses keys or signatures OpenSSL refuses",
+        "nginx uses DH parameters OpenSSL refuses",
+        "nginx enables only TLS protocols OpenSSL refuses",
+        "nginx has certificates that don't cover their server names",
+    ]
+    assert found[1].evidence == [
+        "/etc/ssl/weak.pem: RSA 1024 bits (ssl_certificate in /etc/nginx/sites-enabled/tls)"
+    ]
+
+
+def test_nginx_cert_options() -> None:
+    with pytest.raises(ValueError, match="cert_critical_days"):
+        NginxCheck({"cert_critical_days": 30})
+    files = {"/etc/ssl/good.pem": tls_fixture("soon.pem")}
+    found = NginxCheck({"cert_warning_days": 20, "cert_critical_days": 10}).run(
+        nginx_tls_ctx(files)
+    )
+    assert not [t for t in titles(found) if "expiring" in t]  # 22 days left
+
+
+def test_nginx_odd_statements_are_ignored() -> None:
+    # Empty statements, a directive without arguments, a listen port that isn't a number
+    # and a certificate outside http (the mail module's) name no TLS site.
+    conf = NGINX_CONF + "mail { ssl_certificate /etc/ssl/mail.pem; }\n"
+    site = "server { ;; http2; listen 127.0.0.1:https ssl; ssl_certificate /etc/ssl/good.pem; }\n"
+    ctx = nginx_tls_ctx({"/etc/nginx/nginx.conf": conf, "/etc/nginx/sites-available/tls": site})
+    cfg = nginx_read_config(ctx)
+    assert cfg.sites == []
+    assert ("/etc/ssl/mail.pem", "(ssl_certificate in /etc/nginx/nginx.conf)") in cfg.certificates
