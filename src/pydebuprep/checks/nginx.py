@@ -7,11 +7,13 @@ from typing import Any
 
 from pydebuprep.checks._tls import (
     CERT_OPTIONS,
+    TLS_PROBE_OPTION,
     TlsSite,
     certificate_findings,
     dhparam_findings,
     name_findings,
     protocol_findings,
+    served_findings,
     validate_cert_days,
 )
 from pydebuprep.checks._webconfig import (
@@ -199,7 +201,7 @@ class NginxCheck(Check):
     id = "nginx"
     title = "nginx configuration references"
     category = "applications"
-    options = CERT_OPTIONS
+    options = (*CERT_OPTIONS, TLS_PROBE_OPTION)
 
     def collect_baseline(self, ctx: Context) -> Any | None:
         if not ctx.system.exists(MAIN):
@@ -235,4 +237,6 @@ class NginxCheck(Check):
         found += dhparam_findings(ctx, "nginx", cfg.dhparams)
         found += protocol_findings("nginx", cfg.protocols)
         found += name_findings(ctx, "nginx", cfg.sites)
+        if self.opt("tls_probe"):
+            found += served_findings(ctx, "nginx", "nginx", cfg.sites)
         return found

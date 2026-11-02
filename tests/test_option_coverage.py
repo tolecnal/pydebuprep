@@ -22,6 +22,8 @@ OPTION_TESTS: dict[tuple[str, str], str] = {
     ("postgresql", "credentials_file"): "checks.test_probes::test_pg_credentials_file",
     ("certbot", "cert_warning_days"): "checks.test_certbot::test_live_certificate_expiring",
     ("certbot", "cert_critical_days"): "checks.test_certbot::test_live_certificate_expiring",
+    ("nginx", "tls_probe"): "checks.test_tls_probe::test_tls_probe_off",
+    ("apache", "tls_probe"): "checks.test_tls_probe::test_apache_tls_probe_off",
     ("apache", "cert_warning_days"): "checks.test_web_configs::test_apache_cert_options",
     ("apache", "cert_critical_days"): "checks.test_web_configs::test_apache_cert_options",
     ("nginx", "cert_warning_days"): "checks.test_web_configs::test_nginx_cert_options",

@@ -10,9 +10,12 @@ clients can't connect with such a protocol.
 
 from __future__ import annotations
 
+import hashlib
+import ipaddress
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from pydebuprep.checks._listeners import listening_addresses
 from pydebuprep.checks._x509 import Certificate, CertificateError, dh_bits, parse_pem
 from pydebuprep.checks.base import Context, Option
 from pydebuprep.model import Finding, Severity, truncate_evidence
@@ -35,6 +38,19 @@ CERT_OPTIONS = (
         "Critical when a TLS certificate expires within this many days (below the warning)",
     ),
 )  # fmt: skip
+
+
+TLS_PROBE_OPTION = Option(
+    "tls_probe", True,
+    "Connect to each TLS site on this host with its name (SNI) and compare the "
+    "certificate it serves with the file",
+)  # fmt: skip
+MAX_PROBES = 50
+PROBE_TIMEOUT = 5.0
+# A wildcard listen is reached on loopback, if one of these listens on its port.
+ANY_IPV4 = "0.0.0.0"  # nosec B104 # an address read from configs and /proc, never bound
+LOOPBACK_V4 = ("127.0.0.1", (ANY_IPV4, "127.0.0.1"))
+WILDCARDS = {"": LOOPBACK_V4, "*": LOOPBACK_V4, ANY_IPV4: LOOPBACK_V4, "::": ("::1", ("::", "::1"))}
 
 
 @dataclass(frozen=True)
@@ -311,3 +327,80 @@ def name_findings(ctx: Context, server: str, sites: Sequence[TlsSite]) -> list[F
             remediation=["Add the names to the certificate, or remove them from the site", INSPECT],
         )
     ]
+
+
+def _target(address: str, port: int, listening: set[tuple[str, int]]) -> str | None:
+    """The IP address to probe a site's listen ADDRESS:PORT on, or None if nothing on
+    this host listens there (or the address isn't an IP address)."""
+    address = address.strip("[]")
+    if address in WILDCARDS:
+        loopback, listeners = WILDCARDS[address]
+        return loopback if any((a, port) in listening for a in listeners) else None
+    try:
+        normal = ipaddress.ip_address(address).compressed
+    except ValueError:
+        return None
+    return normal if (normal, port) in listening else None
+
+
+def probe_targets(
+    sites: Sequence[TlsSite], listening: set[tuple[str, int]]
+) -> list[tuple[str, int, str, TlsSite]]:
+    """(address, port, server name, site) to probe: one per address, port and name,
+    only where this host listens, at most MAX_PROBES."""
+    targets: dict[tuple[str, int, str], TlsSite] = {}
+    for site in sites:
+        name = next((n for n in site.names if matchable(n)), None)
+        if name is None:
+            continue
+        for address, port in site.listen:
+            host = _target(address, port, listening)
+            if host is not None:
+                targets.setdefault((host, port, name), site)
+    return [(h, p, n, s) for (h, p, n), s in list(targets.items())[:MAX_PROBES]]
+
+
+def served_findings(
+    ctx: Context, server: str, service: str, sites: Sequence[TlsSite]
+) -> list[Finding]:
+    """Sites serving another certificate than the file they name: the server wasn't
+    reloaded after the certificate was renewed."""
+    differ, errors = [], []
+    for host, port, name, site in probe_targets(sites, listening_addresses(ctx.system)):
+        served, error = ctx.system.tls_peer_certificate(host, port, name, PROBE_TIMEOUT)
+        if served is None:
+            errors.append(f"{name} on {host}:{port}: {error}")
+            continue
+        data = ctx.system.read_bytes(site.certificate)
+        try:
+            on_disk = parse_pem(data)[0].sha256 if data is not None else None
+        except CertificateError:
+            on_disk = None  # reported by certificate_findings
+        digest = hashlib.sha256(served).hexdigest()
+        if on_disk is not None and digest != on_disk:
+            differ.append(
+                f"{name} on {host}:{port} serves {digest[:16]}…, "
+                f"{site.certificate} is {on_disk[:16]}…"
+            )
+    found = []
+    if differ:
+        found.append(
+            Finding(
+                Severity.WARNING,
+                f"{server} serves different certificates than its configuration names",
+                detail=f"The certificate files changed (a renewal, usually) and {server} "
+                "wasn't reloaded, so it still serves the old ones, which expire.",
+                evidence=truncate_evidence(differ),
+                remediation=[f"sudo systemctl reload {service}"],
+            )
+        )
+    if errors:
+        found.append(
+            Finding(
+                Severity.INFO,
+                f"{server}: some TLS sites didn't answer the probe",
+                detail="Their served certificate couldn't be compared with the file.",
+                evidence=truncate_evidence(errors),
+            )
+        )
+    return found

@@ -35,6 +35,14 @@ the `server` block that includes it:
 - the certificate of each TLS `server` block covers its `server_name`s (wildcards
   cover one label; names that are regular expressions, wildcards or `_` are skipped).
 
+As long as `tls_probe` is on (the default), it also connects to each TLS site on this
+host, sending the site's first literal `server_name` as SNI, and compares the certificate
+served with the file the configuration names. A difference means the certificate was
+renewed but nginx wasn't reloaded, so it still serves the old one. It connects only
+where this host listens: a wildcard listen on loopback, a specific address only if the
+kernel lists it as listening. At most 50 connections, 5 seconds each; the certificate
+isn't verified, only compared. nginx logs each connection in its access log.
+
 ## Findings
 
 | Severity | Finding | What to do |
@@ -52,6 +60,8 @@ the `server` block that includes it:
 | warning | nginx enables TLS protocols OpenSSL refuses | Remove the old protocols from `ssl_protocols`; they're refused anyway. |
 | warning | nginx has certificates that don't cover their server names | Add the names to the certificate, or remove them from `server_name`. |
 | info | nginx's certificates were not checked (needs root) | Run as root. |
+| warning | nginx serves different certificates than its configuration names | `sudo systemctl reload nginx`. |
+| info | nginx: some TLS sites didn't answer the probe | The evidence says why; a site that doesn't answer on its address can't be compared. |
 
 ## Compared with a snapshot
 

@@ -255,6 +255,7 @@ The package also installs the example as
 | `python-venvs` | `search_paths` (/opt, /srv, /usr/local, /root, /home, /var/www) and `max_depth` (5): where to look for virtualenvs; `exclude_paths` (\*/.cache/\*): ones to leave out |
 | `network` | `ignore_interfaces` (lo, veth\*, docker\*, br-\*, virbr\*, vnet\*, tap\*, cni\*, flannel\*, cali\*): left out of the baseline comparison |
 | `nginx`, `apache`, `certbot` | `cert_warning_days` (28), `cert_critical_days` (14): how many days before a TLS certificate expires that it's a warning, and critical (1 to 365, critical below warning) |
+| `nginx`, `apache` | `tls_probe` (true): connect to each TLS site on this host with its name and compare the certificate it serves with the file; the server logs each connection |
 | `disk-space` | `include_remote` (false), `warning_pct` (25.0), `critical_pct` (10.0), `exclude_mounts` ([]), `important_mounts` (["/", "/var"]) and `min_free_mib` (2048): an absolute free-space floor for those mounts |
 
 ### Exit codes

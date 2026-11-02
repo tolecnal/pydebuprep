@@ -26,6 +26,11 @@ packages that pass both checks.
   reports read back by `convert` are validated field by field, and YAML is loaded
   safely.
 - Snapshots are readable only by root (directory `0700`, files `0600`).
+- The nginx and apache checks connect to this host's own TLS sites to compare the
+  certificate served with the file configured. They connect only to loopback or to an
+  address and port the kernel lists as listening here, never look a name up, and
+  don't verify the certificate: it's compared, not trusted, and a connection that
+  verified would fail on exactly the certificates worth reporting.
 - CodeQL, Bandit, ShellCheck, pip-audit and zizmor run on every change, and pull
   requests get a dependency review. Dependabot keeps pinned actions and tools up to
   date.

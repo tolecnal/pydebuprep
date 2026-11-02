@@ -33,6 +33,7 @@ class FakeSystem(System):
         links: dict[str, str] | None = None,
         ports: set[tuple[str, int]] | None = None,
         http: dict[str, int] | None = None,
+        tls: dict[tuple[str, int, str], bytes] | None = None,
     ) -> None:
         self.commands = commands or {}
         self.files = files or {}
@@ -41,6 +42,8 @@ class FakeSystem(System):
         self.whole_reads: list[str] = []
         self.ports = ports or set()
         self.http = http or {}
+        self.tls = tls or {}
+        self.tls_calls: list[tuple[str, int, str, float]] = []
         self.mtimes = mtimes or {}
         self.disks = disks or {}
         self.root = root
@@ -125,6 +128,13 @@ class FakeSystem(System):
 
     def tcp_connect(self, host: str, port: int, timeout: float) -> str | None:
         return None if (host, port) in self.ports else "Connection refused"
+
+    def tls_peer_certificate(
+        self, host: str, port: int, server_name: str, timeout: float
+    ) -> tuple[bytes | None, str | None]:
+        self.tls_calls.append((host, port, server_name, timeout))
+        served = self.tls.get((host, port, server_name))
+        return (served, None) if served is not None else (None, "Connection refused")
 
     def http_get(self, url: str, timeout: float) -> tuple[int | None, str | None]:
         return (self.http[url], None) if url in self.http else (None, "Connection refused")

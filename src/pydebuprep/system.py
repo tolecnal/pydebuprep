@@ -10,6 +10,7 @@ import glob as _glob
 import gzip
 import http.client
 import io
+import ipaddress
 import os
 import re
 import shutil
@@ -411,6 +412,35 @@ class System:
         with os.fdopen(os.open(path, flags, 0o600), "wb") as fh:
             fh.write(data)
         return path
+
+    def tls_peer_certificate(
+        self, host: str, port: int, server_name: str, timeout: float
+    ) -> tuple[bytes | None, str | None]:
+        """The certificate (DER) a TLS server at HOST:PORT serves for SERVER_NAME (SNI):
+        (der, None), or (None, error). HOST must be an IP address: the caller decides
+        which of this host's addresses to ask, and no name is ever looked up.
+
+        Nothing is verified: the point is to compare what is served with the file the
+        configuration names, including certificates OpenSSL would refuse, so the
+        security level is lowered for this one connection.
+        """
+        try:
+            ipaddress.ip_address(host)
+        except ValueError:
+            raise ValueError(f"not an IP address: {host!r}") from None
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE  # compared, not trusted (see above)
+        context.set_ciphers("DEFAULT:@SECLEVEL=0")
+        try:
+            with (
+                socket.create_connection((host, port), timeout=timeout) as sock,
+                context.wrap_socket(sock, server_hostname=server_name) as tls,
+            ):
+                der = tls.getpeercert(binary_form=True)
+        except (OSError, ValueError) as exc:  # ssl.SSLError is an OSError
+            return None, str(exc) or type(exc).__name__
+        return (der, None) if der else (None, "no certificate")
 
     def tcp_connect(self, host: str, port: int, timeout: float) -> str | None:
         """Whether something answers on a TCP port: None if so, else why not.

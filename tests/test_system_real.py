@@ -301,3 +301,49 @@ def test_a_file_swapped_for_a_fifo_after_the_check_is_refused(
         system.os, "lstat", lambda p: regular if str(p) == str(fifo) else real_lstat(p)
     )
     assert System().read_bytes(str(fifo)) is None
+
+
+TLS_DATA = Path(__file__).resolve().parent / "data" / "tls"
+
+
+def test_tls_peer_certificate_real() -> None:
+    import base64
+    import re
+    import socket
+    import ssl
+    import threading
+
+    server_ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    server_ctx.load_cert_chain(TLS_DATA / "good.pem", TLS_DATA / "good.key")
+    seen: list[str | None] = []
+    server_ctx.sni_callback = lambda _sock, name, _ctx: seen.append(name)  # type: ignore[assignment,func-returns-value] # records the SNI
+    listener = socket.create_server(("127.0.0.1", 0))
+    port = listener.getsockname()[1]
+
+    def serve() -> None:
+        conn, _ = listener.accept()
+        try:
+            with server_ctx.wrap_socket(conn, server_side=True) as tls:
+                tls.recv(1)
+        except (OSError, ssl.SSLError):
+            pass
+
+    thread = threading.Thread(target=serve, daemon=True)
+    thread.start()
+    try:
+        der, error = System().tls_peer_certificate("127.0.0.1", port, "www.example.org", 5.0)
+    finally:
+        thread.join(5)
+        listener.close()
+    pem = (TLS_DATA / "good.pem").read_bytes()
+    body = re.search(rb"-----BEGIN CERTIFICATE-----(.*?)-----END", pem, re.S)
+    assert body and error is None
+    assert der == base64.b64decode(body.group(1))
+    assert seen == ["www.example.org"]
+    der, error = System().tls_peer_certificate("127.0.0.1", port, "www.example.org", 1.0)
+    assert der is None and error  # nothing listens any more
+
+
+def test_tls_peer_certificate_rejects_hostnames() -> None:
+    with pytest.raises(ValueError, match="IP address"):
+        System().tls_peer_certificate("localhost", 443, "www.example.org", 1.0)

@@ -38,6 +38,14 @@ For TLS, following includes where they stand, so a directive belongs to the
 - the certificate of each virtual host with `SSLEngine on` covers its `ServerName`
   and `ServerAlias` names.
 
+As long as `tls_probe` is on (the default), it also connects to each TLS site on this
+host, sending the site's first literal `ServerName` as SNI, and compares the certificate
+served with the file the configuration names. A difference means the certificate was
+renewed but Apache wasn't reloaded, so it still serves the old one. It connects only
+where this host listens: a wildcard listen on loopback, a specific address only if the
+kernel lists it as listening. At most 50 connections, 5 seconds each; the certificate
+isn't verified, only compared. Apache logs each connection in its access log.
+
 ## Findings
 
 | Severity | Finding | What to do |
@@ -56,6 +64,8 @@ For TLS, following includes where they stand, so a directive belongs to the
 | warning | Apache enables TLS protocols OpenSSL refuses | Remove the old protocols from `SSLProtocol`; they're refused anyway. |
 | warning | Apache has certificates that don't cover their server names | Add the names to the certificate, or remove them from `ServerName`/`ServerAlias`. |
 | info | Apache's certificates were not checked (needs root) | Run as root. |
+| warning | Apache serves different certificates than its configuration names | `sudo systemctl reload apache2`. |
+| info | Apache: some TLS sites didn't answer the probe | The evidence says why; a site that doesn't answer on its address can't be compared. |
 
 ## Compared with a snapshot
 

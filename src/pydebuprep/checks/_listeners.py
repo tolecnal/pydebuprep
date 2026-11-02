@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ipaddress
+
 from pydebuprep.system import System
 
 # /proc/net/<file>: (protocol, socket state that means "listening")
@@ -57,3 +59,23 @@ def unit_listeners(system: System, control_group: str, sockets: dict[str, str]) 
             if target.startswith("socket:[") and target[8:-1] in sockets:
                 found.add(sockets[target[8:-1]])
     return sorted(found)
+
+
+def _address(hex_address: str) -> str:
+    """An address as /proc/net/tcp{,6} writes it (32-bit words in host byte order)."""
+    raw = bytes.fromhex(hex_address)
+    swapped = b"".join(raw[i : i + 4][::-1] for i in range(0, len(raw), 4))
+    return ipaddress.ip_address(swapped).compressed
+
+
+def listening_addresses(system: System) -> set[tuple[str, int]]:
+    """Every (address, port) a TCP socket listens on, from /proc/net/tcp and tcp6."""
+    found = set()
+    for name in ("tcp", "tcp6"):
+        for line in (system.read_text(f"/proc/net/{name}") or "").splitlines()[1:]:
+            fields = line.split()
+            if len(fields) < 4 or fields[3] != PROC_NET[name][1]:
+                continue
+            address, _, port = fields[1].partition(":")
+            found.add((_address(address), int(port, 16)))
+    return found

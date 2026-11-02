@@ -24,6 +24,11 @@
             "enabled": {
               "default": true,
               "type": "boolean"
+            },
+            "tls_probe": {
+              "default": true,
+              "description": "Connect to each TLS site on this host with its name (SNI) and compare the certificate it serves with the file",
+              "type": "boolean"
             }
           },
           "type": [
@@ -595,6 +600,11 @@
             },
             "enabled": {
               "default": true,
+              "type": "boolean"
+            },
+            "tls_probe": {
+              "default": true,
+              "description": "Connect to each TLS site on this host with its name (SNI) and compare the certificate it serves with the file",
               "type": "boolean"
             }
           },
