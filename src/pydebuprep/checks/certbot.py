@@ -20,7 +20,8 @@ RENEWAL_DIR = f"{CONF_DIR}/renewal"
 CERTBOT_PATHS = ("/usr/bin/certbot", "/usr/local/bin/certbot")
 SNAP_CERTBOT = "/snap/bin/certbot"
 SYSTEM_PYTHON = "/usr/bin/python3"
-SYSTEM_SITE_DIRS = ("/usr/lib/python3/dist-packages", "/usr/local/lib/python3.*/dist-packages")
+DIST_PACKAGES = "/usr/lib/python3/dist-packages"
+PYTHON_NAME = re.compile(r"python(\d+\.\d+)")
 BUILT_IN = {"standalone", "webroot", "manual", "null"}
 VENV_VERSION = re.compile(r"^\s*(?:version|version_info)\s*=\s*(\d+)\.(\d+)", re.M)
 VENV_HOME = re.compile(r"^\s*home\s*=\s*(\S+)", re.M)
@@ -74,11 +75,24 @@ def _venv(ctx: Context, python: str) -> tuple[str, str | None, str | None] | Non
     )
 
 
+def _python_version(ctx: Context, python: str) -> str | None:
+    """X.Y of a system Python, from its name or the name it links to (python3 →
+    python3.11)."""
+    for name in (python, ctx.system.readlink(python) or ""):
+        match = PYTHON_NAME.fullmatch(posixpath.basename(name))
+        if match:
+            return match.group(1)
+    return None
+
+
 def site_dirs(ctx: Context, python: str) -> list[str]:
     """Where PYTHON finds installed packages (glob patterns)."""
     venv = _venv(ctx, python)
     if venv is None:
-        return list(SYSTEM_SITE_DIRS)
+        # Only the current Python's /usr/local directory: one left by the old Python
+        # after an upgrade (apt never cleans /usr/local) isn't what certbot loads.
+        version = _python_version(ctx, python)
+        return [DIST_PACKAGES, f"/usr/local/lib/python{version or '3.*'}/dist-packages"]
     root, version, _ = venv
     return [f"{root}/lib/python{version or '3*'}/site-packages"]
 

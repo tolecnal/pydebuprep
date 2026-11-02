@@ -38,7 +38,7 @@ def der(name: str) -> bytes:
 def site(
     *names: str, listen: tuple[tuple[str, int], ...] = (("", 443),), cert: str = "/etc/ssl/good.pem"
 ) -> TlsSite:
-    return TlsSite("/etc/nginx/sites-enabled/s", names, cert, listen)
+    return TlsSite("/etc/nginx/sites-enabled/s", names, (cert,), listen)
 
 
 def test_listening_addresses() -> None:
@@ -84,7 +84,9 @@ def test_probe_targets_capped() -> None:
 
 def ctx_serving(served: bytes | None):  # type: ignore[no-untyped-def] # test helper
     tls = {} if served is None else {("127.0.0.1", 443, "www.example.org"): served}
-    return make_ctx(files={**PROC, "/etc/ssl/good.pem": tls_fixture("good.pem")}, tls=tls)
+    return make_ctx(
+        files={**PROC, "/etc/ssl/good.pem": tls_fixture("good.pem")}, tls=tls, root=False
+    )
 
 
 def test_served_matches_is_clean() -> None:
@@ -118,10 +120,12 @@ def test_probe_error_is_info() -> None:
 
 def test_unreadable_certificate_on_disk_is_not_compared() -> None:
     ctx = make_ctx(
+        root=False,
         files={**PROC, "/etc/ssl/good.pem": b"junk"},
         tls={("127.0.0.1", 443, "www.example.org"): der("good.pem")},
     )
     assert served_findings(ctx, "nginx", "nginx", [site("www.example.org")]) == []
+    assert ctx.system.tls_calls == []  # type: ignore[attr-defined] # nothing to compare: no connection
 
 
 NGINX = {
@@ -132,14 +136,16 @@ NGINX = {
 
 def test_nginx_probes_by_default() -> None:
     ctx = make_ctx(files={**PROC, **NGINX, "/etc/ssl/good.pem": tls_fixture("good.pem")},
-                   tls={("127.0.0.1", 443, "www.example.org"): der("soon.pem")})  # fmt: skip
+                   tls={("127.0.0.1", 443, "www.example.org"): der("soon.pem")}, root=False)  # fmt: skip
     assert "nginx serves different certificates than its configuration names" in titles(
         NginxCheck().run(ctx)
     )
 
 
 def test_tls_probe_off() -> None:
-    ctx = make_ctx(files={**PROC, **NGINX, "/etc/ssl/good.pem": tls_fixture("good.pem")})
+    ctx = make_ctx(
+        files={**PROC, **NGINX, "/etc/ssl/good.pem": tls_fixture("good.pem")}, root=False
+    )
     assert NginxCheck({"tls_probe": False}).run(ctx) == []
     assert ctx.system.tls_calls == []  # type: ignore[attr-defined] # FakeSystem
 
@@ -161,8 +167,62 @@ def test_apache_tls_probe_off() -> None:
         **PROC,
     }
     served = {("127.0.0.1", 443, "www.example.org"): der("soon.pem")}
-    found = ApacheCheck().run(make_ctx(files=files, tls=served))
+    found = ApacheCheck().run(make_ctx(files=files, tls=served, root=False))
     assert titles(found) == ["Apache serves different certificates than its configuration names"]
-    ctx = make_ctx(files=files, tls=served)
+    ctx = make_ctx(files=files, tls=served, root=False)
     assert ApacheCheck({"tls_probe": False}).run(ctx) == []
+    assert ctx.system.tls_calls == []  # type: ignore[attr-defined] # FakeSystem
+
+
+def test_rsa_and_ecdsa_certificates_both_count() -> None:
+    # nginx serves the ECDSA one to a client that prefers it; that's no stale certificate.
+    files = {
+        **PROC,
+        "/etc/ssl/good.pem": tls_fixture("good.pem"),
+        "/etc/ssl/ec.pem": tls_fixture("ec.pem"),
+    }
+    pair = TlsSite("/etc/nginx/sites-enabled/s", ("www.example.org", "ec.example.org"),
+                   ("/etc/ssl/good.pem", "/etc/ssl/ec.pem"), (("", 443),))  # fmt: skip
+    ctx = make_ctx(
+        files=files, root=False, tls={("127.0.0.1", 443, "www.example.org"): der("ec.pem")}
+    )
+    assert served_findings(ctx, "nginx", "nginx", [pair]) == []
+    from pydebuprep.checks._tls import name_findings
+
+    assert name_findings(ctx, "nginx", [pair]) == []  # ec.example.org is on the second
+
+
+def test_nginx_server_keeps_every_certificate() -> None:
+    from pydebuprep.checks.nginx import read_config
+
+    conf = "http { server { listen 443 ssl; server_name a.example.org;\n" \
+        "ssl_certificate /etc/ssl/good.pem; ssl_certificate /etc/ssl/ec.pem; } }\n"  # fmt: skip
+    [site] = read_config(make_ctx(files={"/etc/nginx/nginx.conf": conf})).sites
+    assert site.certificates == ("/etc/ssl/good.pem", "/etc/ssl/ec.pem")
+
+
+def test_apache_vhost_keeps_every_certificate() -> None:
+    from pydebuprep.checks.apache import read_config
+
+    conf = "<VirtualHost *:443>\nSSLEngine on\nSSLCertificateFile /etc/ssl/good.pem\n" \
+        "SSLCertificateFile /etc/ssl/ec.pem\nSSLCertificateChainFile /etc/ssl/chain.pem\n</VirtualHost>\n"  # fmt: skip
+    [site] = read_config(make_ctx(files={"/etc/apache2/apache2.conf": conf})).sites
+    assert site.certificates == ("/etc/ssl/good.pem", "/etc/ssl/ec.pem")
+
+
+def test_only_listeners_owned_by_root_are_probed() -> None:
+    # nginx failed to start after the upgrade and an unprivileged user took its port:
+    # that listener belongs to uid 1000, so nothing is sent to it. Without systemd too.
+    user = ROW.replace("     0        0 1 1", "  1000        0 1 1")
+    proc = {
+        **PROC,
+        "/proc/net/tcp": PROC["/proc/net/tcp"] + user.format(addr="00000000:20FB", state="0A"),
+    }
+    assert ("0.0.0.0", 8443) not in listening_addresses(FakeSystem(files=proc))
+    files = {**proc, "/etc/ssl/good.pem": tls_fixture("good.pem")}
+    ctx = make_ctx(files=files, tls={("127.0.0.1", 8443, "www.example.org"): der("soon.pem")})
+    assert (
+        served_findings(ctx, "nginx", "nginx", [site("www.example.org", listen=(("", 8443),))])
+        == []
+    )
     assert ctx.system.tls_calls == []  # type: ignore[attr-defined] # FakeSystem

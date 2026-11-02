@@ -211,3 +211,30 @@ def test_other_paths_fail(tmp_path: Path) -> None:
 
 def test_process_creation_is_not_a_change(tmp_path: Path) -> None:
     assert audit(tmp_path, "100 clone(child_stack=NULL, flags=SIGCHLD) = 101\n")[0] == 0
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        # The working directory isn't traced: a bare name may be anywhere (/run itself).
+        '300 chmod("run", 0777) = 0\n',
+        '300 fchownat(AT_FDCWD, "apache2", 0, 0, 0) = 0\n',
+        '300 rename("lock", "x") = 0\n',
+    ],
+)
+def test_bare_names_are_agreed_for_mkdir_only(tmp_path: Path, line: str) -> None:
+    assert audit(tmp_path, APACHE_T.splitlines(keepends=True)[0] + line)[0] == 1
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/var/log/syslog",
+        "/var/log/nginx/../auth.log",
+        "/var/log/nginx/sub/x.log",
+        "/var/log/nginx/..",
+    ],
+)
+def test_only_nginx_log_files_are_agreed(tmp_path: Path, path: str) -> None:
+    trace = NGINX_T + f'200 openat(AT_FDCWD, "{path}", O_WRONLY|O_CREAT|O_APPEND, 0644) = 3\n'
+    assert audit(tmp_path, trace)[0] == 1

@@ -82,7 +82,7 @@ def test_plugin_found_in_dist_packages() -> None:
 
 
 def test_site_dirs() -> None:
-    ctx = certbot_ctx()
+    ctx = certbot_ctx()  # python3 isn't a link here: any version's /usr/local directory
     assert site_dirs(ctx, "/usr/bin/python3") == [DIST, "/usr/local/lib/python3.*/dist-packages"]
     venv = certbot_ctx({"/opt/certbot/pyvenv.cfg": "home = /usr/bin\nversion = 3.11.2\n"})
     assert site_dirs(venv, "/opt/certbot/bin/python") == [
@@ -182,4 +182,29 @@ def test_live_unreadable_as_non_root_is_info() -> None:
     del ctx.system.files["/etc/letsencrypt/live/example.org/cert.pem"]  # type: ignore[attr-defined] # FakeSystem
     assert titles(CertbotCheck().run(ctx)) == [
         "certbot's certificates were not checked (needs root)"
+    ]
+
+
+def test_pip_plugin_left_behind_for_the_old_python() -> None:
+    # bullseye → bookworm: /usr/local/lib/python3.9 stays on disk, but python3 is 3.11.
+    files = {
+        "/etc/letsencrypt/renewal/example.org.conf": renewal("dns-cloudflare"),
+        "/usr/bin/python3.11": "",
+        "/usr/local/lib/python3.9/dist-packages/certbot_dns_cloudflare-1.0.dist-info/entry_points.txt": plugin(
+            "dns-cloudflare"
+        ),
+    }
+    ctx = certbot_ctx(files, links={"/usr/bin/python3": "python3.11"})
+    del ctx.system.files["/usr/bin/python3"]  # type: ignore[attr-defined] # a link to python3.11 now
+    assert site_dirs(ctx, "/usr/bin/python3") == [DIST, "/usr/local/lib/python3.11/dist-packages"]
+    assert titles(CertbotCheck().run(ctx)) == ["certbot renewals use plugins that aren't installed"]
+    moved = "/usr/local/lib/python3.11/dist-packages/certbot_dns_cloudflare-1.0.dist-info/entry_points.txt"
+    ctx.system.files[moved] = plugin("dns-cloudflare")  # type: ignore[attr-defined] # FakeSystem
+    assert CertbotCheck().run(ctx) == []
+
+
+def test_versioned_interpreter_names_its_own_site_dir() -> None:
+    assert site_dirs(certbot_ctx(), "/usr/bin/python3.13") == [
+        DIST,
+        "/usr/local/lib/python3.13/dist-packages",
     ]

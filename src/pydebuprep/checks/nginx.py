@@ -19,6 +19,7 @@ from pydebuprep.checks._tls import (
 from pydebuprep.checks._webconfig import (
     CONFIG_TEST_OPTION,
     MAX_FILES,
+    MAX_STATEMENTS,
     Ref,
     config_test_findings,
     findings,
@@ -27,6 +28,7 @@ from pydebuprep.checks._webconfig import (
     missing_sockets,
     resolve,
     socket_path,
+    truncated_finding,
     web_baseline,
     web_compare,
 )
@@ -87,20 +89,21 @@ class _Server:
     source: str
     names: list[str] = field(default_factory=list)
     listen: list[tuple[tuple[str, int], bool]] = field(default_factory=list)  # (addr, ssl)
-    certificate: str | None = None
+    certificates: list[str] = field(default_factory=list)
     ssl_on: bool = False
 
-    def site(self, inherited: str | None) -> TlsSite | None:
+    def site(self, inherited: tuple[str, ...]) -> TlsSite | None:
         tls = [addr for addr, ssl in self.listen if ssl or self.ssl_on]
-        certificate = self.certificate or inherited
-        if not tls or certificate is None:
+        certificates = tuple(self.certificates) or inherited
+        if not tls or not certificates:
             return None
-        return TlsSite(self.source, tuple(self.names), certificate, tuple(tls))
+        return TlsSite(self.source, tuple(self.names), certificates, tuple(tls))
 
 
 @dataclass
 class NginxConfig:
     files: list[str] = field(default_factory=list)
+    truncated: bool = False
     includes: list[str] = field(default_factory=list)
     modules: list[str] = field(default_factory=list)
     sockets: list[Ref] = field(default_factory=list)
@@ -121,16 +124,24 @@ class _Walker:
         self.blocks: list[str] = []
         self.servers: list[_Server] = []
         self.current: _Server | None = None
-        self.http_certificate: str | None = None
-        self.reads = 0
+        self.http_certificates: list[str] = []
+        self.parsed: dict[str, list[tuple[str, list[str]]]] = {}
+        self.count = 0
 
     def walk(self, path: str, including: tuple[str, ...] = ()) -> None:
-        if path in including or self.reads >= MAX_FILES:
+        if path in including:
             return
-        self.reads += 1
-        if path not in self.cfg.files:
+        if path not in self.parsed:
+            if len(self.parsed) >= MAX_FILES:
+                self.cfg.truncated = True
+                return
+            self.parsed[path] = list(statements(self.ctx.system.read_text(path) or ""))
             self.cfg.files.append(path)
-        for end, words in statements(self.ctx.system.read_text(path) or ""):
+        for end, words in self.parsed[path]:
+            self.count += 1
+            if self.count > MAX_STATEMENTS:
+                self.cfg.truncated = True
+                return
             if end == "{":
                 self.enter(words, path)
             elif end == "}":
@@ -170,9 +181,9 @@ class _Walker:
             certificate = resolve(CONF_DIR, args[0])
             cfg.certificates.append((certificate, where))
             if self.current is not None:
-                self.current.certificate = self.current.certificate or certificate
+                self.current.certificates.append(certificate)
             elif self.blocks == ["http"]:
-                self.http_certificate = self.http_certificate or certificate
+                self.http_certificates.append(certificate)
         elif name == "ssl_dhparam" and literal_path(args[0]):
             cfg.dhparams.append((resolve(CONF_DIR, args[0]), where))
         elif name == "ssl_protocols":
@@ -193,7 +204,7 @@ class _Walker:
         cfg = self.cfg
         cfg.includes = list(dict.fromkeys(cfg.includes))
         cfg.modules = list(dict.fromkeys(cfg.modules))
-        cfg.sites = [s for srv in self.servers if (s := srv.site(self.http_certificate))]
+        cfg.sites = [s for srv in self.servers if (s := srv.site(tuple(self.http_certificates)))]
         return cfg
 
 
@@ -250,4 +261,6 @@ class NginxCheck(Check):
             found += config_test_findings(
                 ctx, "nginx", CONFIG_TEST, error=CONFIG_TEST_ERROR, warning=CONFIG_TEST_WARNING
             )
+        if cfg.truncated:
+            found.append(truncated_finding("nginx"))
         return found

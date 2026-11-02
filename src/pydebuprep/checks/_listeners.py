@@ -69,12 +69,14 @@ def _address(hex_address: str) -> str:
 
 
 def listening_addresses(system: System) -> set[tuple[str, int]]:
-    """Every (address, port) a TCP socket listens on, from /proc/net/tcp and tcp6."""
+    """Every (address, port) a socket owned by root listens on (TCP, from /proc/net/tcp
+    and tcp6). Other users' listeners are left out: they may hold a port a server's
+    configuration names after the server failed to start."""
     found = set()
     for name in ("tcp", "tcp6"):
         for line in (system.read_text(f"/proc/net/{name}") or "").splitlines()[1:]:
             fields = line.split()
-            if len(fields) < 4 or fields[3] != PROC_NET[name][1]:
+            if len(fields) < 8 or fields[3] != PROC_NET[name][1] or fields[7] != "0":
                 continue
             address, _, port = fields[1].partition(":")
             found.add((_address(address), int(port, 16)))

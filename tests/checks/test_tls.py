@@ -217,7 +217,10 @@ def test_name_matching() -> None:
 
 def site(*names: str, cert: str = "/certs/good.pem") -> TlsSite:
     return TlsSite(
-        source="/etc/nginx/sites-enabled/site", names=names, certificate=cert, listen=(("", 443),)
+        source="/etc/nginx/sites-enabled/site",
+        names=names,
+        certificates=(cert,),
+        listen=(("", 443),),
     )
 
 
@@ -240,3 +243,13 @@ def test_name_findings_skip_unmatchable_names() -> None:
     assert finding.evidence == [
         "other.org isn't covered by /certs/good.pem (/etc/nginx/sites-enabled/site)"
     ]
+
+
+def test_variables_macros_and_addresses_are_not_host_names() -> None:
+    from pydebuprep.checks._tls import matchable
+
+    for name in ("$hostname", "@domain", "%domain", "192.0.2.1", "[::1]", "::1"):
+        assert not matchable(name), name
+    assert matchable("www.example.org")
+    ctx = ctx_with("good.pem")
+    assert name_findings(ctx, "nginx", [site("$hostname", "192.0.2.1", "@domain")]) == []

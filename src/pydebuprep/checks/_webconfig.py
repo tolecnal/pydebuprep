@@ -25,8 +25,11 @@ CONFIG_TEST_OPTION = Option(
 )  # fmt: skip
 CONFIG_TEST_LINES = 10
 
-# Configurations to follow at most, against include loops and enormous trees.
+# Configuration files to read at most, against include loops and enormous trees; each is
+# read once and replayed wherever it's included (a snippet in every server block), up to
+# MAX_STATEMENTS directives in all.
 MAX_FILES = 500
+MAX_STATEMENTS = 200_000
 GLOB = re.compile(r"[*?\[]")
 SOCKET = re.compile(r"unix:(/[^\s:;|\"']+)")
 # PHP is the one thing Debian and Ubuntu version in module and file names: php7.4.load,
@@ -160,7 +163,7 @@ def unversioned(name: str) -> str:
     return PHP_VERSION.sub("php*", name)
 
 
-def _listeners(ctx: Context, unit: str) -> list[str]:
+def unit_ports(ctx: Context, unit: str) -> list[str]:
     """The ports UNIT's processes listen on; empty unless root and the unit is active."""
     from pydebuprep.checks.systemd_critical import unit_states  # avoids an import cycle
 
@@ -181,7 +184,7 @@ def web_baseline(
     return {
         "modules": sorted({posixpath.basename(m) for m in modules}),
         "files": list(cfg_files),
-        "listeners": _listeners(ctx, unit) if listeners else [],
+        "listeners": unit_ports(ctx, unit) if listeners else [],
     }
 
 
@@ -307,3 +310,12 @@ def config_test_findings(
             evidence=truncate_evidence(warnings[:CONFIG_TEST_LINES]),
         )
     ]
+
+
+def truncated_finding(server: str) -> Finding:
+    return Finding(
+        Severity.INFO,
+        f"{server}'s configuration is too large to check completely",
+        detail=f"It has more than {MAX_FILES} files or {MAX_STATEMENTS} directives "
+        "(counting each include where it stands); the rest wasn't checked.",
+    )

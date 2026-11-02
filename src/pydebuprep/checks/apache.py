@@ -20,6 +20,7 @@ from pydebuprep.checks._tls import (
 from pydebuprep.checks._webconfig import (
     CONFIG_TEST_OPTION,
     MAX_FILES,
+    MAX_STATEMENTS,
     Ref,
     config_test_findings,
     findings,
@@ -28,6 +29,7 @@ from pydebuprep.checks._webconfig import (
     missing_sockets,
     resolve,
     socket_path,
+    truncated_finding,
     web_baseline,
     web_compare,
 )
@@ -86,17 +88,18 @@ class _VirtualHost:
     listen: list[tuple[str, int]]
     names: list[str] = field(default_factory=list)
     ssl: bool = False
-    certificate: str | None = None
+    certificates: list[str] = field(default_factory=list)
 
     def site(self) -> TlsSite | None:
-        if not self.ssl or self.certificate is None or not self.listen:
+        if not self.ssl or not self.certificates or not self.listen:
             return None
-        return TlsSite(self.source, tuple(self.names), self.certificate, tuple(self.listen))
+        return TlsSite(self.source, tuple(self.names), tuple(self.certificates), tuple(self.listen))
 
 
 @dataclass
 class ApacheConfig:
     files: list[str] = field(default_factory=list)
+    truncated: bool = False
     includes: list[str] = field(default_factory=list)
     modules: list[str] = field(default_factory=list)
     sockets: list[Ref] = field(default_factory=list)
@@ -118,20 +121,29 @@ class _Walker:
         self.cfg = ApacheConfig()
         self.vhosts: list[_VirtualHost] = []
         self.current: _VirtualHost | None = None
-        self.reads = 0
+        self.parsed: dict[str, list[tuple[str, list[str]]]] = {}
+        self.count = 0
 
     def walk(self, path: str, including: tuple[str, ...] = ()) -> None:
-        if path in including or self.reads >= MAX_FILES:
+        if path in including:
             return
-        self.reads += 1
-        if path not in self.cfg.files:
+        if path not in self.parsed:
+            if len(self.parsed) >= MAX_FILES:
+                self.cfg.truncated = True
+                return
+            self.parsed[path] = list(directives(self.ctx.system.read_text(path) or ""))
             self.cfg.files.append(path)
-        for name, args in directives(self.ctx.system.read_text(path) or ""):
+        for name, args in self.parsed[path]:
+            self.count += 1
+            if self.count > MAX_STATEMENTS:
+                self.cfg.truncated = True
+                return
             self.directive(name, args, path, (*including, path))
 
     def directive(self, name: str, args: list[str], path: str, chain: tuple[str, ...]) -> None:
         cfg, lower, where = self.cfg, name.lower(), f"({name} in {path})"
-        literal = bool(args) and "$" not in args[-1]
+        # Not built from variables, or from mod_macro parameters (@name, %name)
+        literal = bool(args) and not any(c in args[-1] for c in "$@%")
         if lower == VHOST_OPEN:
             self.current = _VirtualHost(path, [a for s in args if (a := address(s))])
             self.vhosts.append(self.current)
@@ -152,7 +164,7 @@ class _Walker:
             certificate = resolve(SERVER_ROOT, args[0])
             cfg.certificates.append((certificate, where))
             if self.current is not None and lower == "sslcertificatefile":
-                self.current.certificate = self.current.certificate or certificate
+                self.current.certificates.append(certificate)
         elif lower == "sslopensslconfcmd" and args[:1] == ["DHParameters"] and literal:
             cfg.dhparams.append((resolve(SERVER_ROOT, args[-1]), where))
         elif lower == "sslprotocol":
@@ -267,4 +279,6 @@ class ApacheCheck(Check):
             found += config_test_findings(
                 ctx, "Apache", CONFIG_TEST, error=CONFIG_TEST_ERROR, warning=CONFIG_TEST_WARNING
             )
+        if cfg.truncated:
+            found.append(truncated_finding("Apache"))
         return found

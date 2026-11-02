@@ -56,24 +56,28 @@ AGREED_WRITES = (
     # nginx -t: opens its PID file (creating it, never writing it) and its logs for
     # appending, and creates its temp directories (owned by www-data) if missing.
     Agreed("nginx", OPEN_CALLS, re.compile(r"/run/nginx\.pid"), re.compile(r"O_RDWR\|O_CREAT")),
-    Agreed("nginx", OPEN_CALLS, re.compile(r"/var/log/.+"), re.compile(r"O_APPEND")),
+    Agreed(
+        "nginx", OPEN_CALLS, re.compile(r"/var/log/nginx/(?!\.\.?$)[^/]+"), re.compile(r"O_APPEND")
+    ),
     Agreed(
         "nginx",
         ("mkdir", "mkdirat", "chown", "fchownat", "lchown"),
         re.compile(r"/var/lib/nginx/(body|proxy|fastcgi|uwsgi|scgi)"),
     ),
-    # apache2ctl -t: creates Apache's run and lock directories if missing (mkdir -p
-    # walks relative path components; the socket directory is made under a temporary
-    # name and renamed into place).
+    # apache2ctl -t: creates Apache's run and lock directories if missing; the socket
+    # directory is made under a temporary name and renamed into place.
     Agreed(
         "apache2ctl",
         ("mkdir", "mkdirat", "chmod", "fchmodat", "chown", "fchownat", "rename", "renameat",
          "renameat2"),
         re.compile(
             r"(/var)?/run/apache2(/socks(\.\w+)?)?|(/var)?/run/lock/apache2(\.\w+)?"
-            r"|/var/lock/apache2(\.\w+)?|apache2|run|lock"
+            r"|/var/lock/apache2(\.\w+)?"
         ),
     ),
+    # mkdir -p walks relative path components from a working directory the trace doesn't
+    # show; creating a directory is all a bare name may do (an existing one fails).
+    Agreed("apache2ctl", ("mkdir", "mkdirat"), re.compile(r"apache2|run|lock")),
 )  # fmt: skip
 
 

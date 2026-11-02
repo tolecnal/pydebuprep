@@ -324,7 +324,7 @@ def test_server_block_collects_tls_site() -> None:
         TlsSite(
             source="/etc/nginx/sites-enabled/tls",
             names=("www.example.org", "example.org"),
-            certificate="/etc/ssl/good.pem",
+            certificates=("/etc/ssl/good.pem",),
             listen=(("", 443), ("[::]", 443)),
         )
     ]
@@ -355,8 +355,8 @@ def test_http_level_certificate_is_inherited() -> None:
     cfg = nginx_read_config(
         nginx_tls_ctx({"/etc/nginx/nginx.conf": conf, "/etc/nginx/sites-available/tls": site})
     )
-    assert [(s.names, s.certificate) for s in cfg.sites] == [
-        (("a.example.net",), "/etc/ssl/good.pem")
+    assert [(s.names, s.certificates) for s in cfg.sites] == [
+        (("a.example.net",), ("/etc/ssl/good.pem",))
     ]
 
 
@@ -480,7 +480,7 @@ def test_virtualhost_collects_tls_site() -> None:
         TlsSite(
             source="/etc/apache2/sites-enabled/ssl.conf",
             names=("www.example.org", "example.org", "a.example.net"),
-            certificate="/etc/ssl/good.pem",
+            certificates=("/etc/ssl/good.pem",),
             listen=(("", 443), ("[::]", 443)),
         )
     ]
@@ -509,8 +509,8 @@ Listen 0.0.0.0:443 https
 Listen [::]:8443
 """
     cfg = apache_read_config(apache_tls_ctx({"/etc/apache2/sites-available/ssl.conf": site}))
-    assert [(s.listen, s.certificate) for s in cfg.sites] == [
-        ((("", 8443), ("10.0.0.1", 443)), "/etc/apache2/ssl/good.pem"),
+    assert [(s.listen, s.certificates) for s in cfg.sites] == [
+        ((("", 8443), ("10.0.0.1", 443)), ("/etc/apache2/ssl/good.pem",)),
     ]
     assert [p for p, _ in cfg.certificates] == [
         "/etc/apache2/ssl/good.pem", "/etc/ssl/good.pem", "/etc/ssl/global.pem",
@@ -718,3 +718,57 @@ def test_apache_config_test_error() -> None:
         )
         == []
     )
+
+
+def test_apache_macro_parameters_are_not_paths() -> None:
+    site = "<Macro SSL $domain>\nSSLCertificateFile /etc/ssl/@domain.pem\n" \
+        "SSLCertificateChainFile /etc/ssl/%domain.pem\n</Macro>\n"  # fmt: skip
+    cfg = apache_read_config(apache_tls_ctx({"/etc/apache2/sites-available/ssl.conf": site}))
+    assert cfg.certificates == []
+
+
+# --- limits ------------------------------------------------------------------------------
+
+
+def test_a_snippet_shared_by_many_servers_is_read_once() -> None:
+    # 0.8.0 counted files; counting reads would stop after ~500 servers sharing a snippet.
+    servers = "server { listen 443 ssl; server_name s.example.org; include snippets/cert.conf; }\n"
+    ctx = nginx_tls_ctx({"/etc/nginx/sites-available/tls": servers * 600})
+    cfg = nginx_read_config(ctx)
+    assert len(cfg.sites) == 600 and not cfg.truncated
+    assert ctx.system.whole_reads.count("/etc/nginx/snippets/cert.conf") <= 1  # type: ignore[attr-defined] # FakeSystem
+
+
+def test_apache_include_shared_by_many_vhosts_is_read_once() -> None:
+    vhost = "<VirtualHost *:443>\nServerName s.example.org\nSSLEngine on\nInclude conf-available/le.conf\n</VirtualHost>\n"
+    files = {
+        "/etc/apache2/sites-available/ssl.conf": vhost * 600,
+        "/etc/apache2/conf-available/le.conf": "SSLCertificateFile /etc/ssl/good.pem\n",
+    }
+    cfg = apache_read_config(apache_tls_ctx(files))
+    assert len(cfg.sites) == 600 and not cfg.truncated
+
+
+def test_too_many_files_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    import pydebuprep.checks.apache as apache_module
+    import pydebuprep.checks.nginx as nginx_module
+
+    monkeypatch.setattr(nginx_module, "MAX_FILES", 2)
+    monkeypatch.setattr(apache_module, "MAX_FILES", 2)
+    found = NginxCheck().run(nginx_ctx())
+    assert (found[-1].severity, found[-1].title) == (
+        Severity.INFO,
+        "nginx's configuration is too large to check completely",
+    )
+    found = ApacheCheck().run(apache_ctx())
+    assert found[-1].title == "Apache's configuration is too large to check completely"
+
+
+def test_too_many_statements_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    import pydebuprep.checks.apache as apache_module
+    import pydebuprep.checks.nginx as nginx_module
+
+    monkeypatch.setattr(nginx_module, "MAX_STATEMENTS", 5)
+    monkeypatch.setattr(apache_module, "MAX_STATEMENTS", 5)
+    assert nginx_read_config(nginx_ctx()).truncated
+    assert apache_read_config(apache_ctx()).truncated

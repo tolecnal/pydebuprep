@@ -12,11 +12,10 @@ from __future__ import annotations
 import base64
 import binascii
 import hashlib
-import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-PEM_BLOCK = re.compile(rb"-----BEGIN ([A-Z0-9 ]+)-----(.*?)-----END \1-----", re.S)
+MAX_OID_BYTES = 64  # real OIDs are under 20; longer ones only cost time to decode
 
 SEQUENCE, SET, INTEGER, BIT_STRING, OCTET_STRING, OID = 0x30, 0x31, 0x02, 0x03, 0x04, 0x06
 UTC_TIME, GENERALIZED_TIME = 0x17, 0x18
@@ -116,8 +115,8 @@ def _expect(item: Tlv, tag: int) -> Tlv:
 
 def _oid(data: bytes, item: Tlv) -> str:
     raw = data[_expect(item, OID)[1] : item[2]]
-    if not raw:
-        raise CertificateError("empty OID")
+    if not raw or len(raw) > MAX_OID_BYTES:
+        raise CertificateError(f"OID of {len(raw)} bytes")
     parts = [min(raw[0] // 40, 2), raw[0] - 40 * min(raw[0] // 40, 2)]
     value = 0
     for byte in raw[1:]:
@@ -214,13 +213,20 @@ def parse_der(der: bytes) -> Certificate:
 
 
 def _blocks(data: bytes, label: bytes) -> list[bytes]:
-    found = []
-    for match in PEM_BLOCK.finditer(data):
-        if match.group(1) == label:
-            try:
-                found.append(base64.b64decode(b"".join(match.group(2).split()), validate=True))
-            except binascii.Error:
-                raise CertificateError("bad base64 in a PEM block") from None
+    """The decoded bodies of the PEM blocks labelled LABEL, in order. A linear scan:
+    a file of BEGIN lines without an END must not cost quadratic time as root."""
+    begin, end = b"-----BEGIN " + label + b"-----", b"-----END " + label + b"-----"
+    found, pos = [], 0
+    while (start := data.find(begin, pos)) != -1:
+        body_start = start + len(begin)
+        stop = data.find(end, body_start)
+        if stop == -1:
+            break
+        try:
+            found.append(base64.b64decode(b"".join(data[body_start:stop].split()), validate=True))
+        except binascii.Error:
+            raise CertificateError("bad base64 in a PEM block") from None
+        pos = stop + len(end)
     return found
 
 

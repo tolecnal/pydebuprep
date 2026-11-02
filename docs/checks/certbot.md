@@ -19,7 +19,8 @@ For every renewal configuration in `/etc/letsencrypt/renewal/*.conf`:
 - the renewal's `authenticator` and `installer` plugins are installed for that Python:
   each needs a package whose `entry_points.txt` registers it under
   `[certbot.plugins]`, in `/usr/lib/python3/dist-packages`,
-  `/usr/local/lib/python3.*/dist-packages` or the virtualenv's `site-packages`.
+  the `/usr/local/lib/pythonX.Y/dist-packages` of the Python certbot runs now (one
+  left behind for the old Python doesn't count), or the virtualenv's `site-packages`.
   `standalone`, `webroot`, `manual` and `null` are part of certbot;
 - its certificate (the renewal's `cert`, by default `live/NAME/cert.pem`) isn't close
   to expiring. certbot renews 30 days ahead, so a certificate within

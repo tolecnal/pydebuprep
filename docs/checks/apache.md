@@ -43,8 +43,9 @@ As long as `tls_probe` is on (the default), it also connects to each TLS site on
 host, sending the site's first literal `ServerName` as SNI, and compares the certificate
 served with the file the configuration names. A difference means the certificate was
 renewed but Apache wasn't reloaded, so it still serves the old one. It connects only
-where this host listens: a wildcard listen on loopback, a specific address only if the
-kernel lists it as listening. At most 50 connections, 5 seconds each; the certificate
+where root listens on this host (an unprivileged user can't stand in for a server that
+failed to start): a wildcard listen on loopback, a specific address only if the kernel
+lists it. It doesn't connect for a certificate it can't read. At most 50 connections, 5 seconds each; the certificate
 isn't verified, only compared. Apache logs each connection in its access log.
 
 As root, unless `config_test` is off, it also runs `apache2ctl -t`, Apache's own check of the

@@ -224,3 +224,19 @@ def test_empty_dh_parameters_raise() -> None:
     )
     with pytest.raises(CertificateError):
         dh_bits(pem)
+
+
+def test_many_begin_lines_without_an_end_are_fast() -> None:
+    # Was quadratic: a 16 MiB file of BEGIN lines would have taken hours as root.
+    import time
+
+    data = b"-----BEGIN CERTIFICATE-----\n" * 80_000  # ~2.2 MB
+    start = time.monotonic()
+    with pytest.raises(CertificateError):
+        parse_pem(data)
+    assert time.monotonic() - start < 2
+
+
+def test_oversized_oid_is_rejected() -> None:
+    with pytest.raises(CertificateError, match="OID"):
+        parse_der(build(sig="1.2." + ".".join(["1" * 30] * 20)))

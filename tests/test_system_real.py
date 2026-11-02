@@ -347,3 +347,35 @@ def test_tls_peer_certificate_real() -> None:
 def test_tls_peer_certificate_rejects_hostnames() -> None:
     with pytest.raises(ValueError, match="IP address"):
         System().tls_peer_certificate("localhost", 443, "www.example.org", 1.0)
+
+
+def test_tls_peer_certificate_has_a_deadline() -> None:
+    # A peer that trickles a byte now and then never lets the per-read timeout expire;
+    # the whole handshake still has to finish within the timeout.
+    import socket
+    import threading
+    import time
+
+    listener = socket.create_server(("127.0.0.1", 0))
+    port = listener.getsockname()[1]
+    stop = threading.Event()
+
+    def trickle() -> None:
+        conn, _ = listener.accept()
+        with conn:
+            conn.send(b"\x16\x03\x03\x40\x00")  # a handshake record of 16 KiB, then slowly
+            while not stop.wait(0.2):
+                try:
+                    conn.send(b"\x00")
+                except OSError:
+                    return
+
+    threading.Thread(target=trickle, daemon=True).start()
+    start = time.monotonic()
+    try:
+        der, error = System().tls_peer_certificate("127.0.0.1", port, "www.example.org", 1.0)
+    finally:
+        stop.set()
+        listener.close()
+    assert der is None and error is not None and "timed out" in error
+    assert time.monotonic() - start < 3

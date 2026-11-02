@@ -55,12 +55,13 @@ WILDCARDS = {"": LOOPBACK_V4, "*": LOOPBACK_V4, ANY_IPV4: LOOPBACK_V4, "::": (":
 
 @dataclass(frozen=True)
 class TlsSite:
-    """A TLS server block or virtual host: its configuration file, names, certificate
-    and TLS listen addresses (address as written, "" for any; port)."""
+    """A TLS server block or virtual host: its configuration file, names, certificates
+    (more than one for an RSA and an ECDSA pair) and TLS listen addresses (address as
+    written, "" for any; port)."""
 
     source: str
     names: tuple[str, ...]
-    certificate: str
+    certificates: tuple[str, ...]
     listen: tuple[tuple[str, int], ...]
 
 
@@ -276,31 +277,42 @@ def name_matches(name: str, cert: Certificate) -> bool:
 
 
 def matchable(name: str) -> bool:
-    """A literal host name: not nginx's catch-all `_`, a regex, a wildcard or a suffix."""
-    return (
-        bool(name)
-        and name != "_"
-        and "*" not in name
-        and "~" not in name
-        and not name.startswith(".")
-    )
+    """A literal host name: not nginx's catch-all `_`, a regex, a wildcard, a suffix, a
+    variable or macro parameter ($, @, %), or an IP address."""
+    if not name or name == "_" or name.startswith(".") or any(c in name for c in "*~$@%"):
+        return False
+    try:
+        ipaddress.ip_address(name.strip("[]"))
+    except ValueError:
+        return True
+    return False
+
+
+def _leaves(ctx: Context, paths: Sequence[str]) -> list[Certificate]:
+    """The leaf certificate of each readable file in PATHS (unreadable ones are
+    reported by certificate_findings)."""
+    leaves = []
+    for path in paths:
+        data = ctx.system.read_bytes(path)
+        try:
+            if data is not None:
+                leaves.append(parse_pem(data)[0])
+        except CertificateError:
+            continue
+    return leaves
 
 
 def name_findings(ctx: Context, server: str, sites: Sequence[TlsSite]) -> list[Finding]:
-    """Server names that their site's certificate doesn't cover."""
+    """Server names that none of their site's certificates cover."""
     lines = []
     for site in sites:
-        data = ctx.system.read_bytes(site.certificate)
-        try:
-            leaf = parse_pem(data)[0] if data is not None else None
-        except CertificateError:
-            leaf = None  # reported by certificate_findings
-        if leaf is None:
+        leaves = _leaves(ctx, site.certificates)
+        if not leaves:
             continue
         lines += [
-            f"{name} isn't covered by {site.certificate} ({site.source})"
+            f"{name} isn't covered by {', '.join(site.certificates)} ({site.source})"
             for name in site.names
-            if matchable(name) and not name_matches(name, leaf)
+            if matchable(name) and not any(name_matches(name, leaf) for leaf in leaves)
         ]
     if not lines:
         return []
@@ -353,20 +365,19 @@ def served_findings(
     reloaded after the certificate was renewed."""
     differ, errors = [], []
     for host, port, name, site in probe_targets(sites, listening_addresses(ctx.system)):
+        on_disk = {leaf.sha256 for leaf in _leaves(ctx, site.certificates)}
+        if not on_disk:
+            continue  # nothing to compare with: don't connect for nothing
         served, error = ctx.system.tls_peer_certificate(host, port, name, PROBE_TIMEOUT)
         if served is None:
             errors.append(f"{name} on {host}:{port}: {error}")
             continue
-        data = ctx.system.read_bytes(site.certificate)
-        try:
-            on_disk = parse_pem(data)[0].sha256 if data is not None else None
-        except CertificateError:
-            on_disk = None  # reported by certificate_findings
         digest = hashlib.sha256(served).hexdigest()
-        if on_disk is not None and digest != on_disk:
+        if digest not in on_disk:
             differ.append(
                 f"{name} on {host}:{port} serves {digest[:16]}…, "
-                f"{site.certificate} is {on_disk[:16]}…"
+                f"{' or '.join(site.certificates)} {'is' if len(on_disk) == 1 else 'are'} "
+                f"{', '.join(sorted(d[:16] + '…' for d in on_disk))}"
             )
     found = []
     if differ:
