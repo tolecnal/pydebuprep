@@ -37,6 +37,7 @@ from pydebuprep.checks.network import NetworkCheck
 from pydebuprep.checks.nginx import NginxCheck
 from pydebuprep.checks.obsolete_packages import ObsoletePackagesCheck
 from pydebuprep.checks.os_release import OsReleaseCheck
+from pydebuprep.checks.php import PhpCheck
 from pydebuprep.checks.postfix import PostfixCheck
 from pydebuprep.checks.postgresql import PostgresqlCheck
 from pydebuprep.checks.python_venvs import PythonVenvsCheck
@@ -86,6 +87,7 @@ ALL_CHECKS: list[type[Check]] = [
     DockerCheck,
     NginxCheck,
     ApacheCheck,
+    PhpCheck,
     LibvirtCheck,
     PythonVenvsCheck,
 ]

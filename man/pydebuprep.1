@@ -438,6 +438,9 @@ for each check's options.
 .B nginx
 (applications) Includes that point at missing files (dangling \fBsites\-enabled\fR and \fBmodules\-enabled\fR links), \fBload_module\fR files that are gone, \fBunix:\fR sockets in \fB*_pass\fR and upstream \fBserver\fR lines that don't exist (read from the files; \fBnginx \-t\fR isn't used: it writes)
 .TP
+.B php
+(applications) PHP extensions enabled before the upgrade (per SAPI: fpm, apache2, cli) that no PHP version enables now, and SAPIs that are gone; needs a snapshot
+.TP
 .B postfix
 (applications) \fBpostconf \-n\fR warnings and errors (\fBpostfix check\fR isn't used: it creates directories)
 .TP

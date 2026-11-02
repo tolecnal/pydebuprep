@@ -24,7 +24,7 @@ A read-only health report for Debian and Ubuntu systems after a release upgrade
 guides.
 
 `systemctl --failed` and a look at `journalctl` catch some problems. pydebuprep
-runs the rest of the post-upgrade checklist in one go, with [40 checks](#checks):
+runs the rest of the post-upgrade checklist in one go, with [41 checks](#checks):
 
 - **packages:** APT sources still pointing at the old release, third-party
   repositories the upgrader disabled, half-configured packages, unmerged
@@ -304,6 +304,7 @@ host never looks healthy just because a check couldn't look.
 | `libvirt` | applications | Domains set to start at boot that aren't running; disk images, devices and emulators that no longer exist (read from libvirt's files; `virsh` isn't used) (root) |
 | `mariadb` | applications | MariaDB data directory not upgraded to the new server version; opt-in probe that MariaDB or MySQL answers a ping and a query (root) |
 | `nginx` | applications | Includes that point at missing files (dangling `sites-enabled` and `modules-enabled` links), `load_module` files that are gone, `unix:` sockets in `*_pass` and upstream `server` lines that don't exist; TLS certificates that expire or that OpenSSL refuses, small DH parameters, old protocols, server names a certificate doesn't cover (read from the files; `nginx -t` isn't used: it writes) |
+| `php` | applications | PHP extensions enabled before the upgrade (per SAPI: fpm, apache2, cli) that no PHP version enables now, and SAPIs that are gone; needs a snapshot |
 | `postfix` | applications | `postconf -n` warnings and errors (`postfix check` isn't used: it creates directories) |
 | `postgresql` | applications | Clusters still on an older major version than the newest installed server, or left behind after migrating; clusters that should start but are down; clusters online before but not now; opt-in probe that each online cluster accepts connections and answers a query |
 | `python-venvs` | applications | Virtualenvs whose Python no longer exists, or built for an older Python; compiled modules needing libraries that are missing (read from their ELF headers, never `ldd`); scripts whose interpreter doesn't exist |

@@ -607,6 +607,20 @@
             "null"
           ]
         },
+        "php": {
+          "additionalProperties": false,
+          "description": "PHP extensions",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
         "postfix": {
           "additionalProperties": false,
           "description": "postfix configuration",
