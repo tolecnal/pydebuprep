@@ -11,6 +11,16 @@
           "additionalProperties": false,
           "description": "Apache configuration references",
           "properties": {
+            "cert_critical_days": {
+              "default": 14,
+              "description": "Critical when a TLS certificate expires within this many days (below the warning)",
+              "type": "integer"
+            },
+            "cert_warning_days": {
+              "default": 28,
+              "description": "Warn when a TLS certificate expires within this many days",
+              "type": "integer"
+            },
             "enabled": {
               "default": true,
               "type": "boolean"

@@ -7,6 +7,7 @@ import pytest
 from checks.helpers import make_ctx, titles, tls_fixture
 from pydebuprep.checks._tls import TlsSite
 from pydebuprep.checks.apache import ApacheCheck
+from pydebuprep.checks.apache import read_config as apache_read_config
 from pydebuprep.checks.base import CheckSkipped
 from pydebuprep.checks.nginx import NginxCheck
 from pydebuprep.checks.nginx import read_config as nginx_read_config
@@ -434,3 +435,164 @@ def test_nginx_odd_statements_are_ignored() -> None:
     cfg = nginx_read_config(ctx)
     assert cfg.sites == []
     assert ("/etc/ssl/mail.pem", "(ssl_certificate in /etc/nginx/nginx.conf)") in cfg.certificates
+
+
+# --- apache: TLS -------------------------------------------------------------------------
+
+SSL_SITE = """\
+<IfModule mod_ssl.c>
+<VirtualHost *:443 [::]:443>
+    ServerName www.example.org:443
+    ServerAlias example.org a.example.net
+    SSLEngine on
+    SSLCertificateFile /etc/ssl/good.pem
+    SSLCertificateKeyFile /etc/ssl/private/good.key
+</VirtualHost>
+</IfModule>
+"""
+
+
+def apache_tls_ctx(
+    files: dict[str, str | bytes | None] | None = None, links: dict[str, str] | None = None
+):  # type: ignore[no-untyped-def] # test helper
+    base: dict[str, str | bytes | None] = {
+        "/etc/apache2/sites-available/ssl.conf": SSL_SITE,
+        "/etc/ssl/good.pem": tls_fixture("good.pem"),
+    }
+    base.update(files or {})
+    return apache_ctx(
+        files=base,  # type: ignore[arg-type] # bytes files are fine
+        links={
+            "/etc/apache2/sites-enabled/ssl.conf": "../sites-available/ssl.conf",
+            **(links or {}),
+        },
+    )
+
+
+def test_existing_apache_findings_unchanged() -> None:
+    assert ApacheCheck().run(apache_tls_ctx()) == []
+
+
+def test_virtualhost_collects_tls_site() -> None:
+    cfg = apache_read_config(apache_tls_ctx())
+    assert cfg.sites == [
+        TlsSite(
+            source="/etc/apache2/sites-enabled/ssl.conf",
+            names=("www.example.org", "example.org", "a.example.net"),
+            certificate="/etc/ssl/good.pem",
+            listen=(("", 443), ("[::]", 443)),
+        )
+    ]
+    assert cfg.listens == [("", 80)]
+    assert cfg.certificates == [
+        ("/etc/ssl/good.pem", "(SSLCertificateFile in /etc/apache2/sites-enabled/ssl.conf)")
+    ]
+
+
+def test_virtualhost_forms() -> None:
+    site = """\
+<VirtualHost _default_:8443 10.0.0.1:443 *>
+    SSLEngine On
+    SSLCertificateFile ssl/good.pem
+</VirtualHost>
+<VirtualHost *:80>
+    ServerName plain.example.org
+    SSLCertificateFile /etc/ssl/good.pem
+</VirtualHost>
+<VirtualHost *:443>
+    SSLEngine on
+</VirtualHost>
+SSLCertificateFile /etc/ssl/global.pem
+SSLCertificateFile ${CERT}
+Listen 0.0.0.0:443 https
+Listen [::]:8443
+"""
+    cfg = apache_read_config(apache_tls_ctx({"/etc/apache2/sites-available/ssl.conf": site}))
+    assert [(s.listen, s.certificate) for s in cfg.sites] == [
+        ((("", 8443), ("10.0.0.1", 443)), "/etc/apache2/ssl/good.pem"),
+    ]
+    assert [p for p, _ in cfg.certificates] == [
+        "/etc/apache2/ssl/good.pem", "/etc/ssl/good.pem", "/etc/ssl/global.pem",
+    ]  # fmt: skip
+    assert cfg.listens == [("", 80), ("0.0.0.0", 443), ("[::]", 8443)]
+
+
+def test_apache_reports_tls_findings() -> None:
+    site = SSL_SITE.replace(
+        "ServerAlias example.org a.example.net", "ServerAlias other.org"
+    ).replace(
+        "SSLEngine on",
+        "SSLEngine on\n    SSLProtocol TLSv1 TLSv1.1\n"
+        "    SSLOpenSSLConfCmd DHParameters /etc/ssl/dh.pem\n"
+        "    SSLCertificateChainFile /etc/ssl/chain-sha1.pem",
+    )
+    files = {
+        "/etc/apache2/sites-available/ssl.conf": site,
+        "/etc/ssl/dh.pem": tls_fixture("dh1024.pem"),
+        "/etc/ssl/chain-sha1.pem": tls_fixture("sha1.pem"),
+    }
+    found = ApacheCheck().run(apache_tls_ctx(files))
+    assert titles(found) == [
+        "Apache uses keys or signatures OpenSSL refuses",
+        "Apache uses DH parameters OpenSSL refuses",
+        "Apache enables only TLS protocols OpenSSL refuses",
+        "Apache has certificates that don't cover their server names",
+    ]
+    assert found[-1].evidence == [
+        "other.org isn't covered by /etc/ssl/good.pem (/etc/apache2/sites-enabled/ssl.conf)"
+    ]
+
+
+def test_apache_dh_parameters_in_the_certificate_file() -> None:
+    files = {"/etc/ssl/good.pem": tls_fixture("good.pem") + tls_fixture("dh1024.pem")}
+    [finding] = ApacheCheck().run(apache_tls_ctx(files))
+    assert finding.title == "Apache uses DH parameters OpenSSL refuses"
+
+
+def test_apache_cert_options() -> None:
+    with pytest.raises(ValueError, match="cert_critical_days"):
+        ApacheCheck({"cert_warning_days": 10, "cert_critical_days": 10})
+    files = {"/etc/ssl/good.pem": tls_fixture("soon.pem")}
+    ctx = apache_tls_ctx(files)
+    assert "Apache has certificates expiring within 28 days" in titles(ApacheCheck().run(ctx))
+    found = ApacheCheck({"cert_warning_days": 20, "cert_critical_days": 10}).run(ctx)
+    assert not [t for t in titles(found) if "expiring" in t]
+
+
+def test_files_without_conf_are_skipped_and_reported() -> None:
+    files = {
+        "/etc/apache2/sites-available/old-site": "<VirtualHost *:80>\nProxyPass / unix:/run/gone.sock|http://x/\n</VirtualHost>\n",
+        "/etc/apache2/conf-available/legacy": "Alias /x /srv/x\n",
+    }
+    links = {
+        "/etc/apache2/sites-enabled/old-site": "../sites-available/old-site",
+        "/etc/apache2/conf-enabled/legacy": "../conf-available/legacy",
+    }
+    [finding] = ApacheCheck().run(apache_tls_ctx(files, links))
+    assert (finding.severity, finding.title) == (
+        Severity.WARNING,
+        "Apache ignores files in sites-enabled or conf-enabled",
+    )
+    assert finding.evidence == [
+        "/etc/apache2/conf-enabled/legacy",
+        "/etc/apache2/sites-enabled/old-site",
+    ]
+    assert any("a2dissite" in r or ".conf" in r for r in finding.remediation)
+
+
+def test_files_without_conf_read_by_a_wider_include_are_fine() -> None:
+    conf = APACHE_CONF.replace("sites-enabled/*.conf", "sites-enabled/*")
+    files = {
+        "/etc/apache2/apache2.conf": conf,
+        "/etc/apache2/sites-available/old-site": "ServerName x\n",
+    }
+    links = {"/etc/apache2/sites-enabled/old-site": "../sites-available/old-site"}
+    assert ApacheCheck().run(apache_tls_ctx(files, links)) == []
+
+
+def test_apache_include_loops_end() -> None:
+    files = {"/etc/apache2/conf-available/loop.conf": "Include conf-enabled/loop.conf\n"}
+    links = {"/etc/apache2/conf-enabled/loop.conf": "../conf-available/loop.conf"}
+    ctx = apache_tls_ctx(files, links)
+    assert ApacheCheck().run(ctx) == []
+    assert apache_read_config(ctx).files.count("/etc/apache2/conf-enabled/loop.conf") == 1

@@ -254,7 +254,7 @@ The package also installs the example as
 | `docker` | `probe` (false): connect to every published TCP port, and run `http_probes`; `http_probes` ([]): `CONTAINER=URL` items, localhost only, 2xx/3xx passes; `ignore_containers` ([]): name patterns to leave out |
 | `python-venvs` | `search_paths` (/opt, /srv, /usr/local, /root, /home, /var/www) and `max_depth` (5): where to look for virtualenvs; `exclude_paths` (\*/.cache/\*): ones to leave out |
 | `network` | `ignore_interfaces` (lo, veth\*, docker\*, br-\*, virbr\*, vnet\*, tap\*, cni\*, flannel\*, cali\*): left out of the baseline comparison |
-| `nginx` | `cert_warning_days` (28), `cert_critical_days` (14): how many days before a TLS certificate expires that it's a warning, and critical (1 to 365, critical below warning) |
+| `nginx`, `apache` | `cert_warning_days` (28), `cert_critical_days` (14): how many days before a TLS certificate expires that it's a warning, and critical (1 to 365, critical below warning) |
 | `disk-space` | `include_remote` (false), `warning_pct` (25.0), `critical_pct` (10.0), `exclude_mounts` ([]), `important_mounts` (["/", "/var"]) and `min_free_mib` (2048): an absolute free-space floor for those mounts |
 
 ### Exit codes
@@ -298,7 +298,7 @@ host never looks healthy just because a check couldn't look.
 | `systemd-failed` | services | Failed units; services active or enabled before the upgrade that aren't now |
 | `systemd-timers` | services | Enabled timers that aren't active |
 | `time-sync` | services | A time synchronisation service is running and the clock is synchronised (read from the kernel, no daemon queried); service changes since the baseline |
-| `apache` | applications | Includes that point at missing files (dangling `mods-enabled`, `conf-enabled` and `sites-enabled` links), `LoadModule` files that are gone, `unix:` sockets (PHP-FPM `SetHandler`, `ProxyPass`) that don't exist (read from the files; `apachectl -t` isn't used: it writes) |
+| `apache` | applications | Includes that point at missing files (dangling `mods-enabled`, `conf-enabled` and `sites-enabled` links), `LoadModule` files that are gone, `unix:` sockets (PHP-FPM `SetHandler`, `ProxyPass`) that don't exist, site files skipped for not ending in `.conf`; TLS certificates that expire or that OpenSSL refuses, small DH parameters, old protocols, server names a certificate doesn't cover (read from the files; `apachectl -t` isn't used: it writes) |
 | `bind` | applications | `named-checkconf` errors (root) |
 | `docker` | applications | Containers failing their health check, restarting, or still starting it (each its own finding); containers running before but not now; opt-in probes of published ports and HTTP URLs. Only queried when `docker.service` is running, so the daemon is never started (root) |
 | `libvirt` | applications | Domains set to start at boot that aren't running; disk images, devices and emulators that no longer exist (read from libvirt's files; `virsh` isn't used) (root) |
