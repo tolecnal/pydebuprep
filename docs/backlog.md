@@ -1,6 +1,6 @@
 # Backlog
 
-What is still open, as of 2026-11-01 (after pydebuprep 0.8.0 and portal 0.3.0). Remove items as they are done.
+What is still open, as of 2026-11-02 (after pydebuprep 0.9.0 and portal 0.4.0). Remove items as they are done.
 
 ## GitHub repository settings
 
@@ -47,6 +47,11 @@ attestation.
 released on 2026-11-01, published with `SHA256SUMS` and a verified provenance
 attestation.
 
+`v0.9.0` (TLS certificates, snapshot comparisons, a certificate probe and the
+configuration tests in the nginx and apache checks; the php and certbot checks; the
+first agreed side effects) is being released on 2026-11-02; what it contains is in
+`debian/changelog`. Its report format is unchanged, so portal 0.4.0 takes its reports.
+
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't
       match both.
@@ -78,10 +83,10 @@ ssh-server, the boot critical chain, the `/` and `/var` free-space floor, and th
 application checks postgresql, mariadb, postfix, bind, docker and python-venvs. Each
 passes `scripts/readonly-audit.sh` with the service installed.
 
-Done on 2026-11-02, for the next release: TLS certificates, crypto OpenSSL refuses and
-server names in the nginx and apache checks; their modules, configuration files and
-listeners compared with the snapshot; a probe comparing served certificates with the
-files; `nginx -t` and `apache2ctl -t` as the first agreed side effects (listed in
+Done on 2026-11-02 (0.9.0): TLS certificates, crypto OpenSSL refuses and server names
+in the nginx and apache checks; their modules, configuration files and listeners
+compared with the snapshot; a probe comparing served certificates with the files;
+`nginx -t` and `apache2ctl -t` as the first agreed side effects (listed in
 docs/about/read-only.md); and the php and certbot checks.
 
 - [ ] The project still calls itself "read-only" while a few side effects are agreed
