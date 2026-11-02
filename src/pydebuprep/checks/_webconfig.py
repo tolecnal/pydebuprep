@@ -12,7 +12,9 @@ from __future__ import annotations
 import posixpath
 import re
 from dataclasses import dataclass
+from typing import Any
 
+from pydebuprep.checks._listeners import listening_sockets, unit_listeners
 from pydebuprep.checks.base import Context
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
@@ -20,6 +22,10 @@ from pydebuprep.model import Finding, Severity, truncate_evidence
 MAX_FILES = 500
 GLOB = re.compile(r"[*?\[]")
 SOCKET = re.compile(r"unix:(/[^\s:;|\"']+)")
+# PHP is the one thing Debian and Ubuntu version in module and file names: php7.4.load,
+# libphp8.2.so, php8.2-fpm.conf. An upgrade replacing one version with another is a
+# change, not a loss.
+PHP_VERSION = re.compile(r"php\d+(?:\.\d+)?")
 
 
 @dataclass(frozen=True)
@@ -139,4 +145,110 @@ def findings(
                 ],
             )
         )
+    return found
+
+
+def unversioned(name: str) -> str:
+    """NAME with any PHP version replaced by `php*`."""
+    return PHP_VERSION.sub("php*", name)
+
+
+def _listeners(ctx: Context, unit: str) -> list[str]:
+    """The ports UNIT's processes listen on; empty unless root and the unit is active."""
+    from pydebuprep.checks.systemd_critical import unit_states  # avoids an import cycle
+
+    if not ctx.is_root:
+        return []  # other users' /proc/<pid>/fd links can't be read
+    state = unit_states(ctx, [unit]).get(unit, {})
+    if state.get("ActiveState") != "active":
+        return []
+    return unit_listeners(ctx.system, state.get("ControlGroup", ""), listening_sockets(ctx.system))
+
+
+def web_baseline(
+    ctx: Context, unit: str, cfg_files: list[str], modules: list[str], *, listeners: bool = True
+) -> dict[str, list[str]]:
+    """What a snapshot keeps of a web server: the modules it loads (file names), the
+    configuration files it reads and, as root, the ports its unit listens on (looked
+    up only with LISTENERS)."""
+    return {
+        "modules": sorted({posixpath.basename(m) for m in modules}),
+        "files": list(cfg_files),
+        "listeners": _listeners(ctx, unit) if listeners else [],
+    }
+
+
+def had_listeners(before: Any) -> bool:
+    """Whether a snapshot recorded listeners, so they need looking up now."""
+    return isinstance(before, dict) and bool(_strings(before, "listeners"))
+
+
+def _strings(before: dict[Any, Any], key: str) -> list[str]:
+    value = before.get(key)
+    return [v for v in value if isinstance(v, str)] if isinstance(value, list) else []
+
+
+def _by_key(names: list[str]) -> dict[str, str]:
+    return {unversioned(n): n for n in names}
+
+
+def web_compare(
+    ctx: Context, server: str, unit: str, before: dict[Any, Any], now: dict[str, list[str]]
+) -> list[Finding]:
+    """What SERVER lost since the snapshot (BEFORE, a dict of unchecked values)
+    compared with NOW (web_baseline)."""
+    found = []
+    old, new = _by_key(_strings(before, "modules")), _by_key(now["modules"])
+    lost = sorted(old[k] for k in old.keys() - new.keys())
+    changed = sorted(f"{old[k]} → {new[k]}" for k in old.keys() & new.keys() if old[k] != new[k])
+    if lost:
+        found.append(
+            Finding(
+                Severity.WARNING,
+                f"{server} no longer loads modules it loaded before the upgrade",
+                detail="The upgrade removed or disabled them; what they provided (a "
+                "language, authentication, a protocol) no longer works.",
+                evidence=truncate_evidence(lost),
+                remediation=[
+                    "Install the module's package for this release and enable it again, "
+                    "or confirm it's no longer needed"
+                ],
+            )
+        )
+    if changed:
+        found.append(
+            Finding(
+                Severity.INFO,
+                f"{server} loads a new version of modules",
+                detail="Expected after a release upgrade; check that the sites using them work.",
+                evidence=truncate_evidence(changed),
+            )
+        )
+    files = sorted(
+        f
+        for f in _strings(before, "files")
+        if unversioned(f) not in {unversioned(n) for n in now["files"]}
+    )
+    if files:
+        found.append(
+            Finding(
+                Severity.WARNING,
+                f"{server} no longer reads configuration files it read before the upgrade",
+                detail="Sites or settings in them are gone: their package was removed, their "
+                "link in an *-enabled directory was dropped, or an include no longer matches.",
+                evidence=truncate_evidence(files),
+                remediation=["Enable them again, or confirm they're no longer needed"],
+            )
+        )
+    if ctx.is_root:
+        ports = sorted(set(_strings(before, "listeners")) - set(now["listeners"]))
+        if ports:
+            found.append(
+                Finding(
+                    Severity.CRITICAL,
+                    f"{server} listened on {', '.join(ports)} before the upgrade, not now",
+                    detail="Clients of these ports can't connect.",
+                    remediation=[f"systemctl status {unit}", "ss -tlpn"],
+                )
+            )
     return found

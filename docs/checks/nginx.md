@@ -53,9 +53,32 @@ the `server` block that includes it:
 | warning | nginx has certificates that don't cover their server names | Add the names to the certificate, or remove them from `server_name`. |
 | info | nginx's certificates were not checked (needs root) | Run as root. |
 
+## Compared with a snapshot
+
+The snapshot records the modules nginx loads, every configuration file it reads and,
+as root, the TCP ports `nginx.service` listens on. After the upgrade:
+
+| Severity | Finding | What to do |
+|---|---|---|
+| warning | nginx no longer loads modules it loaded before the upgrade | Install the module's package for this release and enable it again, or confirm it's no longer needed. |
+| info | nginx loads a new version of modules | Expected after a release upgrade (`libphp7.4.so → libphp8.2.so`); check the sites that use it. |
+| warning | nginx no longer reads configuration files it read before the upgrade | A site or setting is gone: enable it again, or confirm it's no longer needed. |
+| critical | nginx listened on PORTS before the upgrade, not now | `systemctl status nginx.service` and `ss -tlpn`. |
+
+A PHP version in a name doesn't count as a change of module or file: `php7.4.load`
+replaced by `php8.3.load`, or `php7.4-fpm.conf` by `php8.2-fpm.conf`, is the same thing
+in a new version.
+
 ## Commands it runs
 
-None: it reads nginx's configuration files and looks up the paths they name.
+It reads nginx's configuration files and looks up the paths they name.
+Compared with a snapshot that recorded listening ports, as root, it also asks systemd
+for the unit's control group, to find the ports its processes hold:
+
+```sh
+systemctl show --property=Id,Names,LoadState,ActiveState,SubState,UnitFileState,ConditionResult,ConditionTimestamp,TriggeredBy,Requires,BindsTo,ControlGroup -- nginx.service
+```
+
 `nginx -t` would check more, but it writes its PID file, cache directories and logs.
 
 ## Limitations

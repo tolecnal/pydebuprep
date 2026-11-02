@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from typing import Any
 
 from pydebuprep.checks._tls import (
     CERT_OPTIONS,
@@ -18,10 +19,13 @@ from pydebuprep.checks._webconfig import (
     MAX_FILES,
     Ref,
     findings,
+    had_listeners,
     include,
     missing_sockets,
     resolve,
     socket_path,
+    web_baseline,
+    web_compare,
 )
 from pydebuprep.checks.base import Check, CheckSkipped, Context
 from pydebuprep.model import Finding, Severity, truncate_evidence
@@ -211,6 +215,21 @@ class ApacheCheck(Check):
     title = "Apache configuration references"
     category = "applications"
     options = CERT_OPTIONS
+
+    def collect_baseline(self, ctx: Context) -> Any | None:
+        if not ctx.system.exists(MAIN):
+            return None
+        cfg = read_config(ctx)
+        return web_baseline(ctx, "apache2.service", cfg.files, cfg.module_paths)
+
+    def compare(self, ctx: Context, before: Any) -> list[Finding]:
+        if not isinstance(before, dict):
+            return []
+        cfg = read_config(ctx)
+        now = web_baseline(
+            ctx, "apache2.service", cfg.files, cfg.module_paths, listeners=had_listeners(before)
+        )
+        return web_compare(ctx, "Apache", "apache2.service", before, now)
 
     def validate(self) -> None:
         validate_cert_days(self.opt("cert_warning_days"), self.opt("cert_critical_days"))
