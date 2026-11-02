@@ -253,3 +253,10 @@ def test_variables_macros_and_addresses_are_not_host_names() -> None:
     assert matchable("www.example.org")
     ctx = ctx_with("good.pem")
     assert name_findings(ctx, "nginx", [site("$hostname", "192.0.2.1", "@domain")]) == []
+
+
+def test_only_the_leaf_needs_to_be_readable() -> None:
+    # A chain certificate the reader doesn't understand mustn't make the file unreadable.
+    odd = b"-----BEGIN CERTIFICATE-----\nMAMCAQA=\n-----END CERTIFICATE-----\n"
+    ctx = make_ctx(files={"/certs/fullchain.pem": tls_fixture("good.pem") + odd})
+    assert certs(ctx, "fullchain.pem") == []

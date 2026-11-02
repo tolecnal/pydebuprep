@@ -240,3 +240,11 @@ def test_many_begin_lines_without_an_end_are_fast() -> None:
 def test_oversized_oid_is_rejected() -> None:
     with pytest.raises(CertificateError, match="OID"):
         parse_der(build(sig="1.2." + ".".join(["1" * 30] * 20)))
+
+
+def test_parse_leaf() -> None:
+    from pydebuprep.checks._x509 import parse_leaf
+
+    assert parse_leaf(tls_fixture("chain.pem")).subject_cn == "www.example.org"
+    with pytest.raises(CertificateError, match="no certificate"):
+        parse_leaf(tls_fixture("dh2048.pem"))

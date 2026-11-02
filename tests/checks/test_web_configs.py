@@ -484,7 +484,6 @@ def test_virtualhost_collects_tls_site() -> None:
             listen=(("", 443), ("[::]", 443)),
         )
     ]
-    assert cfg.listens == [("", 80)]
     assert cfg.certificates == [
         ("/etc/ssl/good.pem", "(SSLCertificateFile in /etc/apache2/sites-enabled/ssl.conf)")
     ]
@@ -515,7 +514,6 @@ Listen [::]:8443
     assert [p for p, _ in cfg.certificates] == [
         "/etc/apache2/ssl/good.pem", "/etc/ssl/good.pem", "/etc/ssl/global.pem",
     ]  # fmt: skip
-    assert cfg.listens == [("", 80), ("0.0.0.0", 443), ("[::]", 8443)]
 
 
 def test_apache_reports_tls_findings() -> None:
@@ -772,3 +770,13 @@ def test_too_many_statements_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(apache_module, "MAX_STATEMENTS", 5)
     assert nginx_read_config(nginx_ctx()).truncated
     assert apache_read_config(apache_ctx()).truncated
+
+
+def test_dynamic_certificate_is_not_replaced_by_the_http_one() -> None:
+    conf = NGINX_CONF.replace("http {", "http {\n    ssl_certificate /etc/ssl/good.pem;")
+    site = (
+        "server { listen 443 ssl; server_name other.org; ssl_certificate $ssl_server_name.crt; }\n"
+    )
+    ctx = nginx_tls_ctx({"/etc/nginx/nginx.conf": conf, "/etc/nginx/sites-available/tls": site})
+    assert nginx_read_config(ctx).sites == []
+    assert NginxCheck().run(ctx) == []

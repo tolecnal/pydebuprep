@@ -33,7 +33,7 @@ set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 out=${1:-$(mktemp -d)}
 mkdir -p "$out"
-syscalls=execve,clone,clone3,fork,vfork,open,openat,openat2,creat,unlink,unlinkat,rename,renameat,renameat2,mkdir,mkdirat,rmdir,link,linkat,symlink,symlinkat,chmod,fchmod,fchmodat,chown,fchown,fchownat,lchown,truncate,ftruncate,utime,utimes,utimensat,futimesat,mknod,mknodat,mount,umount2,setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr,kill,tkill,tgkill,reboot,init_module,finit_module,delete_module,sethostname,setdomainname,settimeofday,clock_settime,adjtimex,clock_adjtime,swapon,swapoff,pivot_root,chroot,acct,quotactl,syslog,fallocate
+syscalls=execve,clone,clone3,fork,vfork,write,pwrite64,writev,pwritev,pwritev2,open,openat,openat2,creat,unlink,unlinkat,rename,renameat,renameat2,mkdir,mkdirat,rmdir,link,linkat,symlink,symlinkat,chmod,fchmod,fchmodat,chown,fchown,fchownat,lchown,truncate,ftruncate,utime,utimes,utimensat,futimesat,mknod,mknodat,mount,umount2,setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr,kill,tkill,tgkill,reboot,init_module,finit_module,delete_module,sethostname,setdomainname,settimeofday,clock_settime,adjtimex,clock_adjtime,swapon,swapoff,pivot_root,chroot,acct,quotactl,syslog,fallocate
 # Side effects agreed with the user (docs/about/read-only.md, "Agreed side effects"):
 # files the web servers' configuration tests may create. Listed, not counted; strace
 # (readonly-audit.py's AGREED_WRITES) still checks which program changed them, and how.

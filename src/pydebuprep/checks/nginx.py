@@ -91,11 +91,12 @@ class _Server:
     listen: list[tuple[tuple[str, int], bool]] = field(default_factory=list)  # (addr, ssl)
     certificates: list[str] = field(default_factory=list)
     ssl_on: bool = False
+    dynamic: bool = False  # a certificate built from variables: only nginx knows which
 
     def site(self, inherited: tuple[str, ...]) -> TlsSite | None:
         tls = [addr for addr, ssl in self.listen if ssl or self.ssl_on]
         certificates = tuple(self.certificates) or inherited
-        if not tls or not certificates:
+        if not tls or not certificates or self.dynamic:
             return None
         return TlsSite(self.source, tuple(self.names), certificates, tuple(tls))
 
@@ -184,6 +185,8 @@ class _Walker:
                 self.current.certificates.append(certificate)
             elif self.blocks == ["http"]:
                 self.http_certificates.append(certificate)
+        elif name == "ssl_certificate" and self.current is not None:
+            self.current.dynamic = True
         elif name == "ssl_dhparam" and literal_path(args[0]):
             cfg.dhparams.append((resolve(CONF_DIR, args[0]), where))
         elif name == "ssl_protocols":

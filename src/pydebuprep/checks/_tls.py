@@ -16,7 +16,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from pydebuprep.checks._listeners import listening_addresses
-from pydebuprep.checks._x509 import Certificate, CertificateError, dh_bits, parse_pem
+from pydebuprep.checks._x509 import Certificate, CertificateError, dh_bits, parse_leaf
 from pydebuprep.checks.base import Context, Option
 from pydebuprep.model import Finding, Severity, truncate_evidence
 
@@ -113,7 +113,7 @@ def certificate_findings(
                 needs_root.append(f"{path} {where}")
             continue
         try:
-            leaf = parse_pem(data)[0]
+            leaf = parse_leaf(data)
         except CertificateError as exc:
             unreadable.append(f"{path}: {exc} {where}")
             continue
@@ -296,7 +296,7 @@ def _leaves(ctx: Context, paths: Sequence[str]) -> list[Certificate]:
         data = ctx.system.read_bytes(path)
         try:
             if data is not None:
-                leaves.append(parse_pem(data)[0])
+                leaves.append(parse_leaf(data))
         except CertificateError:
             continue
     return leaves

@@ -92,7 +92,8 @@ agreed on one by one. None of them changes the system's configuration or state, 
 writes into a file another program uses. The web server checks' `config_test` and
 `tls_probe` are on by default and can be turned off; the database and container
 checks' `probe` is off unless turned on. The audit checks them: it allows exactly
-these writes, and only by the program they were agreed for.
+these writes, only by the program they were agreed for, and fails if anything is
+written into a file whose opening was agreed (the PID file, a log).
 
 | What | Triggered by | What it writes or causes | Turn off with |
 |---|---|---|---|

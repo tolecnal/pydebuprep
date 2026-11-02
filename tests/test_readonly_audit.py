@@ -238,3 +238,30 @@ def test_bare_names_are_agreed_for_mkdir_only(tmp_path: Path, line: str) -> None
 def test_only_nginx_log_files_are_agreed(tmp_path: Path, path: str) -> None:
     trace = NGINX_T + f'200 openat(AT_FDCWD, "{path}", O_WRONLY|O_CREAT|O_APPEND, 0644) = 3\n'
     assert audit(tmp_path, trace)[0] == 1
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        '200 write(4, "nginx: [emerg] ...", 18) = 18\n',
+        '200 pwrite64(3, "4242", 4, 0) = 4\n',
+        '200 writev(4, [{iov_base="x", iov_len=1}], 1) = 1\n',
+    ],
+)
+def test_writing_into_an_agreed_file_fails(tmp_path: Path, line: str) -> None:
+    # Opening the PID file and logs was agreed; writing into them wasn't.
+    code, out = audit(tmp_path, NGINX_T + NGINX_WRITES.format(pid=200) + line)
+    assert code == 1 and "wrote into" in out, out
+
+
+def test_other_writes_are_judged_where_the_file_was_opened(tmp_path: Path) -> None:
+    trace = (
+        NGINX_T
+        + NGINX_WRITES.format(pid=200)
+        + '200 write(1, "syntax is ok", 12) = 12\n'  # stdout: /dev/null in the audit
+        + '200 openat(AT_FDCWD, "/etc/nginx/nginx.conf", O_RDONLY) = 4\n'  # fd 4 reused
+        + '200 write(4, "x", 1) = -1 EBADF (Bad file descriptor)\n'
+        + '200 write(3, "", 0) = 0\n'
+    )
+    code, out = audit(tmp_path, trace)
+    assert code == 0, out

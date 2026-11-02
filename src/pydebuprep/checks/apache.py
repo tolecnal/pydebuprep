@@ -108,7 +108,6 @@ class ApacheConfig:
     certificates: list[tuple[str, str]] = field(default_factory=list)
     dhparams: list[tuple[str, str]] = field(default_factory=list)
     protocols: list[tuple[frozenset[str], str]] = field(default_factory=list)
-    listens: list[tuple[str, int]] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
 
 
@@ -169,18 +168,10 @@ class _Walker:
             cfg.dhparams.append((resolve(SERVER_ROOT, args[-1]), where))
         elif lower == "sslprotocol":
             cfg.protocols.append((apache_protocols(args), where))
-        elif (
-            lower == "listen" and args and (found_address := address(args[0]) or self.port(args[0]))
-        ):
-            cfg.listens.append(found_address)
         elif self.current is not None and lower in ("servername", "serveralias", "sslengine"):
             self.vhost_directive(self.current, lower, args)
         else:
             cfg.sockets += [Ref(s, name, path) for a in args if (s := socket_path(a))]
-
-    @staticmethod
-    def port(spec: str) -> tuple[str, int] | None:
-        return ("", int(spec)) if spec.isdigit() else None
 
     @staticmethod
     def vhost_directive(vhost: _VirtualHost, lower: str, args: list[str]) -> None:

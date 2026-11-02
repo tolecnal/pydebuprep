@@ -103,8 +103,14 @@ class PhpCheck(Check):
             if not current:
                 gone.append(sapi)
                 continue
-            have = set().union(*now[sapi].values())
-            lost = sorted(e for e in enabled - have if not _built_in(e, current))
+            newest = current[-1]
+            if _version(newest) > max(_version(v) for v in versions):
+                # The upgrade brought a newer PHP: that's what runs now, even while the
+                # old version's packages linger (Debian keeps them until autoremove).
+                have, checked = now[sapi][newest], [newest]
+            else:
+                have, checked = set().union(*now[sapi].values()), current
+            lost = sorted(e for e in enabled - have if not _built_in(e, checked))
             if lost:
                 old = ", ".join(sorted(versions, key=_version))
                 missing.append(f"{sapi}: {', '.join(lost)} (enabled for PHP {old})")

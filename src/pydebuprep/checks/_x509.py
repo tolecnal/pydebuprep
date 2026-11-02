@@ -212,12 +212,13 @@ def parse_der(der: bytes) -> Certificate:
         raise CertificateError(f"not a certificate: {exc}") from None
 
 
-def _blocks(data: bytes, label: bytes) -> list[bytes]:
+def _blocks(data: bytes, label: bytes, limit: int | None = None) -> list[bytes]:
     """The decoded bodies of the PEM blocks labelled LABEL, in order. A linear scan:
     a file of BEGIN lines without an END must not cost quadratic time as root."""
     begin, end = b"-----BEGIN " + label + b"-----", b"-----END " + label + b"-----"
-    found, pos = [], 0
-    while (start := data.find(begin, pos)) != -1:
+    found: list[bytes] = []
+    pos = 0
+    while (start := data.find(begin, pos)) != -1 and (limit is None or len(found) < limit):
         body_start = start + len(begin)
         stop = data.find(end, body_start)
         if stop == -1:
@@ -237,6 +238,14 @@ def parse_pem(data: bytes) -> list[Certificate]:
     if not certificates:
         raise CertificateError("no certificate in the file")
     return certificates
+
+
+def parse_leaf(data: bytes) -> Certificate:
+    """The first certificate in a PEM file (the leaf); the chain after it isn't read."""
+    blocks = _blocks(data, b"CERTIFICATE", limit=1)
+    if not blocks:
+        raise CertificateError("no certificate in the file")
+    return parse_der(blocks[0])
 
 
 def dh_bits(data: bytes) -> int | None:

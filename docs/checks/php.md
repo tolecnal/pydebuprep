@@ -26,8 +26,10 @@ Both come from comparing with a snapshot:
 The snapshot records, for each installed PHP version and each SAPI (`fpm`, `apache2`,
 `cli`), the extensions its `conf.d/*.ini` files enable (`extension=` and
 `zend_extension=`). After the upgrade, each SAPI is compared across versions: an
-extension enabled for `fpm` in PHP 7.4 must be enabled for `fpm` in a PHP version
-installed now.
+extension enabled for `fpm` in PHP 7.4 must be enabled for `fpm` in the newest PHP
+installed now, when that's newer than any version in the snapshot (the old version's
+packages stay installed until `apt autoremove`, but aren't what runs). Without a newer
+version, any installed version that enables it will do.
 
 Extensions that became part of PHP itself have no ini file of their own any more and
 aren't missing: `json` from PHP 8.0 on.

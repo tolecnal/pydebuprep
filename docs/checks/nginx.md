@@ -115,7 +115,8 @@ nothing into them. Turn it off with `config_test: false`.
 - Without root, or with `config_test` off, only paths are checked, not the syntax or
   the meaning of the configuration.
 - Paths built from variables (`$document_root`, `$ssl_server_name.crt`) and inline
-  certificates (`data:`) are left out; only nginx knows them.
+  certificates (`data:`) are left out; only nginx knows them. A server with such a
+  certificate isn't matched against its names or probed.
 - Certificates are checked for themselves, not against a trust store: an incomplete
   chain or a revoked certificate isn't found.
 - A socket can be missing because its service is stopped; `systemd-failed` and

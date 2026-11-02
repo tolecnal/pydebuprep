@@ -115,3 +115,20 @@ def test_collect_baseline_round_trip() -> None:
     baseline = PhpCheck().collect_baseline(ctx)
     assert baseline == BEFORE
     assert PhpCheck().compare(ctx, baseline) == []
+
+
+def test_lingering_old_version_doesnt_hide_a_missing_extension() -> None:
+    # Debian leaves php7.4 installed until autoremove: its conf.d still enables mysqli.
+    files = {
+        **php_files("7.4", BEFORE["7.4"]),
+        **php_files("8.2", {"fpm": ["intl", "opcache"], "cli": ["mysqli"]}),
+    }
+    [finding] = PhpCheck().compare(make_ctx(files=files), BEFORE)
+    assert finding.evidence == ["fpm: mysqli (enabled for PHP 7.4)"]
+    assert "sudo apt install php8.2-mysql" in finding.remediation
+
+
+def test_several_versions_without_an_upgrade_are_compared_as_a_whole() -> None:
+    before = {"7.4": {"fpm": ["mysqli"]}, "8.2": {"fpm": ["intl"]}}
+    files = {**php_files("7.4", {"fpm": ["mysqli"]}), **php_files("8.2", {"fpm": ["intl"]})}
+    assert PhpCheck().compare(make_ctx(files=files), before) == []

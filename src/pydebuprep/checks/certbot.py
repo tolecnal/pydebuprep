@@ -19,6 +19,7 @@ CONF_DIR = "/etc/letsencrypt"
 RENEWAL_DIR = f"{CONF_DIR}/renewal"
 CERTBOT_PATHS = ("/usr/bin/certbot", "/usr/local/bin/certbot")
 SNAP_CERTBOT = "/snap/bin/certbot"
+OPT_CERTBOT = "/opt/*/bin/certbot"  # certbot's own instructions for pip install it there
 SYSTEM_PYTHON = "/usr/bin/python3"
 DIST_PACKAGES = "/usr/lib/python3/dist-packages"
 PYTHON_NAME = re.compile(r"python(\d+\.\d+)")
@@ -56,7 +57,8 @@ def interpreter(text: str) -> str | None:
         return None
     words = first[2:].split()
     if words[:1] == ["/usr/bin/env"]:
-        return f"/usr/bin/{words[1]}" if len(words) > 1 else None
+        program = next((w for w in words[1:] if not w.startswith("-")), None)
+        return f"/usr/bin/{program}" if program else None
     return words[0] if words else None
 
 
@@ -138,7 +140,8 @@ class CertbotCheck(Check):
         return found
 
     def _installation(self, ctx: Context, texts: dict[str, str]) -> list[Finding]:
-        script = next((p for p in CERTBOT_PATHS if ctx.system.exists(p)), None)
+        candidates = [*CERTBOT_PATHS, *ctx.system.glob(OPT_CERTBOT)]
+        script = next((p for p in candidates if ctx.system.exists(p)), None)
         if script is None:
             if ctx.system.exists(SNAP_CERTBOT):
                 return [
@@ -150,9 +153,10 @@ class CertbotCheck(Check):
                 ]
             return [
                 Finding(
-                    Severity.CRITICAL,
-                    "certbot renewals are configured but certbot isn't installed",
-                    detail="Nothing renews these certificates any more.",
+                    Severity.WARNING,
+                    "certbot renewals are configured but certbot wasn't found",
+                    detail="Nothing on this host renews these certificates, unless certbot "
+                    "runs somewhere else (in a container with /etc/letsencrypt mounted, say).",
                     evidence=truncate_evidence(sorted(texts)),
                     remediation=["sudo apt install certbot", DRY_RUN],
                 )

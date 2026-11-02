@@ -12,7 +12,8 @@ certificate expires.
 
 For every renewal configuration in `/etc/letsencrypt/renewal/*.conf`:
 
-- certbot is still installed (`/usr/bin/certbot` or `/usr/local/bin/certbot`), and
+- certbot is still installed (`/usr/bin/certbot`, `/usr/local/bin/certbot`, or in a
+  virtualenv as `/opt/*/bin/certbot`), and
   the Python its `#!` line names exists. For a certbot in a virtualenv, the Python
   the virtualenv was made with (`home` and `version` in its `pyvenv.cfg`) must exist
   too;
@@ -30,7 +31,7 @@ For every renewal configuration in `/etc/letsencrypt/renewal/*.conf`:
 
 | Severity | Finding | What to do |
 |---|---|---|
-| critical | certbot renewals are configured but certbot isn't installed | `sudo apt install certbot`, then `sudo certbot renew --dry-run`. |
+| warning | certbot renewals are configured but certbot wasn't found | `sudo apt install certbot`, then `sudo certbot renew --dry-run`; nothing to do if certbot runs elsewhere, such as in a container with `/etc/letsencrypt` mounted. |
 | critical | certbot's Python interpreter is missing | Reinstall certbot (`sudo apt install --reinstall certbot`), or recreate its virtualenv with the current Python. |
 | critical | certbot renewals use plugins that aren't installed | Install the plugin for this release, such as `python3-certbot-dns-cloudflare` or `python3-certbot-nginx`, then `sudo certbot renew --dry-run`. |
 | critical | certbot uses expired or not yet valid certificates | `sudo certbot renew`, and find out why the renewal failed (`/var/log/letsencrypt/letsencrypt.log`). |

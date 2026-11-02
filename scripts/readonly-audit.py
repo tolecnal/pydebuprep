@@ -35,6 +35,9 @@ DIRFD_CALLS = ("openat", "openat2", "unlinkat", "mkdirat", "fchmodat", "fchownat
 
 
 PROCESS_CALLS = ("clone", "clone3", "fork", "vfork")
+# Writes are judged where their file was opened, except into a file whose opening was
+# agreed (a PID file, a log): it may be opened, never written to.
+WRITE_CALLS = ("write", "pwrite64", "writev", "pwritev", "pwritev2")
 OPEN_CALLS = ("open", "openat", "openat2", "creat")
 
 
@@ -93,6 +96,7 @@ class Auditor:
         self.signals: list[tuple[str, str]] = []  # (target pid, where), judged in finish()
         self.fds: dict[tuple[str, str], str] = {}  # (pid, fd) -> path it was opened as
         self.lineage: dict[str, frozenset[str]] = {}  # pid -> programs it descends from
+        self.agreed_fds: set[tuple[str, str]] = set()  # (pid, fd) of agreed opens
 
     def allowed(self, path: str) -> bool:
         return path.startswith(HARMLESS) or path.startswith(self.allow)
@@ -134,14 +138,22 @@ class Auditor:
             dirfd = args.split(",", 1)[0].strip()
             base = self.fds.get((pid, dirfd), f"<fd {dirfd}>")
             targets[0] = f"{base.rstrip('/')}/{targets[0]}"
+        if name in WRITE_CALLS:
+            fd = args.split(",", 1)[0].strip()
+            if (pid, fd) in self.agreed_fds and result.isdigit() and int(result) > 0:
+                self.violations.append(f"{where} (wrote into {self.fds[(pid, fd)]})")
+            return
         if name.startswith("open") and result.isdigit() and targets:
             self.fds[(pid, result)] = targets[0]
+            self.agreed_fds.discard((pid, result))
         if result.startswith("-"):
             if self.strict_attempt(name, args, targets):
                 self.violations.append(f"{where} (failed attempt)")
             return
         if not self.agreed(pid, name, args, targets):
             self.check(name, args, targets, where)
+        elif name in OPEN_CALLS and result.isdigit():
+            self.agreed_fds.add((pid, result))
 
     def agreed(self, pid: str, name: str, args: str, targets: list[str]) -> bool:
         """Whether this call is a side effect agreed for a program PID descends from."""

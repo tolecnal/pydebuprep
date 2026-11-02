@@ -134,9 +134,10 @@ def test_certbot_gone() -> None:
     ctx = certbot_ctx()
     del ctx.system.files["/usr/bin/certbot"]  # type: ignore[attr-defined] # FakeSystem
     [finding] = CertbotCheck().run(ctx)
+    # Could be certbot in a container with /etc/letsencrypt mounted: a warning.
     assert (finding.severity, finding.title) == (
-        Severity.CRITICAL,
-        "certbot renewals are configured but certbot isn't installed",
+        Severity.WARNING,
+        "certbot renewals are configured but certbot wasn't found",
     )
 
 
@@ -208,3 +209,23 @@ def test_versioned_interpreter_names_its_own_site_dir() -> None:
         DIST,
         "/usr/local/lib/python3.13/dist-packages",
     ]
+
+
+def test_certbot_in_its_own_virtualenv_under_opt() -> None:
+    files = {
+        "/opt/certbot/bin/certbot": "#!/opt/certbot/bin/python\n",
+        "/opt/certbot/bin/python": "",
+        "/opt/certbot/pyvenv.cfg": "home = /usr/bin\nversion = 3.13.5\n",
+        "/usr/bin/python3.13": "",
+    }
+    ctx = certbot_ctx(files)
+    del ctx.system.files["/usr/bin/certbot"]  # type: ignore[attr-defined] # FakeSystem
+    assert CertbotCheck().run(ctx) == []
+
+
+def test_env_dash_s_shebang() -> None:
+    from pydebuprep.checks.certbot import interpreter
+
+    assert interpreter("#!/usr/bin/env -S python3 -u\n") == "/usr/bin/python3"
+    assert interpreter("#!/usr/bin/env -S\n") is None
+    assert interpreter("#!\n") is None
