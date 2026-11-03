@@ -59,6 +59,9 @@ DPKG_PACKAGES_ARGV = (
     "dpkg-query", "-W", "-f=${db:Status-Abbrev}\t${Package}\t${Version}\t${Installed-Size}\n",
 )  # fmt: skip
 OWNER_QUERY = ("dpkg-query", "-S")
+# And the configuration files dpkg still lists for packages, to back them up first.
+CONFFILES_HEAD = ("dpkg-query", "-W", "-f=${Conffiles}\n")
+DPKG_PACKAGE_NAME = re.compile(r"[a-z0-9][a-z0-9+.-]+")
 OWNER_ROOTS = ("/lib/modules/", "/usr/src/")
 MAX_OWNER_PATHS = 200
 
@@ -222,6 +225,11 @@ def _is_allowed(argv: tuple[str, ...]) -> bool:
         return _is_probe(argv)
     if argv[:2] == OWNER_QUERY:
         return _is_owner_query(argv[2:])
+    if argv[: len(CONFFILES_HEAD)] == CONFFILES_HEAD:
+        names = argv[len(CONFFILES_HEAD) :]
+        return 0 < len(names) <= MAX_OWNER_PATHS and all(
+            DPKG_PACKAGE_NAME.fullmatch(n) for n in names
+        )
     if argv[: len(SHOW_UNITS)] == SHOW_UNITS:
         units = argv[len(SHOW_UNITS) :]
         return 0 < len(units) <= MAX_UNITS and all(_plain_unit(u) for u in units)
