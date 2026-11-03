@@ -236,3 +236,63 @@ def test_wiki_block_markers_at_line_start_neutralised(fmt: str, start: str) -> N
     r.results[0].findings[1] = Finding(Severity.INFO, "t", detail=start)
     out = render(r, fmt)
     assert f"\n{start}" not in out.replace(r"\-\-\-\-", "")
+
+
+# --- Jira's size limit -------------------------------------------------------------------
+
+
+def _huge_report():  # type: ignore[no-untyped-def] # test helper
+    from pydebuprep.model import CheckResult, Status
+
+    report = make_sample_report()
+    lines = [
+        f"/very/long/path/number/{i}/that/takes/up/space/in/the/comment.conf" for i in range(20)
+    ]
+    for n in range(60):
+        severity = (Severity.CRITICAL, Severity.WARNING, Severity.INFO, Severity.INFO)[n % 4]
+        finding = Finding(severity, f"Finding number {n}", detail="A detail. " * 20,
+                          evidence=list(lines), remediation=[f"step {i} " * 10 for i in range(12)])  # fmt: skip
+        report.results.append(
+            CheckResult(f"c{n}", f"Check {n}", "system", Status.FINDINGS, findings=[finding])
+        )
+    return report
+
+
+def test_jira_stays_within_its_size_limit() -> None:
+    from pydebuprep.render.jira import JIRA_LIMIT
+
+    report = _huge_report()
+    assert len(render(report, "confluence").encode()) > JIRA_LIMIT  # really too big
+    out = render(report, "jira")
+    assert len(out.encode()) <= JIRA_LIMIT
+    assert "Shortened to fit Jira's size limit" in out
+    for n in range(60):
+        if n % 4 < 2:  # critical and warning findings are never dropped
+            assert f"Finding number {n}" in out
+
+
+def test_jira_with_todo_stays_within_its_size_limit() -> None:
+    from pydebuprep.render.jira import JIRA_LIMIT
+
+    out = render(_huge_report(), "jira", todo=True)
+    assert len(out.encode()) <= JIRA_LIMIT and "h2. TODO" in out
+
+
+def test_small_jira_reports_are_not_shortened() -> None:
+    out = render(make_sample_report(), "jira")
+    assert "Shortened" not in out
+
+
+def test_jira_cut_as_a_last_resort() -> None:
+    # Even the critical titles alone exceed the limit: the text is cut, and says so.
+    from pydebuprep.model import CheckResult, Status
+    from pydebuprep.render.jira import JIRA_LIMIT
+
+    report = make_sample_report()
+    findings = [Finding(Severity.CRITICAL, f"{n} " + "x" * 200) for n in range(400)]
+    report.results.append(CheckResult("big", "Big", "system", Status.FINDINGS, findings=findings))
+    out = render(report, "jira")
+    assert len(out.encode()) <= JIRA_LIMIT
+    assert out.rstrip().endswith(
+        "Cut off at Jira's size limit; the full report is in the other formats._"
+    )

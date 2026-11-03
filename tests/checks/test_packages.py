@@ -128,3 +128,16 @@ def test_compare_removed_packages() -> None:
     fs = ObsoletePackagesCheck().compare(ctx, {"bash": "5.1", "python3.11": "3.11.2", "zsh": "5.9"})
     assert titles(fs) == ["1 package removed since baseline"]
     assert fs[0].evidence == ["python3.11 3.11.2"]
+
+
+def test_rc_purge_lists_at_most_five_batches() -> None:
+    # Old hosts can have hundreds: a remediation per 20 would swamp the report.
+    out = "".join(f"rc  p{i}\n" for i in range(450))
+    (f,) = DpkgRcCheck().run(make_ctx(commands={DPKG_RC_ARGV: out}))
+    purges = [r for r in f.remediation if r.startswith("sudo apt purge")]
+    assert len(purges) == 5
+    assert f.remediation[-1] == (
+        "... and 350 more packages: "
+        "dpkg-query -W -f='${db:Status-Abbrev} ${Package}\\n' | awk '$1 == \"rc\" {print $2}' "
+        "| xargs sudo apt purge"
+    )

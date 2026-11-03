@@ -35,6 +35,20 @@ matches where you paste.
 sudo pydebuprep --format jira -o - | xclip -selection clipboard
 ```
 
+Jira refuses a description or comment over 32,767 characters, which a host with
+hundreds of findings can exceed. The `jira` format stays within 32,000 bytes. When a
+report doesn't fit, it's rendered shorter, in steps, until it does:
+
+1. evidence and remediation lists are cut to 5 lines each;
+2. then to 2, and info findings lose their details;
+3. then info findings are left out (the note at the top counts them);
+4. then only the findings' titles are kept.
+
+Every critical and warning title stays. The report then starts with "Shortened to fit
+Jira's size limit". If even the titles don't fit, the text is cut and ends with a line
+saying so. The other formats are never shortened; `pydebuprep convert` makes any of
+them from a saved JSON report.
+
 Both were written against the documented markup; check the result in your own
 Jira or Confluence version before relying on the layout.
 
