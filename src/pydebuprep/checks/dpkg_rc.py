@@ -5,6 +5,11 @@ from pydebuprep.model import Finding, Severity, truncate_evidence
 
 DPKG_RC_ARGV = ("dpkg-query", "-W", "-f=${db:Status-Abbrev} ${Package}\n")
 PURGE_BATCH = 20
+MAX_BATCHES = 5  # hundreds of leftovers on old hosts would swamp the report
+PURGE_ALL = (
+    "dpkg-query -W -f='${db:Status-Abbrev} ${Package}\\n' | awk '$1 == \"rc\" {print $2}' "
+    "| xargs sudo apt purge"
+)
 
 
 class DpkgRcCheck(Check):
@@ -19,6 +24,8 @@ class DpkgRcCheck(Check):
         if not pkgs:
             return []
         batches = [pkgs[i : i + PURGE_BATCH] for i in range(0, len(pkgs), PURGE_BATCH)]
+        rest = len(pkgs) - PURGE_BATCH * MAX_BATCHES
+        more = [f"... and {rest} more packages: {PURGE_ALL}"] if rest > 0 else []
         return [
             Finding(
                 Severity.INFO,
@@ -28,7 +35,8 @@ class DpkgRcCheck(Check):
                 evidence=truncate_evidence(pkgs),
                 remediation=[
                     "Review with: dpkg -l | grep ^rc",
-                    *(f"sudo apt purge {' '.join(b)}" for b in batches),
+                    *(f"sudo apt purge {' '.join(b)}" for b in batches[:MAX_BATCHES]),
+                    *more,
                 ],
             )
         ]

@@ -13,7 +13,7 @@ behind, in state `rc`.
 
 | Severity | Finding | What to do |
 |---|---|---|
-| info | *N* removed packages still have configuration files | Review with `dpkg -l | grep ^rc`; purge what you don't need with `sudo apt purge PACKAGE…` (the remediation lists them in batches). |
+| info | *N* removed packages still have configuration files | Review with `dpkg -l | grep ^rc`; purge what you don't need with `sudo apt purge PACKAGE…`. The remediation lists them in batches of 20, at most 5; beyond 100 packages it adds one command that purges them all. |
 
 ## Commands it runs
 
