@@ -13,7 +13,7 @@ behind, in state `rc`.
 
 | Severity | Finding | What to do |
 |---|---|---|
-| info | *N* removed packages still have configuration files | Review with `dpkg -l | grep ^rc`; purge what you don't need with `sudo apt purge PACKAGE…`. The remediation lists them in batches of 20, at most 5; beyond 100 packages it adds one command that purges them all. |
+| info | *N* removed packages still have configuration files | Review with `dpkg -l | grep ^rc`; purge what you don't need with `sudo apt purge PACKAGE…`. The remediation lists them in batches of 20, at most 5; beyond 100 packages it points at `sudo pydebuprep-cleanup --residual`, which shows what it would purge (and with `--apply`, backs up their config files and purges them; see [Cleaning up after an upgrade](../guide/cleanup.md)). |
 
 ## Commands it runs
 

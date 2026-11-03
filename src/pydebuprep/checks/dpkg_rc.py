@@ -6,10 +6,7 @@ from pydebuprep.model import Finding, Severity, truncate_evidence
 DPKG_RC_ARGV = ("dpkg-query", "-W", "-f=${db:Status-Abbrev} ${Package}\n")
 PURGE_BATCH = 20
 MAX_BATCHES = 5  # hundreds of leftovers on old hosts would swamp the report
-PURGE_ALL = (
-    "dpkg-query -W -f='${db:Status-Abbrev} ${Package}\\n' | awk '$1 == \"rc\" {print $2}' "
-    "| xargs sudo apt purge"
-)
+PURGE_ALL = "sudo pydebuprep-cleanup --residual (shows what it would purge; add --apply to do it)"
 
 
 class DpkgRcCheck(Check):

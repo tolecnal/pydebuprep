@@ -216,3 +216,16 @@ def test_principle_is_stated() -> None:
     assert "runtime files" in page and "## The cleanup tool" in page
     for path in (ROOT / "README.md", DOCS / "index.md", ROOT / "man" / "pydebuprep.1"):
         assert "read-only health report" not in path.read_text(encoding="utf-8").lower(), path
+
+
+def test_cleanup_doc_page() -> None:
+    from pydebuprep.cleanup.cli import build_parser as cleanup_parser
+
+    text = (DOCS / "guide" / "cleanup.md").read_text(encoding="utf-8")
+    for action in cleanup_parser()._actions:
+        for option in action.option_strings:
+            if option.startswith("--") and option not in ("--help", "--version"):
+                assert f"`{option}" in text, option
+    for words in ("Dry run", "--apply", "/var/log/pydebuprep/cleanup.log", "/var/backups/pydebuprep",
+                  "journalctl -t pydebuprep-cleanup", "## Guardrails", "keep_packages"):  # fmt: skip
+        assert words in text, words

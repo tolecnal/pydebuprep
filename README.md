@@ -323,6 +323,24 @@ host never looks healthy just because a check couldn't look.
 | `disk-space` | storage | Free space and inodes on local filesystems (network mounts optional); a minimum free-space floor for `/` and `/var` |
 | `fstab` | storage | `findmnt --verify`; mounts that went missing since the baseline |
 
+## Cleaning up after an upgrade
+
+`pydebuprep-cleanup`, in the same package, purges what an upgrade leaves behind: old
+kernels, their modules and headers, directories DKMS leaves in them, and the
+configuration of removed packages. It's the one part of pydebuprep that changes the
+system, so it only shows its plan unless run with `--apply`, refuses to act when
+something is off (apt busy, dpkg broken, the running kernel unknown, apt wanting to
+remove more than planned), backs up configuration files before purging them, and logs
+every action to `/var/log/pydebuprep/cleanup.log` and the journal.
+
+```sh
+sudo pydebuprep-cleanup --all            # what it would do
+sudo pydebuprep-cleanup --all --apply    # do it (asks first)
+```
+
+See the [cleanup guide](https://pydebuprep.app/guide/cleanup/) and
+`man pydebuprep-cleanup`.
+
 ## Running across a fleet with Ansible
 
 ```yaml

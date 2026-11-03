@@ -2,7 +2,8 @@
 set -e
 
 if [ "$1" = "purge" ]; then
-    rm -rf /var/lib/pydebuprep
+    # The backups of purged packages' config files (/var/backups/pydebuprep) stay.
+    rm -rf /var/lib/pydebuprep /var/log/pydebuprep
 fi
 
 #DEBHELPER#

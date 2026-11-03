@@ -236,3 +236,30 @@ def test_timeouts_and_failed_removals_stop_too(
     log.close()
     text = (tmp_path / "cleanup.log").read_text()
     assert "failed (timed out)" in text and "failed: [Errno 13] Permission denied" in text
+
+
+def test_a_directory_the_purge_already_removed_is_fine(
+    tmp_path: Path, syslogged: list[tuple[int, str]]
+) -> None:
+    # dpkg removes a package's directories once they're empty: nothing left to remove.
+    only_dir = Plan(dirs=("/usr/src/linux-headers-6.8.0-10-generic",))
+    removed: list[str] = []
+    log = Log(str(tmp_path / "cleanup.log"), run_id="r8")
+    assert (
+        execute(
+            only_dir,
+            FakeRunner(),
+            FakeSystem(),
+            log,
+            NOW,
+            backup_dir=str(tmp_path),
+            remove=removed.append,
+        )
+        == 0
+    )
+    log.close()
+    assert removed == []
+    assert (
+        "already gone: /usr/src/linux-headers-6.8.0-10-generic"
+        in (tmp_path / "cleanup.log").read_text()
+    )

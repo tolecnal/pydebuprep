@@ -137,6 +137,9 @@ def _remove(
     system: System, log: Log, path: str, remove: Callable[[str], None]
 ) -> Callable[[], bool]:
     def step() -> bool:
+        if not system.exists(path) and system.readlink(path) is None:
+            log.line(f"already gone: {path}")  # dpkg removes a package's empty directories
+            return True
         still = owners(system, [path])[path]
         if still:
             log.line(f"kept {path}: still has files of {', '.join(sorted(still))}")

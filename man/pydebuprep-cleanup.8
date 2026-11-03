@@ -1,0 +1,101 @@
+.TH PYDEBUPREP-CLEANUP 8 "November 2026" "pydebuprep 0.9.0" "System Administration"
+.SH NAME
+pydebuprep\-cleanup \- purge old kernels and leftovers after a Debian or Ubuntu release upgrade
+.SH SYNOPSIS
+.B pydebuprep\-cleanup
+.RB [ \-\-kernels ]
+.RB [ \-\-modules ]
+.RB [ \-\-leftover\-dirs ]
+.RB [ \-\-residual ]
+.RB [ \-\-all ]
+.RB [ \-\-keep\ \fIN\fR ]
+.RB [ \-\-keep\-package\ \fIPKG\fR ]
+.RB [ \-\-apply ]
+.RB [ \-\-yes ]
+.RB [ \-\-json ]
+.RB [ \-\-config\ \fIFILE\fR \ |\  \-\-no\-config ]
+.SH DESCRIPTION
+.B pydebuprep\-cleanup
+purges what a release upgrade leaves behind: old kernels, their modules and
+headers, directories DKMS leaves in them, and the configuration of removed
+packages. Unlike
+.BR pydebuprep (1),
+it changes the system, so it only shows what it would do unless it is run with
+.BR \-\-apply .
+.SH OPTIONS
+.TP
+.B \-\-kernels
+Old kernel images (linux\-image\-\fIVERSION\fR\-\fIFLAVOUR\fR).
+.TP
+.B \-\-modules
+Modules, headers and tools of old kernels, including those whose image is
+already gone.
+.TP
+.B \-\-leftover\-dirs
+Directories of old kernels under /lib/modules and /usr/src that no package owns
+(or only packages this run purges), even when they aren't empty.
+.TP
+.B \-\-residual
+The configuration left by removed packages (dpkg state rc). Their configuration
+files are backed up first.
+.TP
+.B \-\-all
+All of the above.
+.TP
+.BI \-\-keep " N"
+Kernels to keep, besides the running one and GRUB's default (1 to 10, default 2).
+.TP
+.BI \-\-keep\-package " PKG"
+Never purge this package; may be given more than once.
+.TP
+.B \-\-apply
+Carry out the plan. Without it nothing changes.
+.TP
+.B \-\-yes
+Don't ask before acting; needed when not at a terminal.
+.TP
+.B \-\-json
+Print the plan as JSON.
+.TP
+.BI \-\-config " FILE"
+Read
+.B cleanup.keep_packages
+from this config file instead of /etc/pydebuprep.conf.
+.TP
+.B \-\-no\-config
+Ignore any config file.
+.TP
+.B \-\-help
+Show the options and exit.
+.TP
+.B \-\-version
+Show the version and exit.
+.SH GUARDRAILS
+The running kernel, the newest one, GRUB's default and the newest \fIN\fR are
+always kept, as are meta packages (linux\-image\-generic, linux\-image\-amd64).
+If the running kernel can't be identified, no kernel, module or directory is
+removed. Before acting it refuses unless run as root, while apt or dpkg is
+running, when
+.B dpkg \-\-audit
+reports problems, or while another cleanup runs. It asks apt to simulate the
+purge first, and refuses if apt would remove anything not in the plan. A failed
+step stops the run.
+.SH FILES
+.TP
+.I /var/log/pydebuprep/cleanup.log
+Every run's plan and every action; also in the journal:
+.BR "journalctl \-t pydebuprep\-cleanup" .
+.TP
+.I /var/backups/pydebuprep
+The configuration files of purged rc packages, as rc\-\fITIMESTAMP\fR.tar.gz.
+.TP
+.I /etc/pydebuprep.conf
+.B cleanup: keep_packages:
+lists packages to leave alone. A config fetched from a portal can't set it.
+.SH EXIT STATUS
+0 done, or nothing to do; 1 refused by a guardrail; 2 a step failed (the rest
+was left undone); 3 a usage or config error.
+.SH SEE ALSO
+.BR pydebuprep (1),
+.BR apt\-get (8),
+.BR dpkg (1)

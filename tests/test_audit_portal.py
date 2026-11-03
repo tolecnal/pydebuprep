@@ -87,3 +87,15 @@ def test_stand_in_portal(tmp_path: Path) -> None:
     finally:
         stub.terminate()
         stub.wait(5)
+
+
+def test_postinst_creates_the_cleanup_directories_and_logrotate() -> None:
+    postinst = (ROOT / "debian" / "pydebuprep.postinst").read_text()
+    assert "install -d -m 0750 /var/log/pydebuprep" in postinst
+    assert "install -d -m 0700 /var/backups/pydebuprep" in postinst
+    postrm = (ROOT / "debian" / "pydebuprep.postrm").read_text()
+    assert "rm -rf /var/lib/pydebuprep /var/log/pydebuprep" in postrm
+    rotate = (ROOT / "debian" / "pydebuprep.logrotate").read_text()
+    for words in ("/var/log/pydebuprep/cleanup.log", "weekly", "rotate 12", "compress", "missingok",
+                  "notifempty", "create 0640 root adm"):  # fmt: skip
+        assert words in rotate, words
