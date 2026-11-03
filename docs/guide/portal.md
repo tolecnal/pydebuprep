@@ -10,7 +10,10 @@ the portal already contains the upload URL).
 
 The portal checks each report against the pydebuprep it is built on, so upgrade the
 portal first: reports from pydebuprep 0.8.0 carry a machine ID, which
-pydebuprep-portal 0.3.0 and newer accept and older portals refuse.
+pydebuprep-portal 0.3.0 and newer accept and older portals refuse. pydebuprep 0.9.0
+adds nothing to the report, so the same portals take its reports; portal 0.5.0, built
+on it, also shows [what each report was compared with](#snapshots-in-the-portal) and
+offers 0.9.0's new checks and options in its config generator.
 
 ## The token
 
