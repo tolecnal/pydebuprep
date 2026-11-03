@@ -7,7 +7,7 @@ Build-Depends: debhelper-compat (= 13),
                python3-all,
                python3-setuptools,
                python3-yaml,
-               python3-pytest
+               python3-pytest <!nocheck>
 Standards-Version: 4.6.2
 Rules-Requires-Root: no
 X-Python3-Version: >= 3.10

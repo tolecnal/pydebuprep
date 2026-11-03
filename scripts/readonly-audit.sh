@@ -25,10 +25,11 @@
 #   AUDIT_UNATTRIBUTED
 #                 "fail" (default): changed files and PID 1 starting, stopping or
 #                 reloading anything during the run fail the audit, whoever caused
-#                 them. "report": they are listed only, for shared machines whose
-#                 other agents keep writing and starting things. What can be traced
-#                 to the run always fails: strace on its processes, D-Bus activations
-#                 it requested, and AUDIT_EXPECT.
+#                 them. "report": skips the whole-filesystem timestamp walk and lists
+#                 PID 1 jobs only, for shared machines whose other agents keep writing
+#                 and starting things. What can be traced to the run always fails:
+#                 strace on its processes, D-Bus activations it requested, and
+#                 AUDIT_EXPECT.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 out=${1:-$(mktemp -d)}
@@ -82,7 +83,9 @@ jobs_queued() {  # jobs PID 1 has queued since boot
 
 audit() {  # NAME ALLOWED_PREFIX COMMAND...
     name=$1; allow=$2; shift 2
-    marker=$(mktemp); sleep 1.1
+    if [ "$unattributed" != report ]; then
+        marker=$(mktemp); sleep 1.1
+    fi
     if [ -n "$systemd" ]; then
         jobs_before=$(jobs_queued)
         cursor=$(journalctl -q -n 0 --show-cursor | sed -n 's/^-- cursor: //p')
@@ -90,26 +93,25 @@ audit() {  # NAME ALLOWED_PREFIX COMMAND...
             echo "Can't read the journal cursor, so PID 1's log can't be checked"; status=1
         fi
     fi
-    strace -f -qq -s 256 -o "$out/$name.strace" -e trace=$syscalls "$@" >/dev/null 2>&1 || true
-    sleep 1.1; end=$(mktemp)
-    changed=$(changed_between "$marker" "$end" | grep -v "^${allow:-/nonexistent}" || true)
-    rm -f "$marker" "$end"
-    agreed=$(printf '%s\n' "$changed" | ignored 1 "$AGREED_PATHS")
-    changed=$(printf '%s\n' "$changed" | ignored 0 "$AGREED_PATHS")
-    if [ -n "$agreed" ]; then
-        echo "Changed as agreed (docs/about/read-only.md, Agreed side effects), not counted:"
-        echo "$agreed"
-    fi
-    noise=$(printf '%s\n' "$changed" | ignored 1)
-    real=$(printf '%s\n' "$changed" | ignored 0)
-    if [ -n "$noise" ]; then
-        echo "Changed by background services (AUDIT_IGNORE), not counted:"; echo "$noise"
-    fi
-    if [ -n "$real" ] && [ "$unattributed" = report ]; then
-        echo "Changed files after '$*' (AUDIT_UNATTRIBUTED=report, not counted):"
-        echo "$real"
-    elif [ -n "$real" ]; then
-        echo "CHANGED FILES after '$*':"; echo "$real"; status=1
+    strace -f -qq -s 256 -o "$out/$name.strace" -e trace=$syscalls "$@" >"$out/$name.stdout" 2>/dev/null || true
+    if [ "$unattributed" != report ]; then
+        sleep 1.1; end=$(mktemp)
+        changed=$(changed_between "$marker" "$end" | grep -v "^${allow:-/nonexistent}" || true)
+        rm -f "$marker" "$end"
+        agreed=$(printf '%s\n' "$changed" | ignored 1 "$AGREED_PATHS")
+        changed=$(printf '%s\n' "$changed" | ignored 0 "$AGREED_PATHS")
+        if [ -n "$agreed" ]; then
+            echo "Changed as agreed (docs/about/read-only.md, Agreed side effects), not counted:"
+            echo "$agreed"
+        fi
+        noise=$(printf '%s\n' "$changed" | ignored 1)
+        real=$(printf '%s\n' "$changed" | ignored 0)
+        if [ -n "$noise" ]; then
+            echo "Changed by background services (AUDIT_IGNORE), not counted:"; echo "$noise"
+        fi
+        if [ -n "$real" ]; then
+            echo "CHANGED FILES after '$*':"; echo "$real"; status=1
+        fi
     fi
     if [ -n "$systemd" ]; then
         jobs=$(( $(jobs_queued) - jobs_before ))
@@ -159,8 +161,7 @@ if [ -n "${AUDIT_PORTAL_URL:-}" ]; then
     done
     kill "$AUDIT_PORTAL_PID"
     audit portal-offline /var/lib/pydebuprep/ pydebuprep report --config "$AUDIT_PORTAL_URL" --allow-http --no-baseline --format json -o -
-    if pydebuprep report --config "$AUDIT_PORTAL_URL" --allow-http --no-baseline --format json -o - 2>/dev/null \
-        | grep -q '"stale": true'; then
+    if grep -q '"stale": true' "$out/portal-offline.stdout"; then
         echo "exercised: with the portal down, the saved config was used"
     else
         echo "NOT EXERCISED: with the portal down, the report didn't use the saved config"

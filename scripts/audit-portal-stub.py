@@ -19,7 +19,10 @@ def main(url_file: str) -> None:
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     base = f"http://127.0.0.1:{server.server_address[1]}"
     # debsums reads every packaged file; the plain report run already covers it.
-    Handler.config = f"upload:\n  url: {base}\nchecks:\n  debsums:\n    enabled: false\n"
+    Handler.config = (
+        f"upload:\n  url: {base}\nchecks:\n  debsums:\n    enabled: false\n"
+        "  python-venvs:\n    enabled: false\n"
+    )
     with open(url_file, "w", encoding="utf-8") as fh:
         fh.write(base + CONFIG_PATH + "\n")
     server.serve_forever()

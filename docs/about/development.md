@@ -10,7 +10,7 @@ python3 -m venv .venv
 
 | Command | Does |
 |---|---|
-| `make lint` | ruff (lint and format), flake8, mypy |
+| `make lint` | ruff (lint and format), mypy |
 | `make test` | the test suite |
 | `make coverage` | the tests with line and branch coverage, enforced at 100% |
 | `make generated` | regenerate the example config and shell completions after changing commands, options or checks |

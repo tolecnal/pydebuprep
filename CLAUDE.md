@@ -13,7 +13,7 @@ Run all four commands in `.venv` and fix any failure before concluding:
 
 ```sh
 make generated                         # keep example-config and shell completions in sync
-make lint                              # ruff check, ruff format --check, flake8, mypy
+make lint                              # ruff check, ruff format --check, mypy
 .venv/bin/bandit -r src scripts        # static security analysis
 make coverage                          # pytest with 100% line AND branch coverage required
 ```

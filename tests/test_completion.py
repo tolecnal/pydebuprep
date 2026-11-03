@@ -147,21 +147,20 @@ zmodload zsh/zpty
 zpty z "env -i HOME=/tmp TERM=dumb PATH=/usr/bin:/bin $SHELLCMD"
 wait_for() {
     local chunk i
-    for i in {1..150}; do
+    for i in {1..750}; do
         zpty -r -t z chunk && out+=$chunk
         [[ $out == $~1 ]] && return 0
-        sleep 0.1
+        sleep 0.02
     done
     return 1
 }
 local out=""
 zpty -w z "$SETUP"
 zpty -w z 'echo RE''ADY'
-wait_for '*READY*'
-sleep 0.3
+wait_for '*READY*> *'
 out=""
 zpty -w -n z "pydebuprep $LINE"$'\t'
-sleep 0.5
+sleep 0.05
 zpty -w -n z $'\x18\x10'
 wait_for '*BUF<*>*'
 print -r -- "$out"
