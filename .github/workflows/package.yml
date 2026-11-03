@@ -29,7 +29,7 @@ jobs:
       # own Python and PyYAML.
       - name: Install build dependencies
         env:
-          CHECK: ${{ github.event_name == 'pull_request' && '' || 'python3-pytest' }}
+          CHECK: ${{ github.event_name != 'pull_request' && 'python3-pytest' || '' }}
         run: |
           apt-get update
           apt-get install -y --no-install-recommends build-essential devscripts lintian \
