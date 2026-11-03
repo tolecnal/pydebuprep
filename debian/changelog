@@ -1,3 +1,36 @@
+pydebuprep (0.10.0) unstable; urgency=medium
+
+  * New command pydebuprep-cleanup (in /usr/sbin, man page section 8, bash
+    and zsh completion): purges what a release upgrade leaves behind. Old
+    kernels (--kernels), their modules and headers (--modules), kernel
+    directories no package owns any more (--leftover-dirs) and the
+    configuration of removed packages (--residual), or --all.
+  * It only shows its plan unless given --apply, and asks before acting
+    (--yes for scripts). It keeps the running kernel, the newest --keep
+    kernels (default 2) and every kernel GRUB is set to boot, refuses when
+    it can't tell which those are, and never purges held packages or ones
+    named with --keep-package or cleanup.keep_packages in the config.
+  * Before acting it checks for root, the dpkg lock and a clean
+    dpkg --audit, plans under its own lock, and simulates every purge with
+    apt-get -s right before it runs; it stops if apt would change anything
+    else. Configuration files are backed up to /var/backups/pydebuprep
+    first, and every plan and action is logged to
+    /var/log/pydebuprep/cleanup.log (root only, rotated weekly) and the
+    journal.
+  * The dpkg-rc check suggests pydebuprep-cleanup --residual, and lists at
+    most five purge batches; Jira output is shortened to fit Jira's size
+    limit.
+  * pydebuprep no longer calls itself read-only: it changes no system or
+    application settings, and no runtime state such as apt's and dpkg's.
+    Its scratch files go in a private directory under /tmp, or /var/tmp when
+    /tmp can't take one, and are removed before it finishes; it leaves
+    nothing else behind. The page is now "What pydebuprep changes"
+    (about/what-it-changes); the old address points there.
+  * The report format is unchanged: portal 0.3.0 and newer take these
+    reports.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Tue, 03 Nov 2026 20:15:00 +0100
+
 pydebuprep (0.9.0) unstable; urgency=medium
 
   * nginx and apache check the TLS certificates their configuration names:

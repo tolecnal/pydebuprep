@@ -1,6 +1,6 @@
 # Backlog
 
-What is still open, as of 2026-11-03 (after pydebuprep 0.9.0 and portal 0.5.0). Remove items as they are done.
+What is still open, as of 2026-11-03 (after pydebuprep 0.10.0 and portal 0.6.0). Remove items as they are done.
 
 ## GitHub repository settings
 
@@ -94,7 +94,7 @@ compared with the snapshot; a probe comparing served certificates with the files
 `nginx -t` and `apache2ctl -t` as the first agreed side effects (listed in
 docs/about/what-it-changes.md); and the php and certbot checks.
 
-Done on 2026-11-03 (unreleased): `pydebuprep-cleanup`, a separate command in
+Done on 2026-11-03 (0.10.0): `pydebuprep-cleanup`, a separate command in
 `/usr/sbin` that purges old kernels, their modules and headers, leftover kernel
 directories and removed packages' configuration (dry run by default, conffiles backed
 up, logged to a file and syslog), with its man page and completions. The docs no longer
