@@ -30,6 +30,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           cache: "pip"
+          cache-dependency-path: requirements-dev.txt
       - name: Install shells for the completion tests
         if: matrix.python == '3.12'
         run: sudo apt-get update && sudo apt-get install -y zsh bash-completion

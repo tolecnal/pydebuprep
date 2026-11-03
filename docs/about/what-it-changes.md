@@ -68,7 +68,9 @@ and the audit fails on:
 - **commands that should have run but didn't**, so a check can't pass the audit by
   silently skipping its command.
 
-This runs on every supported release, three ways: in plain containers, in
+Pull requests run it on the oldest and newest supported releases (Ubuntu 22.04 and
+26.04) and Debian 13; every release, and a weekly run, cover every supported release.
+Each runs three ways: in plain containers, in
 containers booted with systemd, and on Ubuntu virtual machines with real UEFI
 firmware, systemd-resolved and Docker. A real regression was caught this way:
 pydebuprep 0.3.0's simulated `apt-get autoremove` rewrote apt's solver log on hosts

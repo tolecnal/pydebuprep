@@ -29,7 +29,7 @@ with the commands to fix it, for **you** to review and run.
 
 That's enforced, not just promised: every external command a report runs must match a
 built-in allowlist of commands that change nothing exactly, and every pull request and release
-is traced with strace on every supported release to prove a run as root changes no
+is traced with strace (releases on every supported release) to prove a run as root changes no
 system state or configuration. See [What pydebuprep changes](about/what-it-changes.md), which
 also lists the few [agreed side effects](about/what-it-changes.md#agreed-side-effects). The
 separate [`pydebuprep-cleanup`](guide/cleanup.md) is the one command that changes the

@@ -1,7 +1,7 @@
 name: Package
 
 # Builds the .deb once, then installs it and proves a root run changes nothing, three
-# ways on every supported release:
+# ways on every supported release (pull requests: the oldest, the newest and trixie):
 #   - in plain containers (no systemd: the checks must cope without it);
 #   - in containers booted with systemd as PID 1, with the services the checks inspect
 #     running, so systemctl, journalctl and systemd-analyze meet a real service manager
@@ -24,11 +24,16 @@ jobs:
     env:
       DEBIAN_FRONTEND: noninteractive
     steps:
+      # Pull requests build with the nocheck profile: the Lint and test jobs already ran
+      # the suite. Weekly and release builds run it again here, against the distribution's
+      # own Python and PyYAML.
       - name: Install build dependencies
+        env:
+          CHECK: ${{ github.event_name == 'pull_request' && '' || 'python3-pytest' }}
         run: |
           apt-get update
           apt-get install -y --no-install-recommends build-essential devscripts lintian \
-            debhelper dh-python python3-all python3-setuptools python3-yaml
+            debhelper dh-python python3-all python3-setuptools python3-yaml $CHECK
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -44,8 +49,8 @@ jobs:
           test "$deb_version" = "$py_version"
       - name: Build
         env:
-          DEB_BUILD_OPTIONS: nocheck
-          DEB_BUILD_PROFILES: nocheck
+          DEB_BUILD_OPTIONS: ${{ github.event_name == 'pull_request' && 'nocheck' || '' }}
+          DEB_BUILD_PROFILES: ${{ github.event_name == 'pull_request' && 'nocheck' || '' }}
         run: dpkg-buildpackage -us -uc -b
       - name: Lintian
         run: lintian --fail-on error,warning ../*.deb
@@ -70,7 +75,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: ${{ github.event_name == 'pull_request' && fromJSON('["debian:trixie", "ubuntu:24.04"]') || fromJSON('["debian:bookworm", "debian:trixie", "ubuntu:22.04", "ubuntu:24.04", "ubuntu:26.04"]') }}
+        image: ${{ github.event_name == 'pull_request' && fromJSON('["debian:trixie", "ubuntu:22.04", "ubuntu:26.04"]') || fromJSON('["debian:bookworm", "debian:trixie", "ubuntu:22.04", "ubuntu:24.04", "ubuntu:26.04"]') }}
     container: ${{ matrix.image }}
     env:
       DEBIAN_FRONTEND: noninteractive
@@ -101,7 +106,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: ${{ github.event_name == 'pull_request' && fromJSON('["debian:trixie", "ubuntu:24.04"]') || fromJSON('["debian:bookworm", "debian:trixie", "ubuntu:22.04", "ubuntu:24.04", "ubuntu:26.04"]') }}
+        image: ${{ github.event_name == 'pull_request' && fromJSON('["debian:trixie", "ubuntu:22.04", "ubuntu:26.04"]') || fromJSON('["debian:bookworm", "debian:trixie", "ubuntu:22.04", "ubuntu:24.04", "ubuntu:26.04"]') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

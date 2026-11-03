@@ -73,10 +73,12 @@ if [ -d /run/systemd/system ]; then
     conf=/etc/pydebuprep-audit.conf
     printf 'checks:\n  postgresql:\n    probe: true\n  mariadb:\n    probe: true\n' > "$conf"
     printf '  docker:\n    probe: true\n    http_probes: ["%s"]\n' "${AUDIT_HTTP_PROBE:-none=http://127.0.0.1:1/}" >> "$conf"
-    printf '  python-venvs:\n    search_paths: ["/opt/audit-venv", "/opt/audit-venv-ok"]\n' >> "$conf"
     if [ -n "${AUDIT_TOOLS_ONLY:-}" ]; then
         # debsums reads every packaged file: minutes on a runner VM (containers cover it)
         printf '  debsums:\n    enabled: false\n' >> "$conf"
+        # The runner's /opt/hostedtoolcache holds thousands of directories; the
+        # containers audit the default search paths.
+        printf '  python-venvs:\n    search_paths: ["/opt/audit-venv", "/opt/audit-venv-ok"]\n' >> "$conf"
     else
         admin=$(command -v mariadb-admin >/dev/null && echo mariadb-admin || echo mysqladmin)
         AUDIT_EXPECT="$AUDIT_EXPECT pg_isready setpriv psql $admin mariadb"
