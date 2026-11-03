@@ -14,7 +14,7 @@ python3 -m venv .venv
 | `make test` | the test suite |
 | `make coverage` | the tests with line and branch coverage, enforced at 100% |
 | `make generated` | regenerate the example config and shell completions after changing commands, options or checks |
-| `sudo make audit` | with the package installed: the read-only audit on this machine |
+| `sudo make audit` | with the package installed: the change audit on this machine |
 | `make deb` | build the package (needs `debhelper dh-python python3-all python3-setuptools python3-yaml python3-pytest`) |
 
 The tests never touch the host: checks run against `FakeSystem`, an in-memory system
@@ -68,14 +68,14 @@ Every pull request builds the site; merges to `main` publish it.
    `options` markers), an entry in `mkdocs.yml`'s navigation, a row in the
    README's checks table and an entry in the man page's CHECKS section. The docs
    tests fail until all of these match the code. Run `make generated`.
-7. Prove it's read-only: run the new command under `scripts/readonly-audit.sh` as
+7. Prove it changes nothing: run the new command under `scripts/readonly-audit.sh` as
    root with the service it inspects installed, and add that package to
    `scripts/ci-readonly-audit.sh` (and the command to `AUDIT_EXPECT` there) so every
    pull request is audited with it. Some obvious commands write (`postfix check`,
    `ufw status`); don't use those. A side effect that's worth it (like `nginx -t`
    opening its logs) needs the maintainer's explicit agreement, an entry in
    `AGREED_WRITES` in `scripts/readonly-audit.py` and a row under
-   [Agreed side effects](read-only.md#agreed-side-effects).
+   [Agreed side effects](what-it-changes.md#agreed-side-effects).
 
 ## Security guardrails
 

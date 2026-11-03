@@ -87,3 +87,22 @@ def test_stand_in_portal(tmp_path: Path) -> None:
     finally:
         stub.terminate()
         stub.wait(5)
+
+
+def test_postinst_creates_the_cleanup_directories_and_logrotate() -> None:
+    postinst = (ROOT / "debian" / "pydebuprep.postinst").read_text()
+    assert "install -d -m 0750 /var/log/pydebuprep" in postinst
+    assert "install -d -m 0700 /var/backups/pydebuprep" in postinst
+    postrm = (ROOT / "debian" / "pydebuprep.postrm").read_text()
+    assert "rm -rf /var/lib/pydebuprep /var/log/pydebuprep" in postrm
+    rotate = (ROOT / "debian" / "pydebuprep.logrotate").read_text()
+    for words in ("/var/log/pydebuprep/cleanup.log", "weekly", "rotate 12", "compress", "missingok",
+                  "notifempty", "create 0600 root root"):  # fmt: skip
+        assert words in rotate, words
+
+
+def test_cleanup_command_installs_to_usr_sbin() -> None:
+    # An administrator's command, with a section-8 man page: /usr/sbin, not /usr/bin.
+    rules = (ROOT / "debian" / "rules").read_text()
+    assert "execute_after_dh_auto_install:" in rules
+    assert "mv debian/pydebuprep/usr/bin/pydebuprep-cleanup debian/pydebuprep/usr/sbin/" in rules

@@ -108,7 +108,7 @@ As root, with `config_test` on (the default), it runs Apache's own configuration
 apache2ctl -t
 ```
 
-This is one of pydebuprep's [agreed side effects](../about/read-only.md#agreed-side-effects):
+This is one of pydebuprep's [agreed side effects](../about/what-it-changes.md#agreed-side-effects):
 `apache2ctl -t` creates `/run/apache2` (with `socks` in it) and `/run/lock/apache2` if
 they're missing, as Apache's own start-up would. Turn it off with `config_test: false`.
 

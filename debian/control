@@ -17,7 +17,7 @@ Architecture: all
 Depends: ${python3:Depends}, ${misc:Depends}, python3-yaml
 Recommends: debsums, needrestart
 Suggests: efibootmgr, dkms
-Description: post-upgrade health report for Debian and Ubuntu
+Description: health report suite for Debian and Ubuntu after a release upgrade
  pydebuprep inspects a Debian or Ubuntu system after a release upgrade
  (for example Debian 12 to 13, or Ubuntu 22.04 to 24.04) and reports on
  package state and APT sources, configuration file conflicts, the kernel
@@ -26,8 +26,15 @@ Description: post-upgrade health report for Debian and Ubuntu
  MariaDB, postfix, BIND, Docker and Python virtualenvs, mounts and disk
  space.
  .
- It is strictly read-only: it never changes the system, and every finding
- comes with the commands to fix it. An optional snapshot taken before the
- upgrade lets the report show what changed. Reports are available as text,
- JSON, YAML, HTML, Markdown, Jira and Confluence markup, with exit codes
- suited to automation such as Ansible.
+ It never changes system or application settings, or the state of runtime
+ files such as apt's and dpkg's; scratch files go under /tmp or /var/tmp and
+ are removed again. Every finding comes with the commands to fix it. An
+ optional snapshot taken before the upgrade lets the report show what
+ changed. Reports are available as text, JSON, YAML, HTML, Markdown, Jira and
+ Confluence markup, with exit codes suited to automation such as Ansible.
+ .
+ The separate pydebuprep-cleanup command, run on purpose, purges what an
+ upgrade leaves behind: old kernels, their modules and headers, leftover
+ kernel directories and the configuration of removed packages. It only shows
+ its plan unless asked to act, backs up configuration files first, and logs
+ every action.

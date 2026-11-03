@@ -109,6 +109,8 @@ class FakeSystem(System):
 
     def read_bytes(self, path: str) -> bytes | None:
         self.whole_reads.append(path)
+        if path in getattr(self, "unreadable", ()):
+            return None
         data: str | bytes | None = self.files.get(path)
         if isinstance(data, bytes):  # binary test files may be given as bytes
             return data
@@ -148,14 +150,21 @@ class FakeSystem(System):
         self.scratch_files[path] = data
         return path
 
+    def _dirs(self) -> set[str]:
+        """Directories implied by the files' paths."""
+        return {f.rsplit("/", n)[0] for f in self.files for n in range(1, f.count("/"))}
+
     def glob(self, pattern: str) -> list[str]:
-        # Like the real glob, a * stays within one directory.
+        # Like the real glob, a * stays within one directory; directories count too.
         depth = pattern.count("/")
         return sorted(
             f
-            for f in (*self.files, *self.links)
+            for f in {*self.files, *self.links, *self._dirs()}
             if f.count("/") == depth and fnmatch.fnmatch(f, pattern)
         )
+
+    def is_real_dir(self, path: str) -> bool:
+        return path not in self.links and path in self._dirs()
 
     def mtime(self, path: str) -> float | None:
         return self.mtimes.get(path)
@@ -193,3 +202,20 @@ class FakeSystem(System):
                 if rel is not None and rel.split("/")[-1] == name and rel.count("/") <= max_depth:
                     found.append(path)
         return sorted(found)
+
+
+class FakeRunner:
+    """The cleanup's command runner: answers from a table, after the real allowlist."""
+
+    def __init__(self, answers: dict[tuple[str, ...], CommandResult | str] | None = None) -> None:
+        self.answers = answers or {}
+        self.calls: list[tuple[str, ...]] = []
+
+    def run(self, argv: Sequence[str], timeout: float = 30.0) -> CommandResult:
+        from pydebuprep.cleanup.runner import check_cleanup_allowed
+
+        check_cleanup_allowed(argv)
+        args = tuple(argv)
+        self.calls.append(args)
+        value = self.answers.get(args, "")
+        return CommandResult(args, 0, value, "") if isinstance(value, str) else value

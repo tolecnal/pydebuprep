@@ -8,6 +8,9 @@ if [ "$1" = "configure" ]; then
     # reports that failed to upload, configs/ copies of configs fetched from a URL:
     # pydebuprep itself never creates a directory.
     install -d -m 0700 /var/lib/pydebuprep /var/lib/pydebuprep/snapshots /var/lib/pydebuprep/pending /var/lib/pydebuprep/configs
+    # pydebuprep-cleanup's log, and the config files it backs up before purging.
+    install -d -m 0750 /var/log/pydebuprep
+    install -d -m 0700 /var/backups/pydebuprep
 fi
 
 #DEBHELPER#

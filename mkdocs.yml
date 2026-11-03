@@ -1,6 +1,6 @@
 site_name: pydebuprep
 site_description: >-
-  Read-only health report for Debian and Ubuntu systems after a release upgrade.
+  A health report suite for Debian and Ubuntu systems after a release upgrade.
 site_url: https://pydebuprep.app/
 repo_url: https://github.com/tolecnal/pydebuprep
 repo_name: tolecnal/pydebuprep
@@ -80,6 +80,7 @@ nav:
       - Reading the results: guide/results.md
       - Running across a fleet: guide/fleet.md
       - Using a portal: guide/portal.md
+      - Cleaning up after an upgrade: guide/cleanup.md
   - Configuration:
       - configuration/index.md
       - Reference: configuration/reference.md
@@ -142,7 +143,7 @@ nav:
       - Exit codes: reference/exit-codes.md
   - About:
       - about/index.md
-      - Read-only by design: about/read-only.md
+      - What pydebuprep changes: about/what-it-changes.md
       - Limitations: about/limitations.md
       - Security and releases: about/security.md
       - Development: about/development.md

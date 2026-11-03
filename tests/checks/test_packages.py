@@ -136,8 +136,15 @@ def test_rc_purge_lists_at_most_five_batches() -> None:
     (f,) = DpkgRcCheck().run(make_ctx(commands={DPKG_RC_ARGV: out}))
     purges = [r for r in f.remediation if r.startswith("sudo apt purge")]
     assert len(purges) == 5
+    assert f.remediation[-1].startswith(
+        "... and 350 more packages: sudo pydebuprep-cleanup --residual"
+    )
+
+
+def test_dpkg_rc_points_at_the_cleanup_tool() -> None:
+    out = "".join(f"rc  p{i}\n" for i in range(150))
+    (f,) = DpkgRcCheck().run(make_ctx(commands={DPKG_RC_ARGV: out}))
     assert f.remediation[-1] == (
-        "... and 350 more packages: "
-        "dpkg-query -W -f='${db:Status-Abbrev} ${Package}\\n' | awk '$1 == \"rc\" {print $2}' "
-        "| xargs sudo apt purge"
+        "... and 50 more packages: sudo pydebuprep-cleanup --residual "
+        "(shows what it would purge; add --apply to do it)"
     )

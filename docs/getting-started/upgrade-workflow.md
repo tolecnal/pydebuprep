@@ -67,6 +67,21 @@ until it's clean, or until what's left is expected. Settings in the
 [configuration file](../configuration/index.md) can silence findings that are
 expected on your systems.
 
+## 5. Clean up what the upgrade left
+
+Once the report is clean and the new kernel boots, old kernels, their modules and
+headers, and the configuration of removed packages can go. `pydebuprep-cleanup` shows
+what it would remove, and only does it when asked:
+
+```sh
+sudo pydebuprep-cleanup --all            # the plan; nothing changes
+sudo pydebuprep-cleanup --all --apply    # do it (asks first)
+sudo pydebuprep                          # and record the result
+```
+
+It always keeps the running kernel, the newest one and the one GRUB boots, and refuses
+when it can't tell which those are. See [Cleaning up after an upgrade](../guide/cleanup.md).
+
 ## Upgrading in several steps
 
 Ubuntu upgrades one LTS at a time (22.04 → 24.04 → 26.04), and Debian one release at

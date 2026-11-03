@@ -40,6 +40,7 @@ REMOTE_FORBIDDEN = (
     ("upload", "token_file"),
     ("upload", "ca_file"),
     ("upload", "pending_dir"),
+    ("cleanup", "keep_packages"),  # what pydebuprep-cleanup leaves alone: local only
 )
 
 

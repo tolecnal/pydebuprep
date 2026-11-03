@@ -92,12 +92,14 @@ Done on 2026-11-02 (0.9.0): TLS certificates, crypto OpenSSL refuses and server 
 in the nginx and apache checks; their modules, configuration files and listeners
 compared with the snapshot; a probe comparing served certificates with the files;
 `nginx -t` and `apache2ctl -t` as the first agreed side effects (listed in
-docs/about/read-only.md); and the php and certbot checks.
+docs/about/what-it-changes.md); and the php and certbot checks.
 
-- [ ] The project still calls itself "read-only" while a few side effects are agreed
-      (docs/about/read-only.md, Agreed side effects). The maintainer expects to
-      rephrase that wholesale at some point; the docs now say "changes no system
-      state or configuration".
+Done on 2026-11-03 (unreleased): `pydebuprep-cleanup`, a separate command in
+`/usr/sbin` that purges old kernels, their modules and headers, leftover kernel
+directories and removed packages' configuration (dry run by default, conffiles backed
+up, logged to a file and syslog), with its man page and completions. The docs no longer
+promise "read-only": pydebuprep changes no settings or runtime state, keeps scratch
+files under `/tmp` or `/var/tmp` and removes them, and leaves nothing else behind.
 
 - [ ] Dropped from the wish list, with reasons:
       - WireGuard/OpenVPN tunnels: covered by the network check's interface comparison;

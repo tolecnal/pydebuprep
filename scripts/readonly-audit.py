@@ -26,7 +26,7 @@ from dataclasses import dataclass
 WRITE_FLAGS = re.compile(r"O_WRONLY|O_RDWR|O_CREAT|O_TRUNC|O_APPEND")
 HARMLESS = ("/dev/null", "/dev/tty", "/dev/pts/")
 # Prefix of short-lived files programs create and delete again; matched, never written to.
-TMP = "/tmp/"  # nosec B108
+TMP = ("/tmp/", "/var/tmp/")  # nosec B108
 LINE = re.compile(r"(\d+)\s+(.*)")
 CALL = re.compile(r"(\w+)\((.*)\)\s+=\s+(-?\d+|\?)")
 QUOTED = re.compile(r'"((?:[^"\\]|\\.)*)"')

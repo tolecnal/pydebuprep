@@ -31,7 +31,7 @@ efibootmgr -v
 ```
 
 Only on UEFI systems. It reads the UEFI variables; it never writes them (the
-read-only audit verifies that, including failed write attempts).
+change audit verifies that, including failed write attempts).
 
 ## Limitations
 

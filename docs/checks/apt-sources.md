@@ -83,13 +83,13 @@ sqv --keyring SCRATCH/key-N-0.gpg [--keyring ...] --cleartext --output SCRATCH/o
 gpgv --keyring SCRATCH/key-N-0.gpg [--keyring ...] /var/lib/apt/lists/..._InRelease
 ```
 
-`SCRATCH` is a private directory pydebuprep creates under `/tmp` (mode `0700`) and
-removes before the check returns. The keys are copied there in binary form — `gpgv`
+`SCRATCH` is a private directory pydebuprep creates under `/tmp`, or `/var/tmp` when
+`/tmp` can't take it (mode `0700`), and removes before the check returns. The keys are copied there in binary form — `gpgv`
 can't read ASCII-armored keys, so pydebuprep de-armors them itself — and `sqv` writes
 its output there. The allowlist accepts these commands only with keyrings from
 `/etc/apt/`, `/usr/share/keyrings/` or the scratch directory, output into the
 scratch directory, and an `InRelease` from APT's lists. See
-[Read-only by design](../about/read-only.md#what-it-does-write).
+[What pydebuprep changes](../about/what-it-changes.md#what-it-does-write).
 
 Everything else comes from reading files.
 

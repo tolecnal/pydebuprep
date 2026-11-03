@@ -11,3 +11,6 @@
 - **[Running across a fleet](fleet.md)** — with Ansible.
 - **[Using a portal](portal.md)** — uploading reports, and running with a config
   fetched from a portal.
+- **[Cleaning up after an upgrade](cleanup.md)** — `pydebuprep-cleanup`: old kernels,
+  their modules and headers, leftover directories and removed packages'
+  configuration, with a dry run first.

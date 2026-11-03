@@ -18,6 +18,7 @@ from pydebuprep.patterns import patterns_problems
 from pydebuprep.render import FORMATS
 from pydebuprep.snapshot import DEFAULT_SNAPSHOT_DIR
 from pydebuprep.state import DEFAULT_PENDING_DIR
+from pydebuprep.system import DPKG_PACKAGE_NAME
 
 DEFAULT_CONFIG_PATH = "/etc/pydebuprep.conf"
 DEFAULT_TOKEN_FILE = "/etc/pydebuprep/token"  # nosec B105 - a path, not a token
@@ -81,6 +82,8 @@ class Config:
     path: str | None = None
     log_ignore: list[str] = field(default_factory=list)
     upload: UploadSettings = field(default_factory=UploadSettings)
+    # Packages pydebuprep-cleanup leaves alone (from a local config only).
+    cleanup_keep: list[str] = field(default_factory=list)
 
     @classmethod
     def defaults(cls) -> Config:
@@ -230,15 +233,35 @@ def parse_config(text: str, source: str) -> Config:
     errors = [
         f"{source}: unknown top-level key {key!r}"
         for key in data
-        if key not in ("report", "logs", "checks", "upload")
+        if key not in ("report", "logs", "checks", "upload", "cleanup")
     ]
     report = _report_settings(data.get("report"), source, errors)
     log_ignore = _log_ignore(data.get("logs"), source, errors)
     disabled, check_settings = _check_settings(data.get("checks"), source, errors)
     upload = _upload_settings(data.get("upload"), source, errors)
+    cleanup_keep = _cleanup_keep(data.get("cleanup"), source, errors)
     if errors:
         raise ConfigError(errors)
-    return Config(report, disabled, check_settings, source, log_ignore, upload)
+    return Config(report, disabled, check_settings, source, log_ignore, upload, cleanup_keep)
+
+
+def _cleanup_keep(data: Any, source: str, errors: list[str]) -> list[str]:
+    """cleanup.keep_packages: packages pydebuprep-cleanup never purges."""
+    if data is None:
+        return []
+    if not isinstance(data, dict):
+        errors.append(f"{source}: cleanup: expected a mapping")
+        return []
+    errors.extend(
+        f"{source}: cleanup: unknown key {key!r}" for key in data if key != "keep_packages"
+    )
+    names = data.get("keep_packages", [])
+    if not isinstance(names, list):
+        errors.append(f"{source}: cleanup.keep_packages: expected a list of package names")
+        return []
+    bad = [n for n in names if not (isinstance(n, str) and DPKG_PACKAGE_NAME.fullmatch(n))]
+    errors.extend(f"{source}: cleanup.keep_packages: not a package name: {n!r}" for n in bad)
+    return [n for n in names if n not in bad]
 
 
 LOGS_HELP = (

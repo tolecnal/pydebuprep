@@ -16,7 +16,7 @@
 [![Build provenance: attested](https://img.shields.io/badge/build%20provenance-attested-2EA44F?logo=github)](#releases)
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-025E8C?logo=dependabot&logoColor=white)](.github/dependabot.yml)
 
-A read-only health report for Debian and Ubuntu systems after a release upgrade
+A health report suite for Debian and Ubuntu systems after a release upgrade
 (Debian 12 → 13, Ubuntu 22.04 → 24.04 → 26.04, and minor upgrades too).
 
 **Documentation: <https://pydebuprep.app/>** — a page per check
@@ -44,12 +44,13 @@ With a snapshot taken before the upgrade, it also reports what changed: services
 network interfaces and routes, firewall rules, containers and database clusters that
 were up before and aren't now.
 
-**It never changes the system's configuration or state.** It doesn't install or remove
+**A report never changes the system's configuration or state** (the separate
+[`pydebuprep-cleanup`](#cleaning-up-after-an-upgrade) is the one exception). It doesn't install or remove
 packages, doesn't run `apt update` or `update-grub`, and doesn't restart services.
-Every external command it runs is checked against a built-in allowlist of read-only
-commands, and every release is traced with strace on each supported release to prove
+Every external command it runs is checked against a built-in allowlist of commands that
+change nothing, and every release is traced with strace on each supported release to prove
 a root run changes no system state or configuration. The few
-[agreed side effects](https://pydebuprep.app/about/read-only/#agreed-side-effects),
+[agreed side effects](https://pydebuprep.app/about/what-it-changes/#agreed-side-effects),
 such as nginx's configuration test opening its log files, are listed and can be
 turned off. Each finding comes with the commands to fix it, for you to review and run
 yourself.
@@ -258,7 +259,7 @@ The package also installs the example as
 | `python-venvs` | `search_paths` (/opt, /srv, /usr/local, /root, /home, /var/www) and `max_depth` (5): where to look for virtualenvs; `exclude_paths` (\*/.cache/\*): ones to leave out |
 | `network` | `ignore_interfaces` (lo, veth\*, docker\*, br-\*, virbr\*, vnet\*, tap\*, cni\*, flannel\*, cali\*): left out of the baseline comparison |
 | `nginx`, `apache`, `certbot` | `cert_warning_days` (28), `cert_critical_days` (14): how many days before a TLS certificate expires that it's a warning, and critical (1 to 365, critical below warning) |
-| `nginx`, `apache` | `config_test` (true): as root, run `nginx -t` / `apache2ctl -t` (an [agreed side effect](https://pydebuprep.app/about/read-only/#agreed-side-effects)) |
+| `nginx`, `apache` | `config_test` (true): as root, run `nginx -t` / `apache2ctl -t` (an [agreed side effect](https://pydebuprep.app/about/what-it-changes/#agreed-side-effects)) |
 | `nginx`, `apache` | `tls_probe` (true): connect to each TLS site on this host with its name and compare the certificate it serves with the file; the server logs each connection |
 | `disk-space` | `include_remote` (false), `warning_pct` (25.0), `critical_pct` (10.0), `exclude_mounts` ([]), `important_mounts` (["/", "/var"]) and `min_free_mib` (2048): an absolute free-space floor for those mounts |
 
@@ -321,6 +322,24 @@ host never looks healthy just because a check couldn't look.
 | `unattended-upgrades` | security | Installed but disabled, or still naming the old release in its allowed origins |
 | `disk-space` | storage | Free space and inodes on local filesystems (network mounts optional); a minimum free-space floor for `/` and `/var` |
 | `fstab` | storage | `findmnt --verify`; mounts that went missing since the baseline |
+
+## Cleaning up after an upgrade
+
+`pydebuprep-cleanup`, in the same package, purges what an upgrade leaves behind: old
+kernels, their modules and headers, directories DKMS leaves in them, and the
+configuration of removed packages. It's the one part of pydebuprep that changes the
+system, so it only shows its plan unless run with `--apply`, refuses to act when
+something is off (apt busy, dpkg broken, the running kernel unknown, apt wanting to
+remove more than planned), backs up configuration files before purging them, and logs
+every action to `/var/log/pydebuprep/cleanup.log` and the journal.
+
+```sh
+sudo pydebuprep-cleanup --all            # what it would do
+sudo pydebuprep-cleanup --all --apply    # do it (asks first)
+```
+
+See the [cleanup guide](https://pydebuprep.app/guide/cleanup/) and
+`man pydebuprep-cleanup`.
 
 ## Running across a fleet with Ansible
 
@@ -394,14 +413,14 @@ host never looks healthy just because a check couldn't look.
    options), and an entry in the man page's CHECKS section, in report order.
    `tests/test_docs.py` and `tests/test_docs_site.py` fail until they match the
    code. Run `make generated` to update the example config and shell completions.
-7. Prove it's read-only: run the new command under `scripts/readonly-audit.sh` (or
+7. Prove it changes nothing: run the new command under `scripts/readonly-audit.sh` (or
    `strace`) as root with the service it inspects installed, and add that package
    to `scripts/ci-readonly-audit.sh` so every pull request is audited with it (and to
    `AUDIT_EXPECT` there, so the audit fails if the command never runs). Some obvious
    commands write (`postfix check`, `ufw status`); don't use those. A side effect
    that's worth it (like `nginx -t` opening its logs) needs the maintainer's explicit
    agreement, an entry in `AGREED_WRITES` in `scripts/readonly-audit.py` and a row
-   under "Agreed side effects" in `docs/about/read-only.md`.
+   under "Agreed side effects" in `docs/about/what-it-changes.md`.
 
 ## Development
 
@@ -435,7 +454,7 @@ git tag -a v0.9.0 -m "pydebuprep 0.9.0" && git push origin v0.9.0
 
 The **Release** workflow builds the `.deb` once and lints it with lintian. It then
 installs it on Debian 12, Debian 13, and Ubuntu 22.04, 24.04 and 26.04, runs a
-smoke test, and runs the read-only audit on each. Only if all of that passes
+smoke test, and runs the change audit on each. Only if all of that passes
 does it publish a GitHub Release with the `.deb`, a `SHA256SUMS` file and a
 build-provenance attestation. The release's notes start with the version's
 `debian/changelog` entry (preview them with `python3 scripts/release-notes.py X.Y.Z`).

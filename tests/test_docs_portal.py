@@ -47,7 +47,7 @@ def test_portal_guide_is_in_the_navigation() -> None:
 
 
 def test_read_only_page_lists_the_new_writes() -> None:
-    text = (DOCS / "about" / "read-only.md").read_text()
+    text = (DOCS / "about" / "what-it-changes.md").read_text()
     assert "/var/lib/pydebuprep/pending" in text
     assert "/var/lib/pydebuprep/configs" in text
 

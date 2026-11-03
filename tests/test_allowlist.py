@@ -59,16 +59,24 @@ def _sources() -> list[Path]:
     return sorted(SRC.rglob("*.py"))
 
 
+# The cleanup tool's runner is the one other module that starts processes: it runs the
+# purges, from its own exact allowlist (tests/cleanup/test_runner.py).
+RUNS_COMMANDS = {SRC / "system.py", SRC / "cleanup" / "runner.py"}
+
+
 def test_no_subprocess_outside_system() -> None:
     for path in _sources():
         text = path.read_text()
-        if path.name != "system.py":
+        if path not in RUNS_COMMANDS:
             assert "subprocess" not in text, path
+        if path.name != "system.py":
             assert "os.walk" not in text, path
 
 
 def test_open_only_where_writes_are_expected() -> None:
     allowed = {"system.py", "snapshot.py", "cli.py", "config.py", "state.py", "portal.py"}
+    # The cleanup tool opens its own lock, log and backup files (tests/cleanup).
+    allowed |= {"runner.py", "log.py", "act.py"}
     for path in _sources():
         if path.name not in allowed:
             assert not re.search(r"\bopen\(", path.read_text()), path

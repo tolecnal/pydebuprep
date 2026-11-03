@@ -76,7 +76,7 @@ If the portal can't be reached:
 ### What a config from a URL may not do
 
 A config from a URL is written by someone other than the host's root, so it may
-only steer the read-only checks:
+only steer the checks:
 
 - it can't name a file for pydebuprep to write or open, or steer where it walks or
   probes: `report.output_dir`, `report.snapshot_dir`, `upload.token_file`,
@@ -120,6 +120,6 @@ unencrypted: for test setups only.
 
 Everything pydebuprep keeps for the portal is in its own directory,
 `/var/lib/pydebuprep` (mode `0700`, created by the package): `pending/` and
-`configs/`, files mode `0600`. See [Read-only by design](../about/read-only.md#what-it-does-write).
+`configs/`, files mode `0600`. See [What pydebuprep changes](../about/what-it-changes.md#what-it-does-write).
 The formats are published as JSON Schemas: [report](../reference/report-format.md)
 and config.

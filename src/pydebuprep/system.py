@@ -50,10 +50,29 @@ APT_PROGRAMS = ("apt", "apt-get", "apt-cache", "apt-mark")
 _DF_EXCLUDE = ("-x", "tmpfs", "-x", "devtmpfs", "-x", "squashfs", "-x", "overlay", "-x", "efivarfs")
 _UNITS = ("--no-legend", "--plain", "--no-pager")
 
+# Read-only queries the cleanup planner (pydebuprep-cleanup) makes: every package with
+# its status, version and size; and which packages own files under kernel directories.
+DPKG_PACKAGES_ARGV = (
+    "dpkg-query", "-W",
+    "-f=${db:Status-Abbrev}\t${binary:Package}\t${Version}\t${Installed-Size}\n",
+)  # fmt: skip
+DPKG_ARCH_ARGV = ("dpkg", "--print-architecture")
+OWNER_QUERY = ("dpkg-query", "-S")
+# And the configuration files dpkg still lists for packages, to back them up first.
+CONFFILES_HEAD = ("dpkg-query", "-W", "-f=${Conffiles}\n")
+# A package name, with its architecture for multiarch packages (libc6:i386).
+DPKG_PACKAGE_NAME = re.compile(r"[a-z0-9][a-z0-9+.-]+(?::[a-z0-9]+)?")
+# /usr/lib/modules too: Debian 13's kernels record their files there, and dpkg doesn't
+# treat /lib and /usr/lib as the same path.
+OWNER_ROOTS = ("/lib/modules/", "/usr/lib/modules/", "/usr/src/")
+MAX_OWNER_PATHS = 200
+
 # Every command pydebuprep may run, matched against the WHOLE argv: any extra argument,
 # however harmless it looks, is rejected. apt commands must carry APT_RO_OPTS right after
 # the program name; they are written here without them.
 ALLOWED_COMMANDS: set[tuple[str, ...]] = {
+    DPKG_PACKAGES_ARGV,
+    DPKG_ARCH_ARGV,
     ("dpkg", "--audit"),
     ("dpkg-query", "-W", "-f=${db:Status-Abbrev} ${Package}\n"),
     ("dpkg-query", "-W", "-f=${Package}\t${Version}\n"),
@@ -137,10 +156,11 @@ MAX_UNITS = 256
 
 # Scratch files: some commands need a file to write to (sqv), or a key in a form they
 # can read (gpgv and armored keys). They go in a private directory of pydebuprep's own
-# under /tmp (mode 0700, files 0600), removed before the run ends; never anywhere else.
-SCRATCH_ROOT = "/tmp"  # nosec B108 - a private mkdtemp directory, not a fixed path
+# under /tmp, or /var/tmp when /tmp can't take it (mode 0700, files 0600), removed
+# before the run ends; never anywhere else.
+SCRATCH_ROOTS = ("/tmp", "/var/tmp")  # nosec B108 - private mkdtemp directories, not fixed paths
 SCRATCH_PREFIX = "pydebuprep-"
-SCRATCH_DIR = re.compile(r"^/tmp/pydebuprep-[A-Za-z0-9_]+$")
+SCRATCH_DIR = re.compile(r"^(?:/tmp|/var/tmp)/pydebuprep-[A-Za-z0-9_]+$")
 _ACTIVE_SCRATCH: set[str] = set()
 
 # Verifying an apt repository's InRelease against keyrings (apt-sources): any number of
@@ -210,6 +230,13 @@ def _is_allowed(argv: tuple[str, ...]) -> bool:
         return _is_signature_check(argv)
     if argv and argv[0] in ("pg_isready", "setpriv", "psql", *MYSQL_ADMIN, *MYSQL_CLIENT):
         return _is_probe(argv)
+    if argv[:2] == OWNER_QUERY:
+        return _is_owner_query(argv[2:])
+    if argv[: len(CONFFILES_HEAD)] == CONFFILES_HEAD:
+        names = argv[len(CONFFILES_HEAD) :]
+        return 0 < len(names) <= MAX_OWNER_PATHS and all(
+            DPKG_PACKAGE_NAME.fullmatch(n) for n in names
+        )
     if argv[: len(SHOW_UNITS)] == SHOW_UNITS:
         units = argv[len(SHOW_UNITS) :]
         return 0 < len(units) <= MAX_UNITS and all(_plain_unit(u) for u in units)
@@ -285,6 +312,18 @@ def _is_probe(argv: tuple[str, ...]) -> bool:
     return argv[0] in MYSQL_CLIENT and _without_defaults_file(argv[1:]) == MYSQL_QUERY
 
 
+def _is_owner_query(paths: tuple[str, ...]) -> bool:
+    """dpkg-query -S on directories directly under the kernel roots, nothing else."""
+    return 0 < len(paths) <= MAX_OWNER_PATHS and all(
+        _normal_path(p) and any(_one_below(p, root) for root in OWNER_ROOTS) for p in paths
+    )
+
+
+def _one_below(path: str, root: str) -> bool:
+    rest = path[len(root) :]
+    return path.startswith(root) and bool(rest) and "/" not in rest
+
+
 def _plain_unit(name: str) -> bool:
     return not name.startswith("-") and bool(UNIT_NAME.match(name))
 
@@ -336,6 +375,16 @@ def probe_context() -> ssl.SSLContext:
     context.verify_mode = ssl.CERT_NONE
     context.set_ciphers("DEFAULT:@SECLEVEL=0")
     return context
+
+
+def _make_scratch() -> str:
+    """A private scratch directory under /tmp, or /var/tmp when /tmp can't take it."""
+    for root in SCRATCH_ROOTS[:-1]:
+        try:
+            return tempfile.mkdtemp(prefix=SCRATCH_PREFIX, dir=root)
+        except OSError:
+            continue
+    return tempfile.mkdtemp(prefix=SCRATCH_PREFIX, dir=SCRATCH_ROOTS[-1])
 
 
 class System:
@@ -412,7 +461,7 @@ class System:
     @contextmanager
     def scratch_dir(self) -> Iterator[str]:
         """A private directory for scratch files, removed with everything in it after."""
-        path = tempfile.mkdtemp(prefix=SCRATCH_PREFIX, dir=SCRATCH_ROOT)
+        path = _make_scratch()
         _ACTIVE_SCRATCH.add(path)
         try:
             yield path
@@ -500,6 +549,13 @@ class System:
             return None, str(exc) or type(exc).__name__
         finally:
             conn.close()
+
+    def is_real_dir(self, path: str) -> bool:
+        """A directory itself, not a symlink to one."""
+        try:
+            return stat.S_ISDIR(os.lstat(path).st_mode)
+        except OSError:
+            return False
 
     def readlink(self, path: str) -> str | None:
         try:

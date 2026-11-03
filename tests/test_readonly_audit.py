@@ -316,3 +316,13 @@ def test_executed_lists_programs_from_split_lines(tmp_path: Path) -> None:
         check=False,
     )
     assert res.returncode == 0 and res.stdout.split() == ["nginx", "systemctl"]
+
+
+def test_var_tmp_scratch_is_scratch_too(tmp_path: Path) -> None:
+    created = (
+        '100 mkdir("/var/tmp/pydebuprep-x1", 0700) = 0\n100 rmdir("/var/tmp/pydebuprep-x1") = 0\n'
+    )
+    assert audit(tmp_path, created)[0] == 0
+    left = '100 mkdir("/var/tmp/pydebuprep-x2", 0700) = 0\n'
+    code, out = audit(tmp_path, left)
+    assert code == 1 and "left behind /var/tmp/pydebuprep-x2" in out
