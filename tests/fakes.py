@@ -200,3 +200,20 @@ class FakeSystem(System):
                 if rel is not None and rel.split("/")[-1] == name and rel.count("/") <= max_depth:
                     found.append(path)
         return sorted(found)
+
+
+class FakeRunner:
+    """The cleanup's command runner: answers from a table, after the real allowlist."""
+
+    def __init__(self, answers: dict[tuple[str, ...], CommandResult | str] | None = None) -> None:
+        self.answers = answers or {}
+        self.calls: list[tuple[str, ...]] = []
+
+    def run(self, argv: Sequence[str], timeout: float = 30.0) -> CommandResult:
+        from pydebuprep.cleanup.runner import check_cleanup_allowed
+
+        check_cleanup_allowed(argv)
+        args = tuple(argv)
+        self.calls.append(args)
+        value = self.answers.get(args, "")
+        return CommandResult(args, 0, value, "") if isinstance(value, str) else value
