@@ -138,18 +138,33 @@ def _confirm(plan: Plan, *, yes: bool, interactive: bool, ask: Callable[[str], s
     return None if ask(question).strip().lower() in ("y", "yes") else "not confirmed"
 
 
-def _act(plan: Plan, args: argparse.Namespace, *, system: System, runner: Runner, log: Log,
-         now: datetime, interactive: bool, ask: Callable[[str], str],
-         remove: Callable[[str], None]) -> int:  # fmt: skip
+def _show(plan: Plan, args: argparse.Namespace, log: Log) -> bool:
+    """Print and log the plan; whether there is anything to do."""
+    for line in _plan_text(plan):
+        log.line(line)
+    print(_plan_json(plan, dry_run=not args.apply) if args.json else "\n".join(_plan_text(plan)))
+    if plan.packages or plan.dirs:
+        return True
+    if not args.json:
+        print("Nothing to clean up.")
+    return False
+
+
+def _apply(choice: Choice, args: argparse.Namespace, *, system: System, runner: Runner,
+           log: Log, now: datetime, interactive: bool, ask: Callable[[str], str],
+           remove: Callable[[str], None]) -> int:  # fmt: skip
+    """Check, lock, then plan: the plan acted on is the one made under the lock."""
     reasons = preflight(system, runner, dpkg_lock=runner_module.DPKG_LOCK)
     if reasons:
         raise Refused("; ".join(reasons))
     with Lock(runner_module.LOCK_PATH):
+        plan = build_plan(system, choice)
+        if not _show(plan, args, log):
+            return 0
         if plan.packages:
-            purged, removed = simulate(runner, plan.packages)
-            more = beyond_plan(plan, purged, removed)
+            more = beyond_plan(plan.packages, simulate(runner, plan.packages), plan.arch)
             if more:
-                raise Refused(f"apt would also remove: {', '.join(sorted(more))}")
+                raise Refused(f"apt would also change: {', '.join(sorted(more))}")
         why_not = _confirm(plan, yes=args.yes, interactive=interactive, ask=ask)
         if why_not:
             raise Refused(why_not)
@@ -204,31 +219,16 @@ def main(
     try:
         log.line(f"pydebuprep-cleanup {__version__}: {'apply' if args.apply else 'dry run'} "
                  f"{' '.join(argv if argv is not None else sys.argv[1:])}")  # fmt: skip
-        plan = build_plan(
-            system,
-            Choice(
-                kernels=choice_flags[0],
-                modules=choice_flags[1],
-                dirs=choice_flags[2],
-                residual=choice_flags[3],
-                keep=args.keep,
-                keep_packages=keep_packages,
-            ),
-        )
-        for line in _plan_text(plan):
-            log.line(line)
-        print(
-            _plan_json(plan, dry_run=not args.apply) if args.json else "\n".join(_plan_text(plan))
-        )
-        say = (lambda text: None) if args.json else print
-        if not (plan.packages or plan.dirs):
-            say("Nothing to clean up.")
-            return 0
-        if not args.apply:
-            say("Dry run: nothing changed. Run again with --apply to do this.")
-            return 0
-        return _act(plan, args, system=system, runner=runner, log=log, now=now,
-                    interactive=interactive, ask=ask, remove=remove)  # fmt: skip
+        choice = Choice(
+            kernels=choice_flags[0], modules=choice_flags[1], dirs=choice_flags[2],
+            residual=choice_flags[3], keep=args.keep, keep_packages=keep_packages,
+        )  # fmt: skip
+        if args.apply:
+            return _apply(choice, args, system=system, runner=runner, log=log, now=now,
+                          interactive=interactive, ask=ask, remove=remove)  # fmt: skip
+        if _show(build_plan(system, choice), args, log) and not args.json:
+            print("Dry run: nothing changed. Run again with --apply to do this.")
+        return 0
     except Refused as exc:
         log.line(f"refused: {exc}")
         print(f"pydebuprep-cleanup: refused: {exc}", file=sys.stderr)

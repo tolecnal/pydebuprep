@@ -109,6 +109,8 @@ class FakeSystem(System):
 
     def read_bytes(self, path: str) -> bytes | None:
         self.whole_reads.append(path)
+        if path in getattr(self, "unreadable", ()):
+            return None
         data: str | bytes | None = self.files.get(path)
         if isinstance(data, bytes):  # binary test files may be given as bytes
             return data

@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from cleanup.test_plan import PACKAGES, system
+from cleanup.test_plan import PACKAGES, owner_query, system
 from fakes import FakeRunner
 from pydebuprep.cleanup import cli
 from pydebuprep.cleanup import runner as runner_module
@@ -71,11 +71,8 @@ def test_apply_asks_at_a_terminal(tmp_path: Path) -> None:
 def test_apply_flow(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     code, fake = run(tmp_path, ["--residual", "--apply", "--yes"])
     assert code == 0
-    assert fake.calls == [
-        DPKG_AUDIT,
-        (*APT_SIMULATE, "cowsay", "hello"),
-        (*APT_PURGE, "cowsay", "hello"),
-    ]
+    simulated = (*APT_SIMULATE, "cowsay", "hello")
+    assert fake.calls == [DPKG_AUDIT, simulated, simulated, (*APT_PURGE, "cowsay", "hello")]
     assert "Record the result: sudo pydebuprep report" in capsys.readouterr().out
 
 
@@ -83,7 +80,7 @@ def test_widened_simulation_refuses(tmp_path: Path, capsys: pytest.CaptureFixtur
     widened = FakeRunner({(*APT_SIMULATE, "cowsay", "hello"): SIMULATED + "Remv cowsay-off [1]\n"})
     code, fake = run(tmp_path, ["--residual", "--apply", "--yes"], runner=widened)
     assert code == 1 and not [c for c in fake.calls if c[:3] == APT_PURGE]
-    assert "apt would also remove: cowsay-off" in capsys.readouterr().err
+    assert "apt would also change: cowsay-off" in capsys.readouterr().err
 
 
 def test_json_plan(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -122,7 +119,7 @@ def test_refused_plan_exits_1(tmp_path: Path, capsys: pytest.CaptureFixture[str]
 def test_nothing_to_do(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     sys_ = system(commands={cli.PACKAGES_ARGV: "ii \tbash\t5.2\t7000\n"})
     code, fake = run(tmp_path, ["--residual", "--apply", "--yes"], system=sys_)
-    assert code == 0 and fake.calls == []
+    assert code == 0 and fake.calls == [DPKG_AUDIT]  # checked, locked, planned: nothing
     assert "Nothing to clean up." in capsys.readouterr().out
 
 
@@ -178,12 +175,11 @@ def test_packages_constant_matches(tmp_path: Path) -> None:
 
 
 def test_apply_directories_only(tmp_path: Path) -> None:
-    from pydebuprep.cleanup.plan import OWNER_QUERY
 
     removed: list[str] = []
     sys_ = system(commands={
-        (*OWNER_QUERY, "/lib/modules/6.8.0-30-generic"): "",
-        (*OWNER_QUERY, "/usr/src/linux-headers-6.8.0-30-generic"): "",
+        owner_query("/lib/modules/6.8.0-30-generic"): "",
+        owner_query("/usr/src/linux-headers-6.8.0-30-generic"): "",
     })  # fmt: skip
     code, fake = run(
         tmp_path, ["--leftover-dirs", "--apply", "--yes"], system=sys_, remove=removed.append
@@ -222,3 +218,15 @@ def test_cleanup_section_must_be_a_mapping(
         == 3
     )
     assert "expected a list of package names" in capsys.readouterr().err
+
+
+def test_apply_plans_only_inside_the_lock(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from pydebuprep.cleanup.runner import Lock
+
+    sys_ = system()
+    with Lock(runner_module.LOCK_PATH):  # another cleanup is running
+        code, _ = run(tmp_path, ["--residual", "--apply", "--yes"], system=sys_)
+    assert code == 1 and "already running" in capsys.readouterr().err
+    assert sys_.calls == []  # nothing planned outside the lock

@@ -56,17 +56,23 @@ _UNITS = ("--no-legend", "--plain", "--no-pager")
 # Read-only queries the cleanup planner (pydebuprep-cleanup) makes: every package with
 # its status, version and size; and which packages own files under kernel directories.
 DPKG_PACKAGES_ARGV = (
-    "dpkg-query", "-W", "-f=${db:Status-Abbrev}\t${Package}\t${Version}\t${Installed-Size}\n",
+    "dpkg-query", "-W",
+    "-f=${db:Status-Abbrev}\t${binary:Package}\t${Version}\t${Installed-Size}\n",
 )  # fmt: skip
+DPKG_ARCH_ARGV = ("dpkg", "--print-architecture")
 OWNER_QUERY = ("dpkg-query", "-S")
 # And the configuration files dpkg still lists for packages, to back them up first.
 CONFFILES_HEAD = ("dpkg-query", "-W", "-f=${Conffiles}\n")
-DPKG_PACKAGE_NAME = re.compile(r"[a-z0-9][a-z0-9+.-]+")
-OWNER_ROOTS = ("/lib/modules/", "/usr/src/")
+# A package name, with its architecture for multiarch packages (libc6:i386).
+DPKG_PACKAGE_NAME = re.compile(r"[a-z0-9][a-z0-9+.-]+(?::[a-z0-9]+)?")
+# /usr/lib/modules too: Debian 13's kernels record their files there, and dpkg doesn't
+# treat /lib and /usr/lib as the same path.
+OWNER_ROOTS = ("/lib/modules/", "/usr/lib/modules/", "/usr/src/")
 MAX_OWNER_PATHS = 200
 
 ALLOWED_COMMANDS: set[tuple[str, ...]] = {
     DPKG_PACKAGES_ARGV,
+    DPKG_ARCH_ARGV,
     ("dpkg", "--audit"),
     ("dpkg-query", "-W", "-f=${db:Status-Abbrev} ${Package}\n"),
     ("dpkg-query", "-W", "-f=${Package}\t${Version}\n"),
@@ -308,9 +314,13 @@ def _is_probe(argv: tuple[str, ...]) -> bool:
 def _is_owner_query(paths: tuple[str, ...]) -> bool:
     """dpkg-query -S on directories directly under the kernel roots, nothing else."""
     return 0 < len(paths) <= MAX_OWNER_PATHS and all(
-        _normal_path(p) and p.startswith(OWNER_ROOTS) and "/" not in p.split("/", 3)[3]
-        for p in paths
+        _normal_path(p) and any(_one_below(p, root) for root in OWNER_ROOTS) for p in paths
     )
+
+
+def _one_below(path: str, root: str) -> bool:
+    rest = path[len(root) :]
+    return path.startswith(root) and bool(rest) and "/" not in rest
 
 
 def _plain_unit(name: str) -> bool:

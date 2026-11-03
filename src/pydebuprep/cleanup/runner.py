@@ -9,10 +9,10 @@ import fcntl
 import os
 import re
 import subprocess  # nosec B404 # this module exists to run the purges, from an exact allowlist
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from types import TracebackType
 
-from pydebuprep.cleanup.plan import Plan, Refused
+from pydebuprep.cleanup.plan import Refused
 from pydebuprep.system import (
     CLIENT_ENV,
     CommandResult,
@@ -23,11 +23,10 @@ from pydebuprep.system import (
 APT_SIMULATE = ("apt-get", "-s", "purge")
 APT_PURGE = ("apt-get", "purge", "-y")
 DPKG_AUDIT = ("dpkg", "--audit")
-PACKAGE_NAME = re.compile(r"[a-z0-9][a-z0-9+.-]+")
-PURGE_TIMEOUT = 1800.0  # a kernel's initramfs and GRUB updates take a while
+PACKAGE_NAME = re.compile(r"[a-z0-9][a-z0-9+.-]+(?::[a-z0-9]+)?")  # with a multiarch suffix
 LOCK_PATH = "/run/pydebuprep-cleanup.lock"
 DPKG_LOCK = "/var/lib/dpkg/lock-frontend"
-SIMULATED = re.compile(r"^(Purg|Remv) (\S+)", re.M)
+SIMULATED = re.compile(r"^(?:Purg|Remv|Inst) (\S+)", re.M)
 
 
 def _allowed(argv: tuple[str, ...]) -> bool:
@@ -52,22 +51,32 @@ def _decode(data: bytes | None) -> str:
 
 
 class Runner:
-    def run(self, argv: Sequence[str], timeout: float = PURGE_TIMEOUT) -> CommandResult:
+    def run(self, argv: Sequence[str], timeout: float | None = None) -> CommandResult:
+        """Run ARGV and wait for it. A purge has no timeout and runs in a session of its
+        own: Ctrl-C at the terminal doesn't reach apt and dpkg, and if this process is
+        interrupted it waits for them to finish rather than killing them halfway."""
         check_cleanup_allowed(argv)
         args = tuple(argv)
         env = {k: v for k, v in os.environ.items() if not k.startswith(CLIENT_ENV)}
         env.update(LC_ALL="C", LANG="C", DEBIAN_FRONTEND="noninteractive")
         try:
             # Fixed, allowlisted argv; never a shell.
-            proc = subprocess.run(  # nosec B603 # argv checked against the exact allowlist above
-                args, capture_output=True, timeout=timeout, env=env, check=False,
-                stdin=subprocess.DEVNULL,
+            proc = subprocess.Popen(  # nosec B603 # argv checked against the exact allowlist above
+                args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                env=env, start_new_session=True,
             )  # fmt: skip
-        except subprocess.TimeoutExpired as exc:
-            return CommandResult(args, -1, _decode(exc.stdout), _decode(exc.stderr), True)
         except OSError as exc:
             return CommandResult(args, 127, "", str(exc))
-        return CommandResult(args, proc.returncode, _decode(proc.stdout), _decode(proc.stderr))
+        try:
+            out, err = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:  # only the read-only queries have a timeout
+            proc.kill()
+            out, err = proc.communicate()
+            return CommandResult(args, -1, _decode(out), _decode(err), True)
+        except KeyboardInterrupt:
+            proc.communicate()  # let apt and dpkg finish what they started
+            raise
+        return CommandResult(args, proc.returncode, _decode(out), _decode(err))
 
 
 def _dpkg_locked(path: str) -> bool:
@@ -94,28 +103,33 @@ def preflight(system: System, runner: Runner, *, dpkg_lock: str = DPKG_LOCK) -> 
         return ["pydebuprep-cleanup must be run as root"]
     if _dpkg_locked(dpkg_lock):
         return ["apt or dpkg is running (its lock is held); try again when it's done"]
-    audit = runner.run(DPKG_AUDIT, timeout=60).stdout.strip()
+    res = runner.run(DPKG_AUDIT, timeout=60)
+    if res.returncode != 0 or res.timed_out:
+        detail = (res.stderr or "timed out").strip().splitlines()
+        return [f"dpkg --audit couldn't run: {detail[0] if detail else res.returncode}"]
+    audit = res.stdout.strip()
     if audit:
         return [f"dpkg --audit reports problems: {audit.splitlines()[0]} (fix them first)"]
     return []
 
 
-def simulate(runner: Runner, packages: Sequence[str]) -> tuple[set[str], set[str]]:
-    """What apt would purge and remove for PACKAGES, without doing it."""
+def simulate(runner: Runner, packages: Sequence[str]) -> set[str]:
+    """Every package apt would purge, remove or install for PACKAGES, without doing it."""
     res = runner.run((*APT_SIMULATE, *sorted(packages)), timeout=300)
     if res.returncode != 0 or res.timed_out:
         detail = (res.stderr or res.stdout).strip().splitlines()
         raise Refused(f"apt-get can't plan this: {detail[-1] if detail else 'it failed'}")
-    purged: set[str] = set()
-    removed: set[str] = set()
-    for action, name in SIMULATED.findall(res.stdout):
-        (purged if action == "Purg" else removed).add(name)
-    return purged, removed
+    return set(SIMULATED.findall(res.stdout))
 
 
-def beyond_plan(plan: Plan, purged: set[str], removed: set[str]) -> set[str]:
-    """What apt would purge or remove beyond the plan (a dependency, a meta package)."""
-    return (purged | removed) - set(plan.packages)
+def beyond_plan(planned: Iterable[str], touched: set[str], arch: str) -> set[str]:
+    """What apt would touch beyond PLANNED. apt leaves the native architecture out of
+    package names (libc6, but libc6:i386); dpkg's binary names may carry it."""
+
+    def plain(name: str) -> str:
+        return name.removesuffix(f":{arch}") if arch else name
+
+    return {plain(t) for t in touched} - {plain(p) for p in planned}
 
 
 class Lock:

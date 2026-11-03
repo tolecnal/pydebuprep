@@ -5,12 +5,12 @@ from __future__ import annotations
 import fcntl
 import os
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
 from fakes import FakeRunner, FakeSystem
-from pydebuprep.cleanup.kernels import Package
-from pydebuprep.cleanup.plan import Plan, Refused
+from pydebuprep.cleanup.plan import Refused
 from pydebuprep.cleanup.runner import (
     APT_PURGE,
     APT_SIMULATE,
@@ -48,36 +48,85 @@ def test_runner_allows_exactly_its_commands() -> None:
     check_cleanup_allowed((*APT_PURGE, "libfoo1.2+git", "g++-12"))
 
 
-def test_runner_env(monkeypatch: pytest.MonkeyPatch) -> None:
+class FakePopen:
+    """Stands in for subprocess.Popen: records how it was started, answers communicate()."""
+
+    started: ClassVar[list[dict[str, object]]] = []
+
+    def __init__(self, args, **kw):  # type: ignore[no-untyped-def] # mirrors Popen
+        self.args, self.kw, self.returncode, self.calls = args, kw, 0, 0
+        self.killed = False
+        FakePopen.started.append({"args": args, **kw})
+
+    def communicate(self, timeout=None):  # type: ignore[no-untyped-def] # mirrors Popen
+        self.calls += 1
+        return self.answer(timeout)
+
+    def answer(self, timeout):  # type: ignore[no-untyped-def] # overridden per test
+        return b"ok", b""
+
+    def kill(self) -> None:
+        self.killed = True
+
+
+def test_runner_env_session_and_no_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     import subprocess
 
-    seen = {}
-
-    def fake_run(args, **kw):  # type: ignore[no-untyped-def] # stands in for subprocess.run
-        seen.update(kw["env"], args=args)
-        return subprocess.CompletedProcess(args, 0, b"ok", b"")
-
+    FakePopen.started.clear()
     monkeypatch.setenv("APT_CONFIG", "/tmp/evil.conf")
-    monkeypatch.setattr(subprocess, "run", fake_run)
-    res = Runner().run(DPKG_AUDIT)
+    monkeypatch.setattr(subprocess, "Popen", FakePopen)
+    res = Runner().run((*APT_PURGE, "hello"))
     assert (res.returncode, res.stdout) == (0, "ok")
-    assert seen["LC_ALL"] == "C" and seen["DEBIAN_FRONTEND"] == "noninteractive"
-    assert "APT_CONFIG" not in seen and seen["args"] == DPKG_AUDIT
+    [seen] = FakePopen.started
+    env = seen["env"]
+    assert (
+        isinstance(env, dict)
+        and env["LC_ALL"] == "C"
+        and env["DEBIAN_FRONTEND"] == "noninteractive"
+    )
+    assert "APT_CONFIG" not in env and seen["args"] == (*APT_PURGE, "hello")
+    assert seen["start_new_session"] is True and seen["stdin"] == subprocess.DEVNULL
 
 
-def test_runner_failures_are_results(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_runner_timeouts_and_missing_programs(monkeypatch: pytest.MonkeyPatch) -> None:
     import subprocess
 
-    def timeout(args, **kw):  # type: ignore[no-untyped-def] # stands in for subprocess.run
-        raise subprocess.TimeoutExpired(args, 1, b"partial", b"")
+    class Slow(FakePopen):
+        def answer(self, timeout):  # type: ignore[no-untyped-def] # a query that hangs
+            if self.calls == 1:
+                raise subprocess.TimeoutExpired(self.args, timeout)
+            return b"partial", b""
 
-    def missing(args, **kw):  # type: ignore[no-untyped-def] # stands in for subprocess.run
+    def missing(args, **kw):  # type: ignore[no-untyped-def] # no such program
         raise FileNotFoundError("apt-get")
 
-    monkeypatch.setattr(subprocess, "run", timeout)
-    assert Runner().run(DPKG_AUDIT).timed_out
-    monkeypatch.setattr(subprocess, "run", missing)
+    monkeypatch.setattr(subprocess, "Popen", Slow)
+    res = Runner().run(DPKG_AUDIT, timeout=1)
+    assert res.timed_out and res.stdout == "partial"
+    monkeypatch.setattr(subprocess, "Popen", missing)
     assert Runner().run(DPKG_AUDIT).returncode == 127
+
+
+def test_interrupted_runner_waits_for_apt(monkeypatch: pytest.MonkeyPatch) -> None:
+    import subprocess
+
+    made: list[FakePopen] = []
+
+    class Interrupted(FakePopen):
+        def __init__(self, args, **kw):  # type: ignore[no-untyped-def] # mirrors Popen
+            super().__init__(args, **kw)
+            made.append(self)
+
+        def answer(self, timeout):  # type: ignore[no-untyped-def] # Ctrl-C while waiting
+            if self.calls == 1:
+                raise KeyboardInterrupt
+            return b"", b""
+
+    monkeypatch.setattr(subprocess, "Popen", Interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        Runner().run((*APT_PURGE, "hello"))
+    [proc] = made
+    assert proc.calls == 2 and not proc.killed  # waited for apt, never killed it
 
 
 def test_preflight_reasons(tmp_path: Path) -> None:
@@ -121,11 +170,15 @@ Conf something [1.0]
 """
 
 
-def test_simulation_parses_purg_and_remv() -> None:
-    runner = FakeRunner({(*APT_SIMULATE, "hello", "linux-image-6.8.0-40-generic"): SIMULATION})
-    purged, removed = simulate(runner, ["hello", "linux-image-6.8.0-40-generic"])
-    assert purged == {"linux-image-6.8.0-40-generic", "hello"}
-    assert removed == {"linux-generic"}
+def test_simulation_lists_what_apt_would_touch() -> None:
+    runner = FakeRunner(
+        {
+            (*APT_SIMULATE, "hello", "linux-image-6.8.0-40-generic"): SIMULATION
+            + "Inst new-dep [1]\n"
+        }
+    )
+    touched = simulate(runner, ["hello", "linux-image-6.8.0-40-generic"])
+    assert touched == {"linux-image-6.8.0-40-generic", "hello", "linux-generic", "new-dep"}
 
 
 def test_failed_simulation_refuses() -> None:
@@ -136,12 +189,19 @@ def test_failed_simulation_refuses() -> None:
 
 
 def test_widened_plan_is_refused() -> None:
-    plan = Plan(kernels=(Package("linux-image-6.8.0-40-generic", "ii", "1", 1),),
-                residual=(Package("hello", "rc", "1", 0),))  # fmt: skip
-    assert beyond_plan(plan, {"linux-image-6.8.0-40-generic", "hello"}, set()) == set()
-    assert beyond_plan(plan, {"linux-image-6.8.0-40-generic", "hello"}, {"linux-generic"}) == {
-        "linux-generic"
-    }
+    planned = ["linux-image-6.8.0-40-generic", "hello"]
+    assert beyond_plan(planned, {"linux-image-6.8.0-40-generic", "hello"}, "amd64") == set()
+    widened = {"linux-image-6.8.0-40-generic", "hello", "linux-generic"}
+    assert beyond_plan(planned, widened, "amd64") == {"linux-generic"}
+
+
+def test_beyond_plan_with_architectures() -> None:
+    # apt names native packages without their architecture, foreign ones with it.
+    planned = ["libfoo1:amd64", "libbar1:i386"]
+    assert beyond_plan(planned, {"libfoo1", "libbar1:i386"}, "amd64") == set()
+    assert beyond_plan(planned, {"libfoo1", "libbar1"}, "amd64") == {
+        "libbar1"
+    }  # native libbar1 isn't planned
 
 
 def test_lock_excludes_a_second_run(tmp_path: Path) -> None:
@@ -168,3 +228,13 @@ def test_free_dpkg_lock_and_an_unused_lock(tmp_path: Path) -> None:
     lock.write_text("")
     assert preflight(FakeSystem(root=True), FakeRunner(), dpkg_lock=str(lock)) == []
     Lock(str(tmp_path / "never")).__exit__(None, None, None)  # left without being taken
+
+
+def test_dpkg_audit_that_cant_run_refuses(tmp_path: Path) -> None:
+    lock = str(tmp_path / "lock-frontend")
+    for result in (CommandResult(DPKG_AUDIT, 127, "", "dpkg: not found"),
+                   CommandResult(DPKG_AUDIT, -1, "", "", timed_out=True)):  # fmt: skip
+        [reason] = preflight(
+            FakeSystem(root=True), FakeRunner({DPKG_AUDIT: result}), dpkg_lock=lock
+        )
+        assert reason.startswith("dpkg --audit couldn't run")

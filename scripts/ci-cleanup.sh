@@ -34,6 +34,11 @@ for n in 10 20 30; do
     fake "linux-headers-6.8.0-$n-generic" "6.8.0-$n.$n" "" "/usr/src/linux-headers-6.8.0-$n-generic/Makefile"
 done
 fake linux-image-generic "6.8.0.30.30" "linux-image-6.8.0-30-generic"
+# Older kernels that must stay: one held, and one kept with --keep-package whose files
+# dpkg records under /usr/lib/modules (as Debian 13's kernels are).
+fake linux-image-6.8.0-1-generic "6.8.0-1.1" "" "/lib/modules/6.8.0-1-generic/kernel/x.ko"
+apt-mark hold linux-image-6.8.0-1-generic >/dev/null
+fake linux-image-6.8.0-5-generic "6.8.0-5.5" "" "/usr/lib/modules/6.8.0-5-generic/kernel/x.ko"
 fake fake-tool 1.0 "" "" /etc/fake-tool/fake-tool.conf
 dpkg -r fake-tool >/dev/null
 mkdir -p /lib/modules/6.8.0-10-generic/updates/dkms
@@ -60,7 +65,7 @@ absent() {  # TEXT PATTERN
 
 echo "== dry run"
 before=$(state)
-out=$(cleanup --all --no-config)
+out=$(cleanup --all --no-config --keep-package linux-image-6.8.0-5-generic)
 expect "$out" "linux-image-6.8.0-10-generic"
 expect "$out" "linux-headers-6.8.0-10-generic"
 expect "$out" "fake-tool"
@@ -72,7 +77,7 @@ if [ "$before" = "$(state)" ]; then echo "ok: the dry run changed nothing"; else
 fi
 
 echo "== apply"
-cleanup --all --no-config --apply --yes
+cleanup --all --no-config --keep-package linux-image-6.8.0-5-generic --apply --yes
 after=$(state)
 absent "$after" "linux-image-6.8.0-10-generic"
 absent "$after" "linux-headers-6.8.0-10-generic"
@@ -83,6 +88,12 @@ expect "$after" "ii  linux-image-6.8.0-20-generic"
 expect "$after" "ii  linux-image-6.8.0-30-generic"
 expect "$after" "ii  linux-image-generic"
 expect "$after" "/lib/modules/6.8.0-30-generic"
+expect "$after" "hi  linux-image-6.8.0-1-generic"  # held
+expect "$after" "/lib/modules/6.8.0-1-generic/kernel/x.ko"
+expect "$after" "ii  linux-image-6.8.0-5-generic"  # --keep-package, files under /usr/lib
+expect "$after" "/lib/modules/6.8.0-5-generic/kernel/x.ko"
+expect "$after" "/lib/modules/6.8.0-20-generic/kernel/x.ko"
+expect "$after" "/usr/src/linux-headers-6.8.0-20-generic/Makefile"
 
 echo "== backup and log"
 backup=$(ls /var/backups/pydebuprep/rc-*.tar.gz)
@@ -95,5 +106,18 @@ expect "$log" "removed /lib/modules/6.8.0-10-generic"
 expect "$log" "done"
 
 echo "== nothing left to do"
-expect "$(cleanup --all --no-config --apply --yes)" "Nothing to clean up."
+expect "$(cleanup --all --no-config --keep-package linux-image-6.8.0-5-generic --apply --yes)" \
+    "Nothing to clean up."
+
+echo "== apt would remove more than planned: refused, nothing changed"
+fake linux-image-6.8.0-15-generic "6.8.0-15.15" "" "/lib/modules/6.8.0-15-generic/kernel/x.ko"
+fake old-kernel-meta 1.0 "linux-image-6.8.0-15-generic"
+before=$(state)
+code=0
+out=$(cleanup --kernels --no-config --keep-package linux-image-6.8.0-5-generic --apply --yes 2>&1) || code=$?
+expect "$out" "apt would also change: old-kernel-meta"
+if [ "$code" = 1 ]; then echo "ok: exit 1"; else echo "FAILED: exit $code"; exit 1; fi
+if [ "$before" = "$(state)" ]; then echo "ok: nothing changed"; else
+    echo "FAILED: the refused run changed something"; exit 1
+fi
 echo "cleanup: ok"

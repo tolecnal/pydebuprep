@@ -45,7 +45,8 @@ With a snapshot taken before the upgrade, it also reports what changed: services
 network interfaces and routes, firewall rules, containers and database clusters that
 were up before and aren't now.
 
-**It never changes the system's configuration or state.** It doesn't install or remove
+**A report never changes the system's configuration or state** (the separate
+[`pydebuprep-cleanup`](#cleaning-up-after-an-upgrade) is the one exception). It doesn't install or remove
 packages, doesn't run `apt update` or `update-grub`, and doesn't restart services.
 Every external command it runs is checked against a built-in allowlist of read-only
 commands, and every release is traced with strace on each supported release to prove

@@ -95,10 +95,13 @@ Install only packages that pass both checks.
 
 ## How this project stays secure
 
-- Every command pydebuprep runs must match a complete entry in a read-only allowlist
-  (`src/pydebuprep/system.py`). Every pull request and release is traced with strace
+- Every command `pydebuprep report` and `snapshot` run must match a complete entry in a
+  read-only allowlist (`src/pydebuprep/system.py`); `pydebuprep-cleanup`, the one
+  command that changes the system, has an exact allowlist of its own
+  (`src/pydebuprep/cleanup/runner.py`). Every pull request and release is traced with strace
   on every supported release, with and without systemd and on real UEFI firmware, to
-  prove a root run changes nothing (`scripts/readonly-audit.sh`).
+  prove a root run of `report` and `snapshot` changes no system state or configuration
+  (`scripts/readonly-audit.sh`).
 - CodeQL, Bandit, ShellCheck, pip-audit and zizmor run on every change to `main`, and
   pull requests get a dependency review. Dependabot keeps pinned actions and tools up
   to date.

@@ -14,8 +14,8 @@ from datetime import datetime
 
 from pydebuprep.cleanup.log import Log
 from pydebuprep.cleanup.plan import Plan, Refused, leftover_dir_ok, owners
-from pydebuprep.cleanup.runner import APT_PURGE, Runner
-from pydebuprep.system import CONFFILES_HEAD, System
+from pydebuprep.cleanup.runner import APT_PURGE, Runner, beyond_plan, simulate
+from pydebuprep.system import CONFFILES_HEAD, MAX_OWNER_PATHS, System
 
 BACKUP_DIR = "/var/backups/pydebuprep"
 BACKUP_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
@@ -25,14 +25,21 @@ __all__ = ["CONFFILES_HEAD", "backup_conffiles", "execute", "remove_dir"]
 
 
 def _conffiles(system: System, packages: Sequence[str]) -> list[str]:
-    res = system.run((*CONFFILES_HEAD, *packages))
-    return sorted(
-        {line.split()[0] for line in res.stdout.splitlines() if line.strip().startswith("/")}
-    )
+    paths: set[str] = set()
+    for start in range(0, len(packages), MAX_OWNER_PATHS):  # the query takes at most 200
+        chunk = packages[start : start + MAX_OWNER_PATHS]
+        lines = system.run((*CONFFILES_HEAD, *chunk)).stdout.splitlines()
+        paths |= {line.split()[0] for line in lines if line.strip().startswith("/")}
+    return sorted(paths)
 
 
 def backup_conffiles(
-    system: System, packages: Sequence[str], when: datetime, *, backup_dir: str = BACKUP_DIR
+    system: System,
+    packages: Sequence[str],
+    when: datetime,
+    *,
+    backup_dir: str = BACKUP_DIR,
+    unreadable: list[str] | None = None,
 ) -> str | None:
     """A tarball of the config files dpkg still lists for PACKAGES, before they're
     purged; None when none of them exist any more. Files are read through System's
@@ -50,6 +57,8 @@ def backup_conffiles(
         if data is not None:
             info.size, info.mode = len(data), 0o600
             members.append((info, data))
+        elif system.exists(path) and unreadable is not None:
+            unreadable.append(path)  # too big, a FIFO or device, or unreadable
     if not members:
         return None
     target_path = os.path.join(backup_dir, f"rc-{when.strftime('%Y%m%dT%H%M%SZ')}.tar.gz")
@@ -90,10 +99,17 @@ def execute(
         names = [p.name for p in plan.residual]
 
         def backup() -> bool:
-            path = backup_conffiles(system, names, now, backup_dir=backup_dir)
-            log.line(
-                f"config files backed up to {path}" if path else "no config files left to back up"
-            )
+            skipped: list[str] = []
+            try:
+                path = backup_conffiles(
+                    system, names, now, backup_dir=backup_dir, unreadable=skipped
+                )
+            except OSError as exc:
+                log.line(f"failed: can't write the backup: {exc}", level=syslog.LOG_ERR)
+                return False
+            for missed in skipped:
+                log.line(f"not backed up (can't be read): {missed}", level=syslog.LOG_WARNING)
+            log.line(f"config files backed up to {path}" if path else "no config files to back up")
             return True
 
         steps.append(("back up config files", backup))
@@ -104,12 +120,19 @@ def execute(
     ):
         if packages:
             names = [p.name for p in packages]
-            steps.append((f"purge {label} ({' '.join(names)})", _purge(runner, log, names)))
+            steps.append(
+                (f"purge {label} ({' '.join(names)})", _purge(runner, log, names, plan.arch))
+            )
     for path in plan.dirs:
         steps.append((f"remove {path}", _remove(system, log, path, remove)))
     for n, (label, step) in enumerate(steps):
         log.line(label)
-        if not step():
+        try:
+            ok = step()
+        except KeyboardInterrupt:
+            log.line(f"interrupted during: {label}", level=syslog.LOG_ERR)
+            ok = False
+        if not ok:
             undone = [name for name, _ in steps[n + 1 :]]
             if undone:
                 log.line(f"not done: {'; '.join(undone)}", level=syslog.LOG_ERR)
@@ -118,8 +141,19 @@ def execute(
     return 0
 
 
-def _purge(runner: Runner, log: Log, names: list[str]) -> Callable[[], bool]:
+def _purge(runner: Runner, log: Log, names: list[str], arch: str) -> Callable[[], bool]:
     def step() -> bool:
+        # Simulated again with exactly these packages, right before: apt may want more
+        # now than when the plan was shown (a long confirmation, unattended-upgrades).
+        try:
+            more = beyond_plan(names, simulate(runner, names), arch)
+        except Refused as exc:
+            log.line(f"failed: {exc}", level=syslog.LOG_ERR)
+            return False
+        if more:
+            log.line(f"apt would now also change: {', '.join(sorted(more))}; stopped",
+                     level=syslog.LOG_ERR)  # fmt: skip
+            return False
         res = runner.run((*APT_PURGE, *names))
         for line in _output(res.stdout):
             log.line(f"  {line}")

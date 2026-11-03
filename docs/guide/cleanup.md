@@ -59,17 +59,32 @@ It reads `keep_packages` (below) from `/etc/pydebuprep.conf`, or `--config FILE`
 
 ## Guardrails
 
-- **Kernels kept:** the running kernel, the newest one, GRUB's default entry and the
-  newest `N`. With a reboot pending after an upgrade (the running kernel older than
-  the newest), both stay. Meta packages such as `linux-image-generic` and
-  `linux-image-amd64` are never touched. If the running kernel can't be identified (a
-  kernel built by hand), no kernel, module or directory is removed.
+- **Kernels kept:** the running kernel, the newest installed kernel image, the newest
+  `N` images, and every kernel GRUB is set to boot: `GRUB_DEFAULT` in
+  `/etc/default/grub` (and `grub.d/*.cfg`), and the saved and next entries in
+  `/boot/grub/grubenv`. With a reboot pending after an upgrade (the running kernel
+  older than the newest), both stay. Headers alone don't count as a kernel. Meta
+  packages such as `linux-image-generic` and `linux-image-amd64` are never touched.
+- **When it can't tell, it refuses:** if the running kernel can't be identified (a
+  kernel built by hand), or `GRUB_DEFAULT` names an entry it can't match to a kernel
+  (a menu position like `2`, or a title without a version), no kernel, module or
+  directory is removed. Set `GRUB_DEFAULT` to the kernel's own entry, or to `0` or
+  `saved`.
+- **Held packages stay:** a package held with `apt-mark hold` is never purged, and the
+  plan lists it as left alone.
+- **Directories of installed kernels stay:** a kernel directory is planned only when
+  no package of that kernel remains installed, and dpkg is asked about both
+  `/lib/modules` and `/usr/lib/modules` (Debian 13 records its kernels there).
 - **Before acting**, it refuses unless it runs as root, while apt or dpkg is running,
   when `dpkg --audit` reports problems, or while another cleanup runs.
-- **apt's own simulation first:** `apt-get -s purge` with the plan; if apt would remove
-  anything not in the plan (a meta package, a dependency), it refuses.
+- **apt's own simulation first:** `apt-get -s purge` with the plan, under the lock and
+  after the plan was made there; if apt would remove or install anything not in the
+  plan (a meta package, a dependency), it refuses. Each purge is simulated again with
+  exactly its packages just before it runs, in case apt has come to want more since.
 - **One failure stops it:** the log says what was done and what was left undone, and
-  it exits with status 2.
+  it exits with status 2. So does Ctrl-C: apt and dpkg run in a session of their own,
+  so an interrupt doesn't stop them halfway; the cleanup waits for them, then stops.
+  Purges have no time limit.
 - **Packages to keep for good** go in `/etc/pydebuprep.conf`:
 
   ```yaml
@@ -107,9 +122,10 @@ left undone. 3: a usage or config error.
 To work out what it would remove, it only reads, like `pydebuprep report`:
 
 ```sh
-dpkg-query -W -f='${db:Status-Abbrev}\t${Package}\t${Version}\t${Installed-Size}\n'
+dpkg-query -W -f='${db:Status-Abbrev}\t${binary:Package}\t${Version}\t${Installed-Size}\n'
+dpkg --print-architecture
 uname -r
-dpkg-query -S /lib/modules/VERSION /usr/src/linux-headers-VERSION
+dpkg-query -S /lib/modules/VERSION /usr/lib/modules/VERSION /usr/src/linux-headers-VERSION
 dpkg-query -W -f='${Conffiles}\n' PACKAGE...
 ```
 

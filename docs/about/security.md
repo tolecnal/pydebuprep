@@ -18,9 +18,11 @@ packages that pass both checks.
 
 ## How the project stays secure
 
-- Every command pydebuprep runs must match a complete entry in a read-only
-  allowlist, and every pull request and release is traced to prove a root run
-  changes no system state or configuration. See [What pydebuprep changes](read-only.md).
+- Every command `pydebuprep report` and `snapshot` run must match a complete entry in
+  a read-only allowlist, and every pull request and release is traced to prove a root
+  run changes no system state or configuration. `pydebuprep-cleanup`, which changes
+  the system on purpose, has an exact allowlist of its own. See
+  [What pydebuprep changes](read-only.md).
 - Reports may contain text from logs and files written by other users; the
   human-readable formats escape it and strip terminal control sequences. Saved
   reports read back by `convert` are validated field by field, and YAML is loaded

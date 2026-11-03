@@ -1,7 +1,7 @@
 # About
 
-- **[What pydebuprep changes](read-only.md)** — how pydebuprep guarantees it changes
-  nothing, and how that's tested.
+- **[What pydebuprep changes](read-only.md)** — what pydebuprep never changes, how
+  that's enforced and tested, and the one tool that changes things on purpose.
 - **[Limitations](limitations.md)** — what it doesn't do, and where its results need
   your judgement.
 - **[Security and releases](security.md)** — verifying a release, and reporting a

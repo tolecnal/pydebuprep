@@ -71,15 +71,21 @@ Show the options and exit.
 .B \-\-version
 Show the version and exit.
 .SH GUARDRAILS
-The running kernel, the newest one, GRUB's default and the newest \fIN\fR are
-always kept, as are meta packages (linux\-image\-generic, linux\-image\-amd64).
-If the running kernel can't be identified, no kernel, module or directory is
-removed. Before acting it refuses unless run as root, while apt or dpkg is
+The running kernel, the newest installed image, the newest \fIN\fR images and
+every kernel GRUB is set to boot (GRUB_DEFAULT in /etc/default/grub and
+grub.d, and grubenv's saved and next entries) are always kept, as are meta
+packages (linux\-image\-generic, linux\-image\-amd64) and held packages. If
+the running kernel can't be identified, or GRUB_DEFAULT names an entry that
+can't be matched to a kernel, no kernel, module or directory is removed. A
+kernel's directories are removed only when no package of that kernel stays
+installed. Before acting it refuses unless run as root, while apt or dpkg is
 running, when
 .B dpkg \-\-audit
-reports problems, or while another cleanup runs. It asks apt to simulate the
-purge first, and refuses if apt would remove anything not in the plan. A failed
-step stops the run.
+reports problems or can't run, or while another cleanup runs. It plans under
+its lock, asks apt to simulate the purge, and refuses if apt would remove or
+install anything not in the plan; each purge is simulated again just before it
+runs. A failed step, or Ctrl\-C (after apt and dpkg finish what they started),
+stops the run with status 2.
 .SH FILES
 .TP
 .I /var/log/pydebuprep/cleanup.log

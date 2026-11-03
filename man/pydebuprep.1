@@ -69,7 +69,9 @@ It is strictly read\-only. It never installs, removes or reconfigures anything,
 never runs
 .BR "apt update" ,
 and never restarts services. Each finding includes the commands to fix it, for
-you to review and run yourself. Every external command it runs is checked
+you to review and run yourself (the separate
+.BR pydebuprep\-cleanup (8)
+is the one command that changes the system). Every external command it runs is checked
 against a built\-in allowlist of read\-only commands, and every release is
 traced with strace on each supported release to prove that a run as root
 changes no system state or configuration. The few agreed side effects, such as
