@@ -389,3 +389,14 @@ def test_probe_context_requires_tls_1_2() -> None:
     context = probe_context()
     assert context.minimum_version is ssl.TLSVersion.TLSv1_2
     assert context.verify_mode is ssl.CERT_NONE and not context.check_hostname
+
+
+def test_is_real_dir(tmp_path: Path) -> None:
+    (tmp_path / "dir").mkdir()
+    (tmp_path / "file").write_text("x")
+    (tmp_path / "link").symlink_to(tmp_path / "dir")
+    system = System()
+    assert system.is_real_dir(str(tmp_path / "dir"))
+    assert not system.is_real_dir(str(tmp_path / "link"))  # a link to a directory isn't one
+    assert not system.is_real_dir(str(tmp_path / "file"))
+    assert not system.is_real_dir(str(tmp_path / "missing"))

@@ -83,9 +83,8 @@ def _command(argv: tuple[str, ...]) -> str:
 
 
 def test_every_allowlisted_command_is_documented_on_a_check_page() -> None:
-    pages = " ".join(
-        _normalize(p.read_text(encoding="utf-8")) for p in (DOCS / "checks").glob("*.md")
-    )
+    sources = [*(DOCS / "checks").glob("*.md"), DOCS / "guide" / "cleanup.md"]
+    pages = " ".join(_normalize(p.read_text(encoding="utf-8")) for p in sources)
     commands = [*ALLOWED_COMMANDS, SHOW_UNITS, *UNIT_QUERIES]
     missing = [_command(argv) for argv in commands if _command(argv) not in pages]
     assert missing == []

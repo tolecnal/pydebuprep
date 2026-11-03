@@ -53,7 +53,17 @@ _UNITS = ("--no-legend", "--plain", "--no-pager")
 # Every command pydebuprep may run, matched against the WHOLE argv: any extra argument,
 # however harmless it looks, is rejected. apt commands must carry APT_RO_OPTS right after
 # the program name; they are written here without them.
+# Read-only queries the cleanup planner (pydebuprep-cleanup) makes: every package with
+# its status, version and size; and which packages own files under kernel directories.
+DPKG_PACKAGES_ARGV = (
+    "dpkg-query", "-W", "-f=${db:Status-Abbrev}\t${Package}\t${Version}\t${Installed-Size}\n",
+)  # fmt: skip
+OWNER_QUERY = ("dpkg-query", "-S")
+OWNER_ROOTS = ("/lib/modules/", "/usr/src/")
+MAX_OWNER_PATHS = 200
+
 ALLOWED_COMMANDS: set[tuple[str, ...]] = {
+    DPKG_PACKAGES_ARGV,
     ("dpkg", "--audit"),
     ("dpkg-query", "-W", "-f=${db:Status-Abbrev} ${Package}\n"),
     ("dpkg-query", "-W", "-f=${Package}\t${Version}\n"),
@@ -210,6 +220,8 @@ def _is_allowed(argv: tuple[str, ...]) -> bool:
         return _is_signature_check(argv)
     if argv and argv[0] in ("pg_isready", "setpriv", "psql", *MYSQL_ADMIN, *MYSQL_CLIENT):
         return _is_probe(argv)
+    if argv[:2] == OWNER_QUERY:
+        return _is_owner_query(argv[2:])
     if argv[: len(SHOW_UNITS)] == SHOW_UNITS:
         units = argv[len(SHOW_UNITS) :]
         return 0 < len(units) <= MAX_UNITS and all(_plain_unit(u) for u in units)
@@ -283,6 +295,14 @@ def _is_probe(argv: tuple[str, ...]) -> bool:
     if argv[0] in MYSQL_ADMIN:
         return _without_defaults_file(argv[1:]) == ("ping",)
     return argv[0] in MYSQL_CLIENT and _without_defaults_file(argv[1:]) == MYSQL_QUERY
+
+
+def _is_owner_query(paths: tuple[str, ...]) -> bool:
+    """dpkg-query -S on directories directly under the kernel roots, nothing else."""
+    return 0 < len(paths) <= MAX_OWNER_PATHS and all(
+        _normal_path(p) and p.startswith(OWNER_ROOTS) and "/" not in p.split("/", 3)[3]
+        for p in paths
+    )
 
 
 def _plain_unit(name: str) -> bool:
@@ -500,6 +520,13 @@ class System:
             return None, str(exc) or type(exc).__name__
         finally:
             conn.close()
+
+    def is_real_dir(self, path: str) -> bool:
+        """A directory itself, not a symlink to one."""
+        try:
+            return stat.S_ISDIR(os.lstat(path).st_mode)
+        except OSError:
+            return False
 
     def readlink(self, path: str) -> str | None:
         try:

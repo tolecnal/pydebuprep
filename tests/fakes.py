@@ -148,14 +148,21 @@ class FakeSystem(System):
         self.scratch_files[path] = data
         return path
 
+    def _dirs(self) -> set[str]:
+        """Directories implied by the files' paths."""
+        return {f.rsplit("/", n)[0] for f in self.files for n in range(1, f.count("/"))}
+
     def glob(self, pattern: str) -> list[str]:
-        # Like the real glob, a * stays within one directory.
+        # Like the real glob, a * stays within one directory; directories count too.
         depth = pattern.count("/")
         return sorted(
             f
-            for f in (*self.files, *self.links)
+            for f in {*self.files, *self.links, *self._dirs()}
             if f.count("/") == depth and fnmatch.fnmatch(f, pattern)
         )
+
+    def is_real_dir(self, path: str) -> bool:
+        return path not in self.links and path in self._dirs()
 
     def mtime(self, path: str) -> float | None:
         return self.mtimes.get(path)

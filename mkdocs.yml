@@ -80,6 +80,7 @@ nav:
       - Reading the results: guide/results.md
       - Running across a fleet: guide/fleet.md
       - Using a portal: guide/portal.md
+      - Cleaning up after an upgrade: guide/cleanup.md
   - Configuration:
       - configuration/index.md
       - Reference: configuration/reference.md
