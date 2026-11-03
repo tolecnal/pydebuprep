@@ -16,7 +16,8 @@
 [![Build provenance: attested](https://img.shields.io/badge/build%20provenance-attested-2EA44F?logo=github)](#releases)
 [![Dependabot](https://img.shields.io/badge/dependabot-enabled-025E8C?logo=dependabot&logoColor=white)](.github/dependabot.yml)
 
-A read-only health report for Debian and Ubuntu systems after a release upgrade
+A post-upgrade health report for Debian and Ubuntu systems that never changes their
+settings or state
 (Debian 12 → 13, Ubuntu 22.04 → 24.04 → 26.04, and minor upgrades too).
 
 **Documentation: <https://pydebuprep.app/>** — a page per check

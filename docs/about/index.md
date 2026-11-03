@@ -1,6 +1,6 @@
 # About
 
-- **[Read-only by design](read-only.md)** — how pydebuprep guarantees it changes
+- **[What pydebuprep changes](read-only.md)** — how pydebuprep guarantees it changes
   nothing, and how that's tested.
 - **[Limitations](limitations.md)** — what it doesn't do, and where its results need
   your judgement.

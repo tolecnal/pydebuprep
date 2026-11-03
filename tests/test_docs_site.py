@@ -208,3 +208,12 @@ def test_read_only_page_lists_agreed_side_effects() -> None:
     )
     for page in [*DOCS.rglob("*.md"), ROOT / "README.md"]:
         assert not stale.search(page.read_text(encoding="utf-8")), page
+
+
+def test_principle_is_stated() -> None:
+    page = (DOCS / "about" / "read-only.md").read_text(encoding="utf-8")
+    assert page.startswith("# What pydebuprep changes\n")
+    assert "never changes system or application settings" in page
+    assert "runtime files" in page and "## The cleanup tool" in page
+    for path in (ROOT / "README.md", DOCS / "index.md", ROOT / "man" / "pydebuprep.1"):
+        assert "read-only health report" not in path.read_text(encoding="utf-8").lower(), path

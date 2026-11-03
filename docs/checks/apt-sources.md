@@ -89,7 +89,7 @@ can't read ASCII-armored keys, so pydebuprep de-armors them itself — and `sqv`
 its output there. The allowlist accepts these commands only with keyrings from
 `/etc/apt/`, `/usr/share/keyrings/` or the scratch directory, output into the
 scratch directory, and an `InRelease` from APT's lists. See
-[Read-only by design](../about/read-only.md#what-it-does-write).
+[What pydebuprep changes](../about/read-only.md#what-it-does-write).
 
 Everything else comes from reading files.
 

@@ -94,11 +94,6 @@ compared with the snapshot; a probe comparing served certificates with the files
 `nginx -t` and `apache2ctl -t` as the first agreed side effects (listed in
 docs/about/read-only.md); and the php and certbot checks.
 
-- [ ] The project still calls itself "read-only" while a few side effects are agreed
-      (docs/about/read-only.md, Agreed side effects). The maintainer expects to
-      rephrase that wholesale at some point; the docs now say "changes no system
-      state or configuration".
-
 - [ ] Dropped from the wish list, with reasons:
       - WireGuard/OpenVPN tunnels: covered by the network check's interface comparison;
       - `postfix check`: creates missing directories, so postfix uses `postconf -n`;

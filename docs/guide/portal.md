@@ -120,6 +120,6 @@ unencrypted: for test setups only.
 
 Everything pydebuprep keeps for the portal is in its own directory,
 `/var/lib/pydebuprep` (mode `0700`, created by the package): `pending/` and
-`configs/`, files mode `0600`. See [Read-only by design](../about/read-only.md#what-it-does-write).
+`configs/`, files mode `0600`. See [What pydebuprep changes](../about/read-only.md#what-it-does-write).
 The formats are published as JSON Schemas: [report](../reference/report-format.md)
 and config.

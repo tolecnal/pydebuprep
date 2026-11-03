@@ -1,9 +1,18 @@
-# Read-only by design
+# What pydebuprep changes
 
 pydebuprep is usually run as root, on a production server, right after the most
 disruptive thing that happens to it — a release upgrade. So the most important thing
-about it is that it **changes no system state or configuration**. That's enforced at
-three levels, and the few [agreed side effects](#agreed-side-effects) are listed below.
+about it is what it doesn't do:
+
+**pydebuprep never changes system or application settings, or the state of
+runtime files such as apt's and dpkg's.**
+
+It started out promising to be strictly read-only. In practice a few things it does
+leave a trace that changes neither: scratch files it removes again before it finishes,
+and a short list of [agreed side effects](#agreed-side-effects) such as a web server's
+configuration test opening its log files. That's enforced at three levels, below.
+[The cleanup tool](#the-cleanup-tool) is the one deliberate exception, and a separate
+command.
 
 ## 1. It only runs allowlisted commands
 
@@ -104,6 +113,21 @@ written into a file whose opening was agreed (the PID file, a log).
 
 Writes to the system journal or syslog that these cause are in the same class: a
 record that something looked, never a change of what is configured.
+
+## The cleanup tool
+
+`pydebuprep-cleanup` purges old kernels, their modules and headers, directories they
+leave behind and the configuration of removed packages. It changes the system on
+purpose, so it is kept apart from everything above:
+
+- it's a separate command that `pydebuprep report` and `snapshot` never run or import
+  (a test fails if they do), and the audit above keeps proving `report` and `snapshot`
+  change nothing;
+- it only shows what it would do unless it's run with `--apply`, and asks before it
+  acts;
+- it logs every action to `/var/log/pydebuprep/cleanup.log` and the journal.
+
+See [Cleaning up after an upgrade](../guide/cleanup.md).
 
 ## What "read-only" can't cover
 
