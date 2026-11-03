@@ -1,6 +1,6 @@
 # Backlog
 
-What is still open, as of 2026-11-02 (after pydebuprep 0.9.0 and portal 0.4.0). Remove items as they are done.
+What is still open, as of 2026-11-03 (after pydebuprep 0.9.0 and portal 0.5.0). Remove items as they are done.
 
 ## GitHub repository settings
 
@@ -49,8 +49,9 @@ attestation.
 
 `v0.9.0` (TLS certificates, snapshot comparisons, a certificate probe and the
 configuration tests in the nginx and apache checks; the php and certbot checks; the
-first agreed side effects) is being released on 2026-11-02; what it contains is in
-`debian/changelog`. Its report format is unchanged, so portal 0.4.0 takes its reports.
+first agreed side effects) released on 2026-11-02, published with `SHA256SUMS` and a
+verified provenance attestation. Its report format is unchanged, so portal 0.3.0 and
+newer take its reports.
 
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't
@@ -67,8 +68,12 @@ CodeQL, dependency review) must pass; only admins create `v*` tags. Released `v0
 on 2026-11-01: the image `ghcr.io/tolecnal/pydebuprep-portal`, public, with a
 verified provenance attestation. `v0.2.0` (the sidebar layout) and `v0.3.0` (machine
 IDs, hosts by release, kernel and silence, full-text findings, CSV; built on pydebuprep
-0.8.0) followed the same day. Dependabot keeps its actions, Python dependencies and
-images current, like this repository's.
+0.8.0) followed the same day, then `v0.4.0` (PostgreSQL 18, moved over with
+`scripts/upgrade-postgres-18.sh`) and, on 2026-11-03, `v0.5.0` (built on pydebuprep
+0.9.0: what each report was compared with and the changes since its snapshot, a
+host's upgrades as a chain, and the new checks and options in the config generator).
+Dependabot keeps its actions, Python dependencies and images current, like this
+repository's.
 
 - [ ] Before each release: bump `__version__`, the `CHANGELOG.md` heading and the
       image tag in `compose.yaml` together; the Release workflow refuses a tag that
