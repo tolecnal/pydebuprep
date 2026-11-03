@@ -888,7 +888,7 @@
         "keep_packages": {
           "description": "Packages pydebuprep-cleanup never purges. Only from a local config file: a config fetched from a URL can't set it.",
           "items": {
-            "pattern": "^[a-z0-9][a-z0-9+.-]+$",
+            "pattern": "^[a-z0-9][a-z0-9+.-]+(?::[a-z0-9]+)?$",
             "type": "string"
           },
           "type": "array"
