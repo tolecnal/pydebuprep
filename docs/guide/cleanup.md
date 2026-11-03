@@ -97,7 +97,8 @@ It reads `keep_packages` (below) from `/etc/pydebuprep.conf`, or `--config FILE`
 ## Logs and backups
 
 Every run, dry or not, logs its plan and every action to
-`/var/log/pydebuprep/cleanup.log` (rotated weekly) and to the journal:
+`/var/log/pydebuprep/cleanup.log` (mode `0600`, readable by root only; rotated weekly)
+and to the journal:
 
 ```sh
 journalctl -t pydebuprep-cleanup

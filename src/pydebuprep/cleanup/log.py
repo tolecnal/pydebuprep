@@ -32,7 +32,7 @@ class Log:
         self.fd: int | None = None
         self.file_error: str | None = None
         try:
-            self.fd = os.open(path, LOG_FLAGS, 0o640)
+            self.fd = os.open(path, LOG_FLAGS, 0o600)
         except OSError as exc:
             # A dry run as an ordinary user, or no package directory: syslog still gets it.
             self.file_error = f"can't write {path}: {exc.strerror or exc}"

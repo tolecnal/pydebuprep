@@ -97,7 +97,7 @@ def test_postinst_creates_the_cleanup_directories_and_logrotate() -> None:
     assert "rm -rf /var/lib/pydebuprep /var/log/pydebuprep" in postrm
     rotate = (ROOT / "debian" / "pydebuprep.logrotate").read_text()
     for words in ("/var/log/pydebuprep/cleanup.log", "weekly", "rotate 12", "compress", "missingok",
-                  "notifempty", "create 0640 root adm"):  # fmt: skip
+                  "notifempty", "create 0600 root root"):  # fmt: skip
         assert words in rotate, words
 
 

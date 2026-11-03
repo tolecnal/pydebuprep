@@ -191,7 +191,7 @@ def test_log_goes_to_file_and_syslog(tmp_path: Path, syslogged: list[tuple[int, 
     log = Log(str(tmp_path / "cleanup.log"), run_id="r4", now=lambda: NOW)
     log.line("two\nlines")
     log.close()
-    assert oct((tmp_path / "cleanup.log").stat().st_mode & 0o777) == "0o640"
+    assert oct((tmp_path / "cleanup.log").stat().st_mode & 0o777) == "0o600"
     assert (tmp_path / "cleanup.log").read_text() == (
         "2026-11-03T15:04:05Z [r4] two\n2026-11-03T15:04:05Z [r4] lines\n"
     )

@@ -89,7 +89,8 @@ stops the run with status 2.
 .SH FILES
 .TP
 .I /var/log/pydebuprep/cleanup.log
-Every run's plan and every action; also in the journal:
+Every run's plan and every action (mode 0600, readable by root only; rotated
+weekly); also in the journal:
 .BR "journalctl \-t pydebuprep\-cleanup" .
 .TP
 .I /var/backups/pydebuprep
