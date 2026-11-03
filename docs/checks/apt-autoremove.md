@@ -24,7 +24,7 @@ apt-get -s autoremove
 
 Like every apt command pydebuprep runs, it adds options that stop apt from taking
 locks, regenerating its caches or writing its solver log; see
-[What pydebuprep changes](../about/read-only.md).
+[What pydebuprep changes](../about/what-it-changes.md).
 
 ## Limitations
 

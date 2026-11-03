@@ -50,9 +50,6 @@ APT_PROGRAMS = ("apt", "apt-get", "apt-cache", "apt-mark")
 _DF_EXCLUDE = ("-x", "tmpfs", "-x", "devtmpfs", "-x", "squashfs", "-x", "overlay", "-x", "efivarfs")
 _UNITS = ("--no-legend", "--plain", "--no-pager")
 
-# Every command pydebuprep may run, matched against the WHOLE argv: any extra argument,
-# however harmless it looks, is rejected. apt commands must carry APT_RO_OPTS right after
-# the program name; they are written here without them.
 # Read-only queries the cleanup planner (pydebuprep-cleanup) makes: every package with
 # its status, version and size; and which packages own files under kernel directories.
 DPKG_PACKAGES_ARGV = (
@@ -70,6 +67,9 @@ DPKG_PACKAGE_NAME = re.compile(r"[a-z0-9][a-z0-9+.-]+(?::[a-z0-9]+)?")
 OWNER_ROOTS = ("/lib/modules/", "/usr/lib/modules/", "/usr/src/")
 MAX_OWNER_PATHS = 200
 
+# Every command pydebuprep may run, matched against the WHOLE argv: any extra argument,
+# however harmless it looks, is rejected. apt commands must carry APT_RO_OPTS right after
+# the program name; they are written here without them.
 ALLOWED_COMMANDS: set[tuple[str, ...]] = {
     DPKG_PACKAGES_ARGV,
     DPKG_ARCH_ARGV,
@@ -156,10 +156,11 @@ MAX_UNITS = 256
 
 # Scratch files: some commands need a file to write to (sqv), or a key in a form they
 # can read (gpgv and armored keys). They go in a private directory of pydebuprep's own
-# under /tmp (mode 0700, files 0600), removed before the run ends; never anywhere else.
-SCRATCH_ROOT = "/tmp"  # nosec B108 - a private mkdtemp directory, not a fixed path
+# under /tmp, or /var/tmp when /tmp can't take it (mode 0700, files 0600), removed
+# before the run ends; never anywhere else.
+SCRATCH_ROOTS = ("/tmp", "/var/tmp")  # nosec B108 - private mkdtemp directories, not fixed paths
 SCRATCH_PREFIX = "pydebuprep-"
-SCRATCH_DIR = re.compile(r"^/tmp/pydebuprep-[A-Za-z0-9_]+$")
+SCRATCH_DIR = re.compile(r"^(?:/tmp|/var/tmp)/pydebuprep-[A-Za-z0-9_]+$")
 _ACTIVE_SCRATCH: set[str] = set()
 
 # Verifying an apt repository's InRelease against keyrings (apt-sources): any number of
@@ -376,6 +377,16 @@ def probe_context() -> ssl.SSLContext:
     return context
 
 
+def _make_scratch() -> str:
+    """A private scratch directory under /tmp, or /var/tmp when /tmp can't take it."""
+    for root in SCRATCH_ROOTS[:-1]:
+        try:
+            return tempfile.mkdtemp(prefix=SCRATCH_PREFIX, dir=root)
+        except OSError:
+            continue
+    return tempfile.mkdtemp(prefix=SCRATCH_PREFIX, dir=SCRATCH_ROOTS[-1])
+
+
 class System:
     """Read-only access to the running system."""
 
@@ -450,7 +461,7 @@ class System:
     @contextmanager
     def scratch_dir(self) -> Iterator[str]:
         """A private directory for scratch files, removed with everything in it after."""
-        path = tempfile.mkdtemp(prefix=SCRATCH_PREFIX, dir=SCRATCH_ROOT)
+        path = _make_scratch()
         _ACTIVE_SCRATCH.add(path)
         try:
             yield path

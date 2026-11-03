@@ -19,7 +19,9 @@ from pydebuprep.system import CONFFILES_HEAD, MAX_OWNER_PATHS, System
 
 BACKUP_DIR = "/var/backups/pydebuprep"
 BACKUP_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC
-OUTPUT_LINES = 20  # of a failed or noisy command, in the log
+# dpkg-query's ${Conffiles}: " PATH MD5SUM [obsolete] [remove-on-upgrade]"; the path may
+# hold spaces, so it's what's left once the flags and the checksum are taken off the end.
+CONFFILE_FLAGS = frozenset({"obsolete", "remove-on-upgrade", "newconffile"})
 
 __all__ = ["CONFFILES_HEAD", "backup_conffiles", "execute", "remove_dir"]
 
@@ -29,7 +31,7 @@ def _conffiles(system: System, packages: Sequence[str]) -> list[str]:
     for start in range(0, len(packages), MAX_OWNER_PATHS):  # the query takes at most 200
         chunk = packages[start : start + MAX_OWNER_PATHS]
         lines = system.run((*CONFFILES_HEAD, *chunk)).stdout.splitlines()
-        paths |= {line.split()[0] for line in lines if line.strip().startswith("/")}
+        paths |= {p for line in lines if (p := _conffile_path(line)) is not None}
     return sorted(paths)
 
 
@@ -79,8 +81,15 @@ def remove_dir(system: System, path: str, *, remove: Callable[[str], None] = shu
 
 
 def _output(res_text: str) -> list[str]:
-    lines = [line for line in res_text.splitlines() if line.strip()]
-    return lines[-OUTPUT_LINES:]
+    return [line for line in res_text.splitlines() if line.strip()]
+
+
+def _conffile_path(line: str) -> str | None:
+    words = line.strip().split(" ")
+    while words and words[-1] in CONFFILE_FLAGS:
+        words.pop()
+    path = " ".join(words[:-1])
+    return path if path.startswith("/") else None
 
 
 def execute(
@@ -154,9 +163,11 @@ def _purge(runner: Runner, log: Log, names: list[str], arch: str) -> Callable[[]
             log.line(f"apt would now also change: {', '.join(sorted(more))}; stopped",
                      level=syslog.LOG_ERR)  # fmt: skip
             return False
-        res = runner.run((*APT_PURGE, *names))
+        argv = (*APT_PURGE, *names)
+        res = runner.run(argv)
         for line in _output(res.stdout):
             log.line(f"  {line}")
+        log.line(f"{' '.join(argv)}: exit {res.returncode}")
         if res.returncode != 0 or res.timed_out:
             detail = _output(res.stderr or res.stdout)
             reason = "timed out" if res.timed_out else f"exit {res.returncode}"

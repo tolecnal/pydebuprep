@@ -354,3 +354,39 @@ def test_unreadable_conffiles_and_a_failed_backup_are_logged(
     text = (tmp_path / "cleanup.log").read_text()
     assert "not backed up (can't be read): /etc/hello/big.conf" in text
     assert "failed: can't write the backup" in text and "not done: purge residual (hello)" in text
+
+
+def test_conffile_paths_with_spaces(tmp_path: Path) -> None:
+    listed = (" /etc/odd dir/my file.conf 1234abcd\n /etc/odd dir/old.conf 5678 obsolete\n"
+              " /etc/odd dir/gone.conf 9abc remove-on-upgrade\n")  # fmt: skip
+    system = FakeSystem(
+        files={
+            "/etc/odd dir/my file.conf": "a",
+            "/etc/odd dir/old.conf": "b",
+            "/etc/odd dir/gone.conf": "c",
+        },
+        commands={(*CONFFILES_HEAD, "odd"): listed},
+    )
+    path = backup_conffiles(system, ["odd"], NOW, backup_dir=str(tmp_path))
+    assert path is not None
+    with tarfile.open(path) as tar:
+        assert sorted(tar.getnames()) == [
+            "etc/odd dir/gone.conf",
+            "etc/odd dir/my file.conf",
+            "etc/odd dir/old.conf",
+        ]
+
+
+def test_every_output_line_and_exit_status_are_logged(
+    tmp_path: Path, syslogged: list[tuple[int, str]]
+) -> None:
+    output = "".join(f"line {n}\n" for n in range(30))
+    purge = (*APT_PURGE, "linux-image-6.8.0-40-generic")
+    runner = FakeRunner({purge: output})
+    kernels_only = Plan(kernels=(Package("linux-image-6.8.0-40-generic", "ii", "1", 1),))
+    log = Log(str(tmp_path / "cleanup.log"), run_id="r13")
+    assert execute(kernels_only, runner, FakeSystem(), log, NOW, backup_dir=str(tmp_path)) == 0
+    log.close()
+    text = (tmp_path / "cleanup.log").read_text()
+    assert "]   line 0" in text and "]   line 29" in text
+    assert "apt-get purge -y linux-image-6.8.0-40-generic: exit 0" in text

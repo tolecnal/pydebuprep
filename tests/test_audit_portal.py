@@ -99,3 +99,10 @@ def test_postinst_creates_the_cleanup_directories_and_logrotate() -> None:
     for words in ("/var/log/pydebuprep/cleanup.log", "weekly", "rotate 12", "compress", "missingok",
                   "notifempty", "create 0640 root adm"):  # fmt: skip
         assert words in rotate, words
+
+
+def test_cleanup_command_installs_to_usr_sbin() -> None:
+    # An administrator's command, with a section-8 man page: /usr/sbin, not /usr/bin.
+    rules = (ROOT / "debian" / "rules").read_text()
+    assert "execute_after_dh_auto_install:" in rules
+    assert "mv debian/pydebuprep/usr/bin/pydebuprep-cleanup debian/pydebuprep/usr/sbin/" in rules

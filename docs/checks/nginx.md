@@ -104,7 +104,7 @@ As root, with `config_test` on (the default), it runs nginx's own configuration 
 nginx -t
 ```
 
-This is one of pydebuprep's [agreed side effects](../about/read-only.md#agreed-side-effects):
+This is one of pydebuprep's [agreed side effects](../about/what-it-changes.md#agreed-side-effects):
 `nginx -t` opens `/run/nginx.pid` (creating it, empty, if nginx isn't running) and the
 log files the configuration names, for appending (creating any that are missing), and
 creates its temporary directories under `/var/lib/nginx` if they're missing. It writes

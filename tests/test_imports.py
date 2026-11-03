@@ -43,5 +43,22 @@ def test_report_never_imports_cleanup() -> None:
             if isinstance(node, ast.Import):
                 names = [a.name for a in node.names]
             elif isinstance(node, ast.ImportFrom):
-                names = [node.module or "", *(f"{node.module}.{a.name}" for a in node.names)]
+                module = _absolute(path, package, node.module or "", node.level)
+                names = [module, *(f"{module}.{a.name}" for a in node.names)]
             assert not any(n.startswith("pydebuprep.cleanup") for n in names), path
+
+
+def _absolute(path: Path, package: Path, module: str, level: int) -> str:
+    """The absolute name of a (possibly relative) import in PATH."""
+    if level == 0:
+        return module
+    parts = ["pydebuprep", *path.relative_to(package).parent.parts]
+    base = parts[: len(parts) - (level - 1)]
+    return ".".join([*base, module] if module else base)
+
+
+def test_relative_imports_are_resolved() -> None:
+    package = SRC / "pydebuprep"
+    assert _absolute(package / "checks" / "x.py", package, "", 2) == "pydebuprep"
+    assert _absolute(package / "checks" / "x.py", package, "base", 1) == "pydebuprep.checks.base"
+    assert _absolute(package / "cli.py", package, "cleanup", 1) == "pydebuprep.cleanup"

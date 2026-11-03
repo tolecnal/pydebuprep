@@ -8,3 +8,8 @@ export PYBUILD_TEST_ARGS=cd {dir} && {interpreter} -m pytest -q -p no:cacheprovi
 
 %:
 	dh $@ --with python3 --buildsystem=pybuild
+
+# pydebuprep-cleanup is an administrator's command (man section 8): /usr/sbin.
+execute_after_dh_auto_install:
+	mkdir -p debian/pydebuprep/usr/sbin
+	mv debian/pydebuprep/usr/bin/pydebuprep-cleanup debian/pydebuprep/usr/sbin/

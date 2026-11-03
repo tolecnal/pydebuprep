@@ -1,6 +1,6 @@
 # pydebuprep
 
-**A post-upgrade health report for Debian and Ubuntu systems that never changes their settings or state.**
+**A health report suite for Debian and Ubuntu systems after a release upgrade.**
 
 A release upgrade (Debian 12 → 13, Ubuntu 22.04 → 24.04 → 26.04) usually works, but
 it can leave things behind that no single error message tells you about: an APT
@@ -28,10 +28,10 @@ A report only reads. It doesn't install or remove packages, doesn't run
 with the commands to fix it, for **you** to review and run.
 
 That's enforced, not just promised: every external command a report runs must match a
-built-in allowlist of read-only commands exactly, and every pull request and release
+built-in allowlist of commands that change nothing exactly, and every pull request and release
 is traced with strace on every supported release to prove a run as root changes no
-system state or configuration. See [What pydebuprep changes](about/read-only.md), which
-also lists the few [agreed side effects](about/read-only.md#agreed-side-effects). The
+system state or configuration. See [What pydebuprep changes](about/what-it-changes.md), which
+also lists the few [agreed side effects](about/what-it-changes.md#agreed-side-effects). The
 separate [`pydebuprep-cleanup`](guide/cleanup.md) is the one command that changes the
 system: only when asked, and only from an allowlist of its own.
 
@@ -49,6 +49,8 @@ system: only when asked, and only from an allowlist of its own.
   how settings combine.
 - **[Checks](checks/index.md)** — what each check looks at, what it reports, and its
   limits.
+- **[Cleaning up](guide/cleanup.md)** — `pydebuprep-cleanup` purges old kernels and
+  other leftovers, safely and only when asked.
 - **[Command line](reference/cli.md)** — every command and option.
 
 </div>

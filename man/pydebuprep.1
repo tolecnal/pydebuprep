@@ -1,6 +1,6 @@
 .TH PYDEBUPREP 1 "November 2026" "pydebuprep 0.9.0" "User Commands"
 .SH NAME
-pydebuprep \- post\-upgrade health report for Debian and Ubuntu that changes no settings or state
+pydebuprep \- health report suite for Debian and Ubuntu after a release upgrade
 .SH SYNOPSIS
 .B pydebuprep
 .RB [ report ]
@@ -492,6 +492,16 @@ Example configuration with every default, also printed by
 .I /usr/share/zsh/vendor\-completions/_pydebuprep
 Shell completion for bash (active when the bash\-completion package is
 installed) and zsh.
+.TP
+.I /tmp/pydebuprep\-*/
+.TQ
+.I /var/tmp/pydebuprep\-*/
+Private scratch directories (mode 0700) for checks that need a file to work
+with, such as a signing key for
+.BR gpgv (1);
+under /var/tmp only when /tmp can't take one. Removed before the check
+returns. pydebuprep leaves no other files behind, in a home directory or
+anywhere else, beyond the ones listed here and the files you ask for.
 .TP
 .I /var/lib/pydebuprep/snapshots/
 Default snapshot directory (mode 0700). Snapshots are JSON files (mode 0600)

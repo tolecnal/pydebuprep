@@ -4,7 +4,7 @@
 modules and headers, directories DKMS leaves in them, and the configuration of
 removed packages (dpkg state `rc`, which the [dpkg-rc](../checks/dpkg-rc.md) check
 reports). Unlike `pydebuprep report`, it changes the system: on purpose, and only when
-you ask it to (see [What pydebuprep changes](../about/read-only.md#the-cleanup-tool)).
+you ask it to (see [What pydebuprep changes](../about/what-it-changes.md#the-cleanup-tool)).
 
 ## Dry run first
 
@@ -111,6 +111,12 @@ sudo tar -xzf /var/backups/pydebuprep/rc-20261103T150405Z.tar.gz -C / etc/hello/
 ```
 
 Purging pydebuprep itself removes its log but keeps those backups.
+
+## Installed with pydebuprep
+
+`pydebuprep-cleanup` comes with the pydebuprep package, in `/usr/sbin`, with its man
+page (`man pydebuprep-cleanup`) and bash and zsh completion: options, `--keep`'s
+range, and package names for `--keep-package`.
 
 ## Exit status
 

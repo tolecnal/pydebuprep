@@ -1,6 +1,6 @@
 site_name: pydebuprep
 site_description: >-
-  A post-upgrade health report for Debian and Ubuntu systems that never changes their settings or state.
+  A health report suite for Debian and Ubuntu systems after a release upgrade.
 site_url: https://pydebuprep.app/
 repo_url: https://github.com/tolecnal/pydebuprep
 repo_name: tolecnal/pydebuprep
@@ -143,7 +143,7 @@ nav:
       - Exit codes: reference/exit-codes.md
   - About:
       - about/index.md
-      - What pydebuprep changes: about/read-only.md
+      - What pydebuprep changes: about/what-it-changes.md
       - Limitations: about/limitations.md
       - Security and releases: about/security.md
       - Development: about/development.md

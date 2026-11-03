@@ -400,3 +400,43 @@ def test_is_real_dir(tmp_path: Path) -> None:
     assert not system.is_real_dir(str(tmp_path / "link"))  # a link to a directory isn't one
     assert not system.is_real_dir(str(tmp_path / "file"))
     assert not system.is_real_dir(str(tmp_path / "missing"))
+
+
+def test_scratch_falls_back_to_var_tmp(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    import tempfile
+
+    import pydebuprep.system as system_module
+
+    made: list[str] = []
+    real = tempfile.mkdtemp
+
+    def mkdtemp(prefix: str, dir: str) -> str:  # tempfile's own parameter name
+        made.append(dir)
+        if dir == "/tmp":
+            raise PermissionError(13, "Permission denied", dir)  # /tmp read-only or full
+        return real(prefix=prefix, dir=str(tmp_path))
+
+    monkeypatch.setattr(system_module.tempfile, "mkdtemp", mkdtemp)
+    with System().scratch_dir() as scratch:
+        assert scratch.startswith(str(tmp_path))
+    assert made == ["/tmp", "/var/tmp"]
+    assert not os.path.exists(scratch)
+
+
+def test_scratch_fails_when_neither_root_works(monkeypatch: pytest.MonkeyPatch) -> None:
+    import pydebuprep.system as system_module
+
+    def mkdtemp(prefix: str, dir: str) -> str:  # tempfile's own parameter name
+        raise OSError(28, "No space left on device", dir)
+
+    monkeypatch.setattr(system_module.tempfile, "mkdtemp", mkdtemp)
+    with pytest.raises(OSError, match="No space"), System().scratch_dir():
+        pass
+
+
+def test_var_tmp_scratch_paths_are_scratch() -> None:
+    from pydebuprep.system import _in_scratch
+
+    assert _in_scratch("/var/tmp/pydebuprep-abc123/key.gpg")
+    assert _in_scratch("/tmp/pydebuprep-abc123/key.gpg")
+    assert not _in_scratch("/var/tmp/other/key.gpg") and not _in_scratch("/home/u/pydebuprep-x/k")

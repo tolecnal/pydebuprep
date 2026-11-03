@@ -55,12 +55,13 @@ In scope, for example:
 
 - **anything that makes pydebuprep change the system it inspects** while running
   `report`: writing, deleting or rewriting files, changing packages, services or
-  firmware settings, or starting commands outside its read-only allowlist. The read-only
-  promise is the most important property of this tool. `snapshot` writing its snapshot
-  file, a report file you asked for, and temporary files in pydebuprep's own private
-  scratch directory (created under `/tmp` with mode 0700 and removed before it exits)
-  are expected. A scratch file that outlives the run, or one written anywhere else, is
-  in scope;
+  firmware settings, or starting commands outside its allowlist. That it changes no
+  system or application settings is the most important property of this tool.
+  `snapshot` writing its snapshot file, a report file you asked for, and temporary
+  files in pydebuprep's own private scratch directory (created under `/tmp`, or
+  `/var/tmp` when `/tmp` can't take it, with mode 0700 and removed before it exits)
+  are expected. A scratch file that outlives the run, or any file left in a home
+  directory or anywhere else you didn't ask for, is in scope;
 - command or argument injection, for example through config values, file names, or
   output of the commands it runs;
 - unsafe file handling, such as following symlinks to overwrite files when writing
@@ -95,12 +96,12 @@ Install only packages that pass both checks.
 
 ## How this project stays secure
 
-- Every command `pydebuprep report` and `snapshot` run must match a complete entry in a
-  read-only allowlist (`src/pydebuprep/system.py`); `pydebuprep-cleanup`, the one
-  command that changes the system, has an exact allowlist of its own
-  (`src/pydebuprep/cleanup/runner.py`). Every pull request and release is traced with strace
-  on every supported release, with and without systemd and on real UEFI firmware, to
-  prove a root run of `report` and `snapshot` changes no system state or configuration
+- Every command `pydebuprep report` and `snapshot` run must match a complete entry in an
+  allowlist (`src/pydebuprep/system.py`); `pydebuprep-cleanup`, the one command that
+  changes the system, has an exact allowlist of its own
+  (`src/pydebuprep/cleanup/runner.py`). Every pull request and release is traced with
+  strace on every supported release, with and without systemd and on real UEFI
+  firmware, to prove a root run of `report` and `snapshot` changes no system state or configuration
   (`scripts/readonly-audit.sh`).
 - CodeQL, Bandit, ShellCheck, pip-audit and zizmor run on every change to `main`, and
   pull requests get a dependency review. Dependabot keeps pinned actions and tools up

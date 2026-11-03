@@ -135,7 +135,11 @@ def _confirm(plan: Plan, *, yes: bool, interactive: bool, ask: Callable[[str], s
     question = (
         f"Purge {len(plan.packages)} packages and remove {len(plan.dirs)} directories? [y/N] "
     )
-    return None if ask(question).strip().lower() in ("y", "yes") else "not confirmed"
+    try:
+        answer = ask(question)
+    except EOFError:  # Ctrl-D, or input that ended: no
+        return "not confirmed"
+    return None if answer.strip().lower() in ("y", "yes") else "not confirmed"
 
 
 def _show(plan: Plan, args: argparse.Namespace, log: Log) -> bool:

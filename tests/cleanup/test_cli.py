@@ -230,3 +230,14 @@ def test_apply_plans_only_inside_the_lock(
         code, _ = run(tmp_path, ["--residual", "--apply", "--yes"], system=sys_)
     assert code == 1 and "already running" in capsys.readouterr().err
     assert sys_.calls == []  # nothing planned outside the lock
+
+
+def test_end_of_input_at_the_prompt_is_no(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def eof(prompt: str) -> str:
+        raise EOFError
+
+    code, fake = run(tmp_path, ["--residual", "--apply"], interactive=True, ask=eof)
+    assert code == 1 and not [c for c in fake.calls if c[:3] == APT_PURGE]
+    assert "not confirmed" in capsys.readouterr().err

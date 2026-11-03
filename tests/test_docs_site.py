@@ -60,12 +60,16 @@ def test_navigation_lists_every_page() -> None:
     for check_id in CHECK_IDS:
         assert f"checks/{check_id}.md" in nav
     excluded = {"backlog.md"}
+    # Pages that moved: kept so old links still land somewhere, out of the navigation.
+    moved = {"about/read-only.md": "about/what-it-changes.md"}
     on_disk = {
         str(p.relative_to(DOCS))
         for p in DOCS.rglob("*.md")
         if p.name not in excluded and "superpowers" not in p.parts
     }
-    assert on_disk == set(nav)
+    assert on_disk - set(moved) == set(nav)
+    for old, new in moved.items():
+        assert new in nav and new.rsplit("/", 1)[1] in (DOCS / old).read_text(encoding="utf-8")
 
 
 def test_navigation_orders_checks_like_the_report() -> None:
@@ -195,7 +199,7 @@ def test_docs_are_built_with_zensical() -> None:
 
 
 def test_read_only_page_lists_agreed_side_effects() -> None:
-    text = (DOCS / "about" / "read-only.md").read_text(encoding="utf-8")
+    text = (DOCS / "about" / "what-it-changes.md").read_text(encoding="utf-8")
     section = text.split("## Agreed side effects", 1)[1].split("\n## ", 1)[0]
     for needle in (
         "`tls_probe`", "`config_test`", "`/run/nginx.pid`", "`/var/lib/nginx`",
@@ -210,7 +214,7 @@ def test_read_only_page_lists_agreed_side_effects() -> None:
 
 
 def test_principle_is_stated() -> None:
-    page = (DOCS / "about" / "read-only.md").read_text(encoding="utf-8")
+    page = (DOCS / "about" / "what-it-changes.md").read_text(encoding="utf-8")
     assert page.startswith("# What pydebuprep changes\n")
     assert "never changes system or application settings" in page
     assert "runtime files" in page and "## The cleanup tool" in page

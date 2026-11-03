@@ -1,6 +1,6 @@
 # About
 
-- **[What pydebuprep changes](read-only.md)** — what pydebuprep never changes, how
+- **[What pydebuprep changes](what-it-changes.md)** — what pydebuprep never changes, how
   that's enforced and tested, and the one tool that changes things on purpose.
 - **[Limitations](limitations.md)** — what it doesn't do, and where its results need
   your judgement.

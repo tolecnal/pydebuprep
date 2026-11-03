@@ -20,7 +20,7 @@ Use `--snapshot-dir DIR` (or `snapshot_dir` in the configuration) to keep snapsh
 elsewhere. The same directory is where `report` looks for them.
 
 !!! note "A snapshot is the one thing pydebuprep writes"
-    `snapshot` writes its own file and nothing else. The read-only audit allows
+    `snapshot` writes its own file and nothing else. The change audit allows
     exactly that one path for it.
 
 ## Comparing against a baseline

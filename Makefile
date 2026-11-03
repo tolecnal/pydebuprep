@@ -20,6 +20,8 @@ generated:
 	mkdir -p completions/bash completions/zsh examples
 	PYTHONPATH=src $(PYTHON) -m pydebuprep completion bash > completions/bash/pydebuprep
 	PYTHONPATH=src $(PYTHON) -m pydebuprep completion zsh > completions/zsh/_pydebuprep
+	PYTHONPATH=src $(PYTHON) -c 'import sys; from pydebuprep.cleanup.completion import main; sys.exit(main(["bash"]))' > completions/bash/pydebuprep-cleanup
+	PYTHONPATH=src $(PYTHON) -c 'import sys; from pydebuprep.cleanup.completion import main; sys.exit(main(["zsh"]))' > completions/zsh/_pydebuprep-cleanup
 	PYTHONPATH=src $(PYTHON) -m pydebuprep example-config > examples/pydebuprep.conf
 	mkdir -p schema
 	PYTHONPATH=src $(PYTHON) -m pydebuprep.schema report > schema/report.schema.json
