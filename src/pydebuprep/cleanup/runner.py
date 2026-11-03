@@ -113,7 +113,7 @@ def simulate(runner: Runner, packages: Sequence[str]) -> tuple[set[str], set[str
     return purged, removed
 
 
-def extra(plan: Plan, purged: set[str], removed: set[str]) -> set[str]:
+def beyond_plan(plan: Plan, purged: set[str], removed: set[str]) -> set[str]:
     """What apt would purge or remove beyond the plan (a dependency, a meta package)."""
     return (purged | removed) - set(plan.packages)
 

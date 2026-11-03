@@ -61,8 +61,9 @@ def test_is_url() -> None:
 
 @pytest.mark.parametrize(("section", "key"), REMOTE_FORBIDDEN)
 def test_write_paths_and_credentials_refused(section: str, key: str) -> None:
+    value = "[hello]" if key == "keep_packages" else "/etc"  # a valid value for each key
     with pytest.raises(ConfigError) as exc:
-        parse_remote(f"{section}:\n  {key}: /etc\n", URL)
+        parse_remote(f"{section}:\n  {key}: {value}\n", URL)
     assert exc.value.errors == [
         f"{URL}: {section}.{key} can't be set by a config fetched from a URL"
     ]

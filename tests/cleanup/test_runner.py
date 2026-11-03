@@ -17,8 +17,8 @@ from pydebuprep.cleanup.runner import (
     DPKG_AUDIT,
     Lock,
     Runner,
+    beyond_plan,
     check_cleanup_allowed,
-    extra,
     preflight,
     simulate,
 )
@@ -138,8 +138,8 @@ def test_failed_simulation_refuses() -> None:
 def test_widened_plan_is_refused() -> None:
     plan = Plan(kernels=(Package("linux-image-6.8.0-40-generic", "ii", "1", 1),),
                 residual=(Package("hello", "rc", "1", 0),))  # fmt: skip
-    assert extra(plan, {"linux-image-6.8.0-40-generic", "hello"}, set()) == set()
-    assert extra(plan, {"linux-image-6.8.0-40-generic", "hello"}, {"linux-generic"}) == {
+    assert beyond_plan(plan, {"linux-image-6.8.0-40-generic", "hello"}, set()) == set()
+    assert beyond_plan(plan, {"linux-image-6.8.0-40-generic", "hello"}, {"linux-generic"}) == {
         "linux-generic"
     }
 

@@ -14,6 +14,7 @@ from pydebuprep.config import LOGS_HELP, REPORT_HELP, SEVERITIES, UPLOAD_HELP
 from pydebuprep.identity import MACHINE_ID
 from pydebuprep.model import CATEGORY_ORDER, SCHEMA_VERSION, Severity, Status
 from pydebuprep.render import FORMATS
+from pydebuprep.system import DPKG_PACKAGE_NAME
 
 DRAFT = "https://json-schema.org/draft/2020-12/schema"
 BASE = "https://pydebuprep.app/schema"
@@ -189,6 +190,16 @@ def config_schema() -> dict[str, Any]:
                 {k: {**upload_types[k], "description": text} for k, text in UPLOAD_HELP.items()}
             ),
             "checks": _settings(check_props),
+            "cleanup": _settings(
+                {
+                    "keep_packages": {
+                        "type": "array",
+                        "items": {"type": "string", "pattern": f"^{DPKG_PACKAGE_NAME.pattern}$"},
+                        "description": "Packages pydebuprep-cleanup never purges. Only from a "
+                        "local config file: a config fetched from a URL can't set it.",
+                    }
+                }
+            ),
         },
     }
 

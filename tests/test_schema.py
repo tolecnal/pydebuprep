@@ -77,7 +77,7 @@ def test_report_and_upload_keys_in_the_config_schema() -> None:
     props = config_schema()["properties"]
     assert set(props["report"]["properties"]) == set(REPORT_HELP)
     assert set(props["upload"]["properties"]) == set(UPLOAD_HELP)
-    assert set(props) == {"report", "logs", "checks", "upload"}
+    assert set(props) == {"report", "logs", "checks", "upload", "cleanup"}
 
 
 def test_main_prints_a_schema(capsys: pytest.CaptureFixture[str]) -> None:
@@ -155,3 +155,10 @@ def test_references_must_be_web_links(validator: Any) -> None:
 def test_the_package_is_typed() -> None:
     assert (ROOT / "src" / "pydebuprep" / "py.typed").exists()
     assert "py.typed" in (ROOT / "setup.cfg").read_text()
+
+
+def test_cleanup_section_in_the_config_schema(validator: Any) -> None:
+    check = validator(config_schema())
+    check.validate({"cleanup": {"keep_packages": ["hello", "libfoo1.2"]}})
+    for bad in ({"cleanup": {"keep_packages": ["-x"]}}, {"cleanup": {"other": 1}}, {"cleanup": 5}):
+        assert not check.is_valid(bad), bad
