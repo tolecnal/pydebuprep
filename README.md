@@ -481,7 +481,7 @@ reporting, not a public issue.
 | Security / pip-audit | Known vulnerabilities in the pinned tools (`requirements-dev.txt`, `requirements-audit.txt`) |
 | Security / zizmor | GitHub Actions security: pinning, permissions, credentials, injection; results in the Security tab |
 | Security / Dependency review | New vulnerable dependencies in pull requests |
-| CI / Package | Builds the `.deb` on every pull request, push to `main` and weekly, installs it on every supported release and proves a root run changes no system state or configuration (`scripts/readonly-audit.sh`): in plain containers, in containers booted with systemd (services running, UEFI variables mounted), and on the Ubuntu runner VMs |
+| CI / Package | Builds the `.deb` on every pull request and weekly, installs it (pull requests: on the oldest, the newest and Debian 13; weekly and for releases: on every supported release) and proves a root run changes no system state or configuration (`scripts/readonly-audit.sh`): in plain containers, in containers booted with systemd (services running, UEFI variables mounted), and on the Ubuntu runner VMs |
 | Release | For a release tag, runs the same packaging and audit jobs, then publishes the `.deb` with checksums and a provenance attestation |
 | Docs | Builds the documentation site on every pull request (strict: broken links fail), publishes it to GitHub Pages from `main` |
 

@@ -40,7 +40,7 @@ if [ -d /run/systemd/system ]; then
     [ -z "$timers" ] || systemctl stop $timers
     # Azure's VM agent (on CI runner VMs) collects logs and writes status mid-run.
     systemctl stop walinuxagent.service 2>/dev/null || true
-    sleep 10
+    sleep 2
     # Where the running services (and on CI VMs, the runner and Azure's agent) keep
     # writing on their own; strace still covers pydebuprep's own processes everywhere.
     AUDIT_IGNORE="/var/log/ /var/lib/postgresql/ /var/lib/mysql/ /var/cache/bind/ \
@@ -76,6 +76,9 @@ if [ -d /run/systemd/system ]; then
     if [ -n "${AUDIT_TOOLS_ONLY:-}" ]; then
         # debsums reads every packaged file: minutes on a runner VM (containers cover it)
         printf '  debsums:\n    enabled: false\n' >> "$conf"
+        # The runner's /opt/hostedtoolcache holds thousands of directories; the
+        # containers audit the default search paths.
+        printf '  python-venvs:\n    search_paths: ["/opt/audit-venv", "/opt/audit-venv-ok"]\n' >> "$conf"
     else
         admin=$(command -v mariadb-admin >/dev/null && echo mariadb-admin || echo mysqladmin)
         AUDIT_EXPECT="$AUDIT_EXPECT pg_isready setpriv psql $admin mariadb"

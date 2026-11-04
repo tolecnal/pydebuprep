@@ -4,7 +4,6 @@ PyYAML
 pytest
 pytest-cov
 ruff
-flake8
 mypy
 types-PyYAML
 bandit

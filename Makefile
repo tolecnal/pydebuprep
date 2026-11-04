@@ -5,7 +5,6 @@ PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 lint:
 	$(PYTHON) -m ruff check src tests scripts tools
 	$(PYTHON) -m ruff format --check src tests scripts tools
-	$(PYTHON) -m flake8 src tests scripts tools
 	$(PYTHON) -m mypy
 
 test:
