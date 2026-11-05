@@ -9,8 +9,8 @@ import pytest
 from conftest import make_sample_report
 from pydebuprep.model import CheckResult, ConfigInfo, Finding, Report, Severity, Status
 from pydebuprep.render import EXTENSIONS, FORMATS, render
+from pydebuprep.render._cloud_markdown import UNRESOLVED
 from pydebuprep.render._jira_limit import JIRA_LIMIT
-from pydebuprep.render.jira_cloud import UNRESOLVED
 
 
 def _one_check(*findings: Finding, status: Status = Status.FINDINGS, **kwargs: str) -> Report:

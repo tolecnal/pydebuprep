@@ -157,13 +157,23 @@ def host_line(report: Report) -> str:
     return fields + host_note(report)
 
 
-def bold_label(line: str, bold: Callable[[str], str], esc: Callable[[str], str]) -> str:
+def _bold_label(line: str, bold: Callable[[str], str], esc: Callable[[str], str]) -> str:
     """LINE with its "Label:" in BOLD and the rest through ESC. A line that is a sentence, like
     the note about a stale config, has no label."""
     label, colon, rest = line.partition(": ")
     if colon and label.isalpha():
         return f"{bold(label + ':')} {esc(rest)}"
     return esc(line)
+
+
+def header_lines(
+    report: Report, bold: Callable[[str], str], esc: Callable[[str], str], separator: str = " | "
+) -> list[str]:
+    """The report's header for a format with markup: labels in BOLD, values through ESC."""
+    fields = separator.join(f"{bold(k + ':')} {esc(v)}" for k, v in host_fields(report))
+    lines = [f"Generated: {report.generated_at}", baseline_line(report)]
+    lines += [line for line in [config_line(report)] if line]
+    return [fields + esc(host_note(report)), *(_bold_label(ln, bold, esc) for ln in lines)]
 
 
 def baseline_line(report: Report) -> str:

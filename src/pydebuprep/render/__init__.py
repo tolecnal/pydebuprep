@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydebuprep.model import Report
 from pydebuprep.render import confluence, html, jira, jira_cloud, json_, markdown, text, yaml_
+from pydebuprep.render._cloud_markdown import render_markdown
 from pydebuprep.render._common import clean_report, valid_utf8
 
 FORMATS = (
@@ -16,6 +17,8 @@ FORMATS = (
     "jira-legacy",
     "jira-cloud",
     "confluence",
+    "confluence-legacy",
+    "confluence-cloud",
 )
 EXTENSIONS = {
     "text": "txt",
@@ -27,6 +30,8 @@ EXTENSIONS = {
     "jira-legacy": "jira.txt",
     "jira-cloud": "jira-cloud.md",
     "confluence": "confluence.txt",
+    "confluence-legacy": "confluence.txt",
+    "confluence-cloud": "confluence-cloud.md",
 }
 
 
@@ -50,6 +55,8 @@ def _render(report: Report, fmt: str, color: bool, todo: bool) -> str:
         return jira.render(clean_report(report), todo=todo)
     if fmt == "jira-cloud":
         return jira_cloud.render(clean_report(report), todo=todo)
-    if fmt == "confluence":
+    if fmt in ("confluence", "confluence-legacy"):
         return confluence.render(clean_report(report), todo=todo)
+    if fmt == "confluence-cloud":
+        return render_markdown(clean_report(report), todo=todo)
     raise ValueError(f"unknown format: {fmt}")

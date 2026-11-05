@@ -13,14 +13,10 @@ from pydebuprep.model import CheckResult, Finding, Report
 from pydebuprep.render._common import (
     NOTHING_TO_DO,
     TodoItem,
-    baseline_line,
     baseline_state,
-    bold_label,
     by_category,
-    config_line,
     has_baseline_section,
-    host_fields,
-    host_note,
+    header_lines,
     safe_url,
     todo_items,
 )
@@ -100,13 +96,6 @@ def _bold(text: str) -> str:
     return f"*{text}*"
 
 
-def _header(report: Report) -> list[str]:
-    fields = r" \| ".join(f"{_bold(k + ':')} {esc(v)}" for k, v in host_fields(report))
-    lines = [f"Generated: {report.generated_at}", baseline_line(report)]
-    lines += [line for line in [config_line(report)] if line]
-    return [fields + esc(host_note(report)), *(bold_label(ln, _bold, esc) for ln in lines)]
-
-
 def render_wiki(
     report: Report,
     *,
@@ -118,7 +107,7 @@ def render_wiki(
     out = [
         "h1. pydebuprep report",
         "",
-        *_header(report),
+        *header_lines(report, _bold, esc, r" \| "),
         "",
         "h2. Summary",
         "",

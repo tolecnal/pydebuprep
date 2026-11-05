@@ -1,4 +1,6 @@
-"""Confluence wiki markup (Insert > Markup > Confluence wiki), using status and panel macros."""
+"""Confluence wiki markup for on-prem Confluence (Insert > Markup > Confluence wiki), using
+status and panel macros. Confluence Cloud's editor doesn't read it; see _cloud_markdown.py.
+"""
 
 from __future__ import annotations
 
