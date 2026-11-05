@@ -7,9 +7,9 @@ Every release is built by GitHub Actions from a release tag, installed and
 a `SHA256SUMS` file and a signed **build-provenance attestation**:
 
 ```sh
-gh release download v0.10.0 -R tolecnal/pydebuprep
+gh release download v0.11.0 -R tolecnal/pydebuprep
 sha256sum -c SHA256SUMS
-gh attestation verify pydebuprep_0.10.0_all.deb -R tolecnal/pydebuprep
+gh attestation verify pydebuprep_0.11.0_all.deb -R tolecnal/pydebuprep
 ```
 
 `gh attestation verify` checks that the package was built by this repository's

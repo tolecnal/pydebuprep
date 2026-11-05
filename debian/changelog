@@ -1,3 +1,28 @@
+pydebuprep (0.11.0) unstable; urgency=medium
+
+  * A check's FINDINGS status now takes the colour of its worst finding, so
+    a check with only warnings is no longer red in Jira and Confluence. It
+    is grey when --min-severity hides all of its findings.
+  * Colours mean the same in every format: critical and errors are red,
+    warnings orange, info blue, OK green and skipped grey. HTML now colours
+    the check status, and warnings there are orange instead of brown or
+    yellow. In colour text output, warnings are orange and info blue using
+    256-colour codes, errors are red instead of magenta, and severities are
+    coloured in the TODO list. Confluence's status macro has no orange, so
+    warnings stay yellow there.
+  * The TODO list in Jira and Confluence output (--todo) is now a table, with
+    one row per item and its steps numbered in the Fix column. Each row starts
+    with the (-) icon for unresolved: change it to (!) for something that
+    needs attention, or (/) when it is resolved. Anything that reads the old
+    bulleted list needs changing. A paste into real Jira and Confluence is
+    still to be tested; report any rendering problem.
+  * In every format, including the todo array in JSON and YAML, a multi-line
+    title, step or error is joined onto one line in the TODO list.
+  * The report format is unchanged: portal 0.3.0 and newer take these
+    reports.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Thu, 05 Nov 2026 16:10:00 +0100
+
 pydebuprep (0.10.0) unstable; urgency=medium
 
   * New command pydebuprep-cleanup (in /usr/sbin, man page section 8, bash
