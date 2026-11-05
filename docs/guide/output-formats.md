@@ -13,7 +13,8 @@ its findings and its changes since the baseline, in the same order. Choose one w
 | `markdown` | Git hosting, wikis, chat | |
 | `jira-cloud` | Jira Cloud issues and comments | Markdown that its editor converts when pasted |
 | `jira-legacy` | on-prem Jira issues and comments | Jira wiki markup; `jira` is another name for it |
-| `confluence` | Confluence pages | Confluence wiki markup, with status lozenges and panels |
+| `confluence-cloud` | Confluence Cloud pages | the same Markdown as `jira-cloud`, with no size limit |
+| `confluence-legacy` | on-prem Confluence pages | Confluence wiki markup, with status lozenges and panels; `confluence` is another name for it |
 
 ```sh
 sudo pydebuprep report --format html --output-dir /var/tmp
@@ -26,7 +27,8 @@ control sequences. JSON and YAML carry the data as it is.
 
 ## Pasting into Jira or Confluence
 
-Jira has two editors that need different text, so there are two formats:
+Jira and Confluence each have two editors that need different text, so each has two
+formats. For Jira:
 
 - `--format jira-cloud` is for Jira Cloud, whose editor doesn't read wiki markup. It
   produces Markdown, which the editor converts when you paste it. Emoji show the severity,
@@ -34,16 +36,22 @@ Jira has two editors that need different text, so there are two formats:
 - `--format jira-legacy`, or `--format jira`, is for on-prem Jira. It produces Jira wiki
   markup: switch the comment to text mode and paste it there.
 
-`--format confluence` produces Confluence wiki markup; insert it with
-**Insert → Markup → Confluence wiki**. The dialects differ, so use the one that
-matches where you paste.
+For Confluence:
+
+- `--format confluence-cloud` is for Confluence Cloud, whose editor doesn't read wiki
+  markup either. It's the same Markdown as `jira-cloud`: paste it into the page.
+- `--format confluence-legacy`, or `--format confluence`, is for on-prem Confluence. It
+  produces Confluence wiki markup; insert it with **Insert → Markup → Confluence wiki**.
+
+The formats differ, so use the one that matches where you paste.
 
 ```sh
 sudo pydebuprep --format jira-cloud -o - | xclip -selection clipboard
 ```
 
 Jira refuses a description or comment over 32,767 characters, which a host with
-hundreds of findings can exceed. Both Jira formats stay within 32,000 bytes. When a
+hundreds of findings can exceed. Both Jira formats stay within 32,000 bytes (the
+Confluence formats have no such limit). When a
 report doesn't fit, it's rendered shorter, in steps, until it does:
 
 1. evidence and remediation lists are cut to 5 lines each;
@@ -102,8 +110,8 @@ hidden by `--min-severity`. With nothing to do, the section says so.
 | text | `[ ]` items with indented `[ ]` steps |
 | markdown | task lists (`- [ ]`), which GitHub, GitLab and many wikis render as tickable checkboxes |
 | html | real checkboxes you can tick in the browser (nothing is saved; the page has no script) |
-| jira, jira-legacy, confluence | a table with one row per item and its steps in the Fix column. Wiki markup has no checkbox, so each row starts with the `(-)` icon for unresolved: change it to `(!)` for something that needs attention, or `(/)` when it's resolved |
-| jira-cloud | the same table. Action items don't convert when pasted, so each row starts with ➖ for unresolved: change it to ⚠️ for something that needs attention, or ✅ when it's resolved |
+| jira, jira-legacy, confluence, confluence-legacy | a table with one row per item and its steps in the Fix column. Wiki markup has no checkbox, so each row starts with the `(-)` icon for unresolved: change it to `(!)` for something that needs attention, or `(/)` when it's resolved |
+| jira-cloud, confluence-cloud | the same table. Action items don't convert when pasted, so each row starts with ➖ for unresolved: change it to ⚠️ for something that needs attention, or ✅ when it's resolved |
 | json, yaml | a `todo` array of `{severity, check, title, steps}` for your own tooling |
 
 `--no-todo` leaves it out for one run when the configuration turns it on.

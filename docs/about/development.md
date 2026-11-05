@@ -112,7 +112,7 @@ tests in `tests/test_allowlist.py` enforce these rules:
   in `src/pydebuprep/remote_config.py`. Bound integer depth/count options in
   `Check.validate()`.
 - **Untrusted text is cleaned before rendering or printing to stderr.** Every
-  human-readable renderer (`text`, `html`, `markdown`, `jira`, `jira_cloud`, `confluence`) receives
+  human-readable renderer (`text`, `html`, `markdown`, `jira`, `_cloud_markdown`, `confluence`) receives
   `clean_report(report)`, which strips C0/DEL/C1 control sequences from every string
   field (including `host`, `baseline`, `config` and `generated_at`). Portal error
   excerpts, upload locations and baseline warnings also pass through `clean()`.

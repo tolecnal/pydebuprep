@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import re
 
 import pytest
 import yaml
@@ -36,6 +37,7 @@ def expected_sequence() -> list[str]:
 def test_formats_and_extensions() -> None:
     assert FORMATS == (
         "text", "json", "yaml", "html", "markdown", "jira", "jira-legacy", "jira-cloud", "confluence",
+        "confluence-legacy", "confluence-cloud",
     )  # fmt: skip
     assert EXTENSIONS == {
         "text": "txt",
@@ -47,6 +49,8 @@ def test_formats_and_extensions() -> None:
         "jira-legacy": "jira.txt",
         "jira-cloud": "jira-cloud.md",
         "confluence": "confluence.txt",
+        "confluence-legacy": "confluence.txt",
+        "confluence-cloud": "confluence-cloud.md",
     }
 
 
@@ -60,7 +64,17 @@ def test_yaml_roundtrip_equals_to_dict() -> None:
     assert yaml.safe_load(render(r, "yaml")) == r.to_dict()
 
 
-HUMAN_FORMATS = ["text", "html", "markdown", "jira", "jira-legacy", "jira-cloud", "confluence"]
+HUMAN_FORMATS = [
+    "text",
+    "html",
+    "markdown",
+    "jira",
+    "jira-legacy",
+    "jira-cloud",
+    "confluence",
+    "confluence-legacy",
+    "confluence-cloud",
+]
 
 
 @pytest.mark.parametrize("fmt", HUMAN_FORMATS)
@@ -83,7 +97,7 @@ def test_no_baseline_mentioned_once(fmt: str) -> None:
     out = render(r, fmt)
     assert out.lower().count("baseline") == 1
     # Jira and Confluence make the label bold.
-    assert "Baseline: none" in out.replace("*", "")
+    assert "Baseline: none" in re.sub(r"\*|</?strong>", "", out)
     assert "Changes since baseline" not in out
 
 

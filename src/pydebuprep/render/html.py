@@ -5,12 +5,10 @@ from html import escape
 from pydebuprep.model import Finding, Report
 from pydebuprep.render._common import (
     NOTHING_TO_DO,
-    baseline_line,
     baseline_state,
     by_category,
-    config_line,
     has_baseline_section,
-    host_line,
+    header_lines,
     safe_url,
     status_colour,
     summary_line,
@@ -42,6 +40,10 @@ pre { padding:.5rem .75rem; overflow-x:auto; white-space:pre-wrap; word-break:br
 .finding .title { color:var(--fg); }
 @media print { body { max-width:none; } pre { white-space:pre-wrap; } }
 """
+
+
+def _strong(text: str) -> str:
+    return f"<strong>{text}</strong>"
 
 
 def _finding(f: Finding) -> list[str]:
@@ -80,10 +82,7 @@ def render(report: Report, *, todo: bool = False) -> str:
         f"<title>pydebuprep report - {escape(report.host.hostname)}</title>",
         f"<style>{STYLE}</style></head><body>",
         "<h1>pydebuprep report</h1>",
-        f'<p class="meta">{escape(host_line(report))}<br>Generated: '
-        f"{escape(report.generated_at)}<br>{escape(baseline_line(report))}"
-        + "".join(f"<br>{escape(line)}" for line in [config_line(report)] if line)
-        + "</p>",
+        f'<p class="meta">{"<br>".join(header_lines(report, _strong, escape))}</p>',
         f"<h2>Summary</h2><p>{escape(summary_line(report))}</p>",
     ]
     for category, results in by_category(report):

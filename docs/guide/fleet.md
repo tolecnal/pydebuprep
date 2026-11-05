@@ -72,7 +72,7 @@ done
 Add `--todo` to get each host's checklist, ready to paste into a ticket:
 
 ```sh
-pydebuprep convert reports/web1.json --format jira --todo -o -
+pydebuprep convert reports/web1.json --format jira-cloud --todo -o -
 ```
 
 For dashboards, the [report format](../reference/report-format.md) gives each

@@ -120,10 +120,11 @@ and on the Ubuntu runner VMs, so `systemctl`, `journalctl`, `systemd-analyze`,
 `resolvectl`, `docker` and `efibootmgr` are now exercised; `AUDIT_EXPECT` fails the
 audit if one of them stops running.
 
-- [ ] Paste a report with `--todo` into real on-prem Jira, Jira Cloud (`jira-cloud`) and
-      Confluence: the TODO tables and icons render, and Confluence's
-      `{status:colour=...|title=...}` doesn't split its table cell at the `|`. Cloud
-      Confluence may not read wiki markup either, like Jira Cloud.
+- [ ] Paste a report with `--todo` into real on-prem Jira (`jira-legacy`, for the bold
+      header labels) and on-prem Confluence (`confluence-legacy`): the TODO tables and
+      icons render, and Confluence's `{status:colour=...|title=...}` doesn't split its
+      table cell at the `|`. `jira-cloud` and `confluence-cloud` are confirmed in the real
+      products.
 - [ ] Still only on real hosts: `docker` on Debian (no runner VM), and the checks'
       behaviour on real hardware (RAID, multiple disks, physical NICs).
 
@@ -144,5 +145,8 @@ audit if one of them stops running.
   if that happens often.
   The portal's CI matches: no run on merges, weekly instead, and its Release now runs
   the lint and test jobs before building the image.
+- `--format jira` and `--format confluence` are other names for the `-legacy` formats,
+  for on-prem products that end in 2029. Don't switch them to the Cloud formats silently:
+  deprecate them nearer the time.
 - The Release workflow builds the `.deb` once on Debian 12 and installs that same
   file everywhere. Revisit if a dependency ever needs a per-release build.
