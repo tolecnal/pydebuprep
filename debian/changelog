@@ -1,3 +1,20 @@
+pydebuprep (0.13.0) unstable; urgency=medium
+
+  * New format confluence-cloud: Markdown for pasting into Confluence Cloud,
+    whose editor shows wiki markup as plain text. It is the same as jira-cloud,
+    but has no size limit, so pages keep the full report.
+  * New format confluence-legacy: the existing wiki markup, for on-prem
+    Confluence. --format confluence is another name for it, so existing
+    commands and configurations keep working. Use confluence-cloud if you are
+    on Confluence Cloud. A host needs this version before a portal's config
+    can set either new format; older versions reject it.
+  * The labels in the report header (Host, OS, Kernel, Machine, Generated,
+    Baseline and Config) are now bold in Markdown and HTML too.
+  * The report format is unchanged: portal 0.3.0 and newer take these
+    reports.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Thu, 05 Nov 2026 20:17:36 +0100
+
 pydebuprep (0.12.0) unstable; urgency=medium
 
   * New format jira-cloud: Markdown for pasting into Jira Cloud, whose editor
