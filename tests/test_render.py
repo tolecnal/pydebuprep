@@ -34,7 +34,9 @@ def expected_sequence() -> list[str]:
 
 
 def test_formats_and_extensions() -> None:
-    assert FORMATS == ("text", "json", "yaml", "html", "markdown", "jira", "confluence")
+    assert FORMATS == (
+        "text", "json", "yaml", "html", "markdown", "jira", "jira-legacy", "jira-cloud", "confluence",
+    )  # fmt: skip
     assert EXTENSIONS == {
         "text": "txt",
         "json": "json",
@@ -42,6 +44,8 @@ def test_formats_and_extensions() -> None:
         "html": "html",
         "markdown": "md",
         "jira": "jira.txt",
+        "jira-legacy": "jira.txt",
+        "jira-cloud": "jira-cloud.md",
         "confluence": "confluence.txt",
     }
 
@@ -56,7 +60,7 @@ def test_yaml_roundtrip_equals_to_dict() -> None:
     assert yaml.safe_load(render(r, "yaml")) == r.to_dict()
 
 
-HUMAN_FORMATS = ["text", "html", "markdown", "jira", "confluence"]
+HUMAN_FORMATS = ["text", "html", "markdown", "jira", "jira-legacy", "jira-cloud", "confluence"]
 
 
 @pytest.mark.parametrize("fmt", HUMAN_FORMATS)
@@ -78,7 +82,8 @@ def test_no_baseline_mentioned_once(fmt: str) -> None:
         res.baseline_diff = None
     out = render(r, fmt)
     assert out.lower().count("baseline") == 1
-    assert "Baseline: none" in out
+    # Jira and Confluence make the label bold.
+    assert "Baseline: none" in out.replace("*", "")
     assert "Changes since baseline" not in out
 
 
@@ -262,7 +267,7 @@ def _huge_report():  # type: ignore[no-untyped-def] # test helper
 
 
 def test_jira_stays_within_its_size_limit() -> None:
-    from pydebuprep.render.jira import JIRA_LIMIT
+    from pydebuprep.render._jira_limit import JIRA_LIMIT
 
     report = _huge_report()
     assert len(render(report, "confluence").encode()) > JIRA_LIMIT  # really too big
@@ -275,7 +280,7 @@ def test_jira_stays_within_its_size_limit() -> None:
 
 
 def test_jira_with_todo_stays_within_its_size_limit() -> None:
-    from pydebuprep.render.jira import JIRA_LIMIT
+    from pydebuprep.render._jira_limit import JIRA_LIMIT
 
     out = render(_huge_report(), "jira", todo=True)
     assert len(out.encode()) <= JIRA_LIMIT and "h2. TODO" in out
@@ -289,7 +294,7 @@ def test_small_jira_reports_are_not_shortened() -> None:
 def test_jira_cut_as_a_last_resort() -> None:
     # Even the critical titles alone exceed the limit: the text is cut, and says so.
     from pydebuprep.model import CheckResult, Status
-    from pydebuprep.render.jira import JIRA_LIMIT
+    from pydebuprep.render._jira_limit import JIRA_LIMIT
 
     report = make_sample_report()
     findings = [Finding(Severity.CRITICAL, f"{n} " + "x" * 200) for n in range(400)]

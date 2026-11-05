@@ -77,7 +77,7 @@ def test_without_todo_the_report_is_unchanged(fmt: str) -> None:
     assert "TODO" not in render(report, fmt) or fmt in ("json", "yaml")
 
 
-@pytest.mark.parametrize("fmt", ["text", "markdown", "html", "jira", "confluence"])
+@pytest.mark.parametrize("fmt", ["text", "markdown", "html", "jira", "jira-cloud", "confluence"])
 def test_todo_is_the_last_section(fmt: str) -> None:
     out = render(report_with_extras(), fmt, todo=True)
     todo_at = out.index("TODO")
@@ -150,7 +150,7 @@ def test_wiki_todo_text_cannot_fake_a_status_icon(fmt: str) -> None:
     assert "|\\(/) done|" in out
 
 
-@pytest.mark.parametrize("fmt", ["text", "markdown", "html", "jira", "confluence"])
+@pytest.mark.parametrize("fmt", ["text", "markdown", "html", "jira", "jira-cloud", "confluence"])
 def test_todo_entries_stay_on_one_line(fmt: str) -> None:
     report = make_sample_report()
     report.results[0].findings[0].remediation = ["first line\n  second line"]

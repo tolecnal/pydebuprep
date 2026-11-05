@@ -37,8 +37,8 @@ _pydebuprep_first() {
     _arguments -s -S \
         '(--help -h)--help[show this help message and exit]' \
         '(--help -h)-h[show this help message and exit]' \
-        '(--format -f)--format=[output format]:format:(text json yaml html markdown jira confluence)' \
-        '(--format -f)-f[output format]:format:(text json yaml html markdown jira confluence)' \
+        '(--format -f)--format=[output format]:format:(text json yaml html markdown jira jira-legacy jira-cloud confluence)' \
+        '(--format -f)-f[output format]:format:(text json yaml html markdown jira jira-legacy jira-cloud confluence)' \
         '(--output --output-dir -o)--output-dir=[write the report to a timestamped file in DIR instead of stdout]:output-dir:_files -/' \
         '(--output --output-dir -o)--output=[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
         '(--output --output-dir -o)-o[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
@@ -65,8 +65,8 @@ _pydebuprep_report() {
     _arguments -s -S \
         '(--help -h)--help[show this help message and exit]' \
         '(--help -h)-h[show this help message and exit]' \
-        '(--format -f)--format=[output format]:format:(text json yaml html markdown jira confluence)' \
-        '(--format -f)-f[output format]:format:(text json yaml html markdown jira confluence)' \
+        '(--format -f)--format=[output format]:format:(text json yaml html markdown jira jira-legacy jira-cloud confluence)' \
+        '(--format -f)-f[output format]:format:(text json yaml html markdown jira jira-legacy jira-cloud confluence)' \
         '(--output --output-dir -o)--output-dir=[write the report to a timestamped file in DIR instead of stdout]:output-dir:_files -/' \
         '(--output --output-dir -o)--output=[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
         '(--output --output-dir -o)-o[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
@@ -92,8 +92,8 @@ _pydebuprep_convert() {
     _arguments -s -S \
         '(--help -h)--help[show this help message and exit]' \
         '(--help -h)-h[show this help message and exit]' \
-        '(--format -f)--format=[output format]:format:(text json yaml html markdown jira confluence)' \
-        '(--format -f)-f[output format]:format:(text json yaml html markdown jira confluence)' \
+        '(--format -f)--format=[output format]:format:(text json yaml html markdown jira jira-legacy jira-cloud confluence)' \
+        '(--format -f)-f[output format]:format:(text json yaml html markdown jira jira-legacy jira-cloud confluence)' \
         '(--output --output-dir -o)--output-dir=[write the report to a timestamped file in DIR instead of stdout]:output-dir:_files -/' \
         '(--output --output-dir -o)--output=[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \
         '(--output --output-dir -o)-o[write the report to FILE (a timestamp is added if FILE exists); '\''-'\'' means standard output, overriding a configured output_dir]:output:_files' \

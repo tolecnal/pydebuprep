@@ -120,9 +120,10 @@ and on the Ubuntu runner VMs, so `systemctl`, `journalctl`, `systemd-analyze`,
 `resolvectl`, `docker` and `efibootmgr` are now exercised; `AUDIT_EXPECT` fails the
 audit if one of them stops running.
 
-- [ ] Paste a report with `--todo` into real Jira and Confluence (0.11.0 shipped without
-      this, both being down for maintenance): the TODO tables and icons render, and
-      Confluence's `{status:colour=...|title=...}` doesn't split its table cell at the `|`.
+- [ ] Paste a report with `--todo` into real on-prem Jira, Jira Cloud (`jira-cloud`) and
+      Confluence: the TODO tables and icons render, and Confluence's
+      `{status:colour=...|title=...}` doesn't split its table cell at the `|`. Cloud
+      Confluence may not read wiki markup either, like Jira Cloud.
 - [ ] Still only on real hosts: `docker` on Debian (no runner VM), and the checks'
       behaviour on real hardware (RAID, multiple disks, physical NICs).
 

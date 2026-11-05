@@ -3,10 +3,20 @@
 from __future__ import annotations
 
 from pydebuprep.model import Report
-from pydebuprep.render import confluence, html, jira, json_, markdown, text, yaml_
+from pydebuprep.render import confluence, html, jira, jira_cloud, json_, markdown, text, yaml_
 from pydebuprep.render._common import clean_report, valid_utf8
 
-FORMATS = ("text", "json", "yaml", "html", "markdown", "jira", "confluence")
+FORMATS = (
+    "text",
+    "json",
+    "yaml",
+    "html",
+    "markdown",
+    "jira",
+    "jira-legacy",
+    "jira-cloud",
+    "confluence",
+)
 EXTENSIONS = {
     "text": "txt",
     "json": "json",
@@ -14,6 +24,8 @@ EXTENSIONS = {
     "html": "html",
     "markdown": "md",
     "jira": "jira.txt",
+    "jira-legacy": "jira.txt",
+    "jira-cloud": "jira-cloud.md",
     "confluence": "confluence.txt",
 }
 
@@ -34,8 +46,10 @@ def _render(report: Report, fmt: str, color: bool, todo: bool) -> str:
         return html.render(clean_report(report), todo=todo)
     if fmt == "markdown":
         return markdown.render(clean_report(report), todo=todo)
-    if fmt == "jira":
+    if fmt in ("jira", "jira-legacy"):
         return jira.render(clean_report(report), todo=todo)
+    if fmt == "jira-cloud":
+        return jira_cloud.render(clean_report(report), todo=todo)
     if fmt == "confluence":
         return confluence.render(clean_report(report), todo=todo)
     raise ValueError(f"unknown format: {fmt}")

@@ -83,7 +83,7 @@ extra: 1
     errors = exc.value.errors
     assert "bad.conf: unknown top-level key 'extra'" in errors
     assert (
-        "bad.conf: report.format: must be one of text, json, yaml, html, markdown, jira, confluence"
+        "bad.conf: report.format: must be one of text, json, yaml, html, markdown, jira, jira-legacy, jira-cloud, confluence"
         in errors
     )
     assert "bad.conf: report: unknown key 'colour'" in errors

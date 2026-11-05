@@ -15,10 +15,12 @@ from pydebuprep.render._common import (
     TodoItem,
     baseline_line,
     baseline_state,
+    bold_label,
     by_category,
     config_line,
     has_baseline_section,
-    host_line,
+    host_fields,
+    host_note,
     safe_url,
     todo_items,
 )
@@ -94,6 +96,17 @@ def todo_table(items: list[TodoItem], severity: Callable[[str], str]) -> list[st
     return rows
 
 
+def _bold(text: str) -> str:
+    return f"*{text}*"
+
+
+def _header(report: Report) -> list[str]:
+    fields = r" \| ".join(f"{_bold(k + ':')} {esc(v)}" for k, v in host_fields(report))
+    lines = [f"Generated: {report.generated_at}", baseline_line(report)]
+    lines += [line for line in [config_line(report)] if line]
+    return [fields + esc(host_note(report)), *(bold_label(ln, _bold, esc) for ln in lines)]
+
+
 def render_wiki(
     report: Report,
     *,
@@ -105,10 +118,7 @@ def render_wiki(
     out = [
         "h1. pydebuprep report",
         "",
-        esc(host_line(report)),
-        f"Generated: {esc(report.generated_at)}",
-        esc(baseline_line(report)),
-        *(esc(line) for line in [config_line(report)] if line),
+        *_header(report),
         "",
         "h2. Summary",
         "",

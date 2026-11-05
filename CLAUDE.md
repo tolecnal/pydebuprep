@@ -81,13 +81,13 @@ make coverage                          # pytest with 100% line AND branch covera
 6. **Untrusted input & output sanitization:**
    - Log lines, unit names, package names, container statuses, snapshot fields, and
      portal responses can contain terminal escape sequences (CSI/OSC) or markup.
-   - All human-readable renderers (`text`, `html`, `markdown`, `jira`, `confluence`)
+   - All human-readable renderers (`text`, `html`, `markdown`, `jira`, `jira_cloud`, `confluence`)
      must render `clean_report(report)`, which runs `clean()` over every text field in
      `Report`, `Host`, `BaselineInfo`, `ConfigInfo`, `CheckResult`, and `Finding`.
    - Stderr warnings derived from snapshots (`baseline_warnings`) or portal replies
      (`_excerpt`, `upload_report` location) must also pass through `clean()`.
    - `Finding.references` must be validated with `safe_url()` (`http://` or `https://`
      only, no whitespace, control characters, or `<>`) both when loading saved reports
-     (`reportfile.py`) and when rendering links (`html.py`, `markdown.py`, `_wiki.py`).
+     (`reportfile.py`) and when rendering links (`html.py`, `markdown.py`, `jira_cloud.py`, `_wiki.py`).
    - Always use `yaml.safe_load()` (never `yaml.load()`) and catch `RecursionError` on
      untrusted YAML/JSON inputs.
