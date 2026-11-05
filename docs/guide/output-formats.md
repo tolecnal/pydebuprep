@@ -11,7 +11,8 @@ its findings and its changes since the baseline, in the same order. Choose one w
 | `yaml` | the same, for humans | needs `python3-yaml`; can be converted later |
 | `html` | a browser, e-mail, a ticket attachment | one self-contained file, no scripts or external resources |
 | `markdown` | Git hosting, wikis, chat | |
-| `jira` | Jira issues and comments | Jira wiki markup |
+| `jira-cloud` | Jira Cloud issues and comments | Markdown that its editor converts when pasted |
+| `jira-legacy` | on-prem Jira issues and comments | Jira wiki markup; `jira` is another name for it |
 | `confluence` | Confluence pages | Confluence wiki markup, with status lozenges and panels |
 
 ```sh
@@ -25,18 +26,24 @@ control sequences. JSON and YAML carry the data as it is.
 
 ## Pasting into Jira or Confluence
 
-`--format jira` produces Jira wiki markup: paste it into an issue or comment (in
-the text editor, or the visual editor, which converts wiki markup on paste).
+Jira has two editors that need different text, so there are two formats:
+
+- `--format jira-cloud` is for Jira Cloud, whose editor doesn't read wiki markup. It
+  produces Markdown, which the editor converts when you paste it. Emoji show the severity,
+  as the editor has no pasted text colour: 🔴 critical, 🟠 warning, 🔵 info.
+- `--format jira-legacy`, or `--format jira`, is for on-prem Jira. It produces Jira wiki
+  markup: switch the comment to text mode and paste it there.
+
 `--format confluence` produces Confluence wiki markup; insert it with
-**Insert → Markup → Confluence wiki**. The two dialects differ, so use the one that
+**Insert → Markup → Confluence wiki**. The dialects differ, so use the one that
 matches where you paste.
 
 ```sh
-sudo pydebuprep --format jira -o - | xclip -selection clipboard
+sudo pydebuprep --format jira-cloud -o - | xclip -selection clipboard
 ```
 
 Jira refuses a description or comment over 32,767 characters, which a host with
-hundreds of findings can exceed. The `jira` format stays within 32,000 bytes. When a
+hundreds of findings can exceed. Both Jira formats stay within 32,000 bytes. When a
 report doesn't fit, it's rendered shorter, in steps, until it does:
 
 1. evidence and remediation lists are cut to 5 lines each;
@@ -49,8 +56,7 @@ Jira's size limit". If even the titles don't fit, the text is cut and ends with 
 saying so. The other formats are never shortened; `pydebuprep convert` makes any of
 them from a saved JSON report.
 
-Both were written against the documented markup; check the result in your own
-Jira or Confluence version before relying on the layout.
+Check the result in your own Jira or Confluence version before relying on the layout.
 
 ## A TODO list to track the fixes
 
@@ -81,7 +87,7 @@ TODO
 - one item per **critical** and **warning** finding — critical first, changes since
   the baseline included — naming its check;
 - the finding's **remediation steps as sub-items**, so you can tick off partial
-  progress (Jira and Confluence number them in the row's Fix column);
+  progress (the Jira and Confluence formats number them in the row's Fix column);
 - an item for each check that **failed to run**, since it may hide problems;
 - a reminder to **run as root** if checks were skipped for lack of it;
 - a final **confirmation run**.
@@ -96,7 +102,8 @@ hidden by `--min-severity`. With nothing to do, the section says so.
 | text | `[ ]` items with indented `[ ]` steps |
 | markdown | task lists (`- [ ]`), which GitHub, GitLab and many wikis render as tickable checkboxes |
 | html | real checkboxes you can tick in the browser (nothing is saved; the page has no script) |
-| jira, confluence | a table with one row per item and its steps in the Fix column. Wiki markup has no checkbox, so each row starts with the `(-)` icon for unresolved: change it to `(!)` for something that needs attention, or `(/)` when it's resolved |
+| jira, jira-legacy, confluence | a table with one row per item and its steps in the Fix column. Wiki markup has no checkbox, so each row starts with the `(-)` icon for unresolved: change it to `(!)` for something that needs attention, or `(/)` when it's resolved |
+| jira-cloud | the same table. Action items don't convert when pasted, so each row starts with ➖ for unresolved: change it to ⚠️ for something that needs attention, or ✅ when it's resolved |
 | json, yaml | a `todo` array of `{severity, check, title, steps}` for your own tooling |
 
 `--no-todo` leaves it out for one run when the configuration turns it on.

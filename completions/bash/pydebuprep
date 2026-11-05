@@ -83,7 +83,7 @@ _pydebuprep() {
 
     case $prev in
         --format|-f)
-            mapfile -t COMPREPLY < <(compgen -W "text json yaml html markdown jira confluence" -- "$cur")
+            mapfile -t COMPREPLY < <(compgen -W "text json yaml html markdown jira jira-legacy jira-cloud confluence" -- "$cur")
             return
             ;;
         --output-dir|--snapshot-dir)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import groupby
 from typing import Any
@@ -137,14 +138,32 @@ def by_category(report: Report) -> list[tuple[str, list[CheckResult]]]:
     return [(cat, list(items)) for cat, items in groupby(report.results, key=lambda r: r.category)]
 
 
-def host_line(report: Report) -> str:
+def host_fields(report: Report) -> list[tuple[str, str]]:
     h = report.host
-    root = "" if h.is_root else " (not run as root: some checks skipped)"
-    machine = "" if h.machine_id is None else f" | Machine: {h.machine_id}"
-    return (
-        f"Host: {h.hostname} | OS: {h.os_id} {h.os_version} ({h.codename}) | "
-        f"Kernel: {h.kernel}{machine}{root}"
-    )
+    fields = [
+        ("Host", h.hostname),
+        ("OS", f"{h.os_id} {h.os_version} ({h.codename})"),
+        ("Kernel", h.kernel),
+    ]
+    return fields if h.machine_id is None else [*fields, ("Machine", h.machine_id)]
+
+
+def host_note(report: Report) -> str:
+    return "" if report.host.is_root else " (not run as root: some checks skipped)"
+
+
+def host_line(report: Report) -> str:
+    fields = " | ".join(f"{label}: {value}" for label, value in host_fields(report))
+    return fields + host_note(report)
+
+
+def bold_label(line: str, bold: Callable[[str], str], esc: Callable[[str], str]) -> str:
+    """LINE with its "Label:" in BOLD and the rest through ESC. A line that is a sentence, like
+    the note about a stale config, has no label."""
+    label, colon, rest = line.partition(": ")
+    if colon and label.isalpha():
+        return f"{bold(label + ':')} {esc(rest)}"
+    return esc(line)
 
 
 def baseline_line(report: Report) -> str:
@@ -181,7 +200,7 @@ CONFIRM = "Run pydebuprep again to confirm everything is fixed"
 NOTHING_TO_DO = "Nothing to do."
 
 
-def _one_line(text: str) -> str:
+def one_line(text: str) -> str:
     return re.sub(r"\s*\n\s*", " ", text.strip())
 
 
@@ -206,14 +225,14 @@ def todo_items(report: Report) -> list[TodoItem]:
     checks that failed to run, a root re-run if root checks were skipped, and a final
     confirmation run. Info findings are for awareness, not action. Empty if nothing."""
     items = [
-        TodoItem(_one_line(f.title), severity.value, r.id, [_one_line(s) for s in f.remediation])
+        TodoItem(one_line(f.title), severity.value, r.id, [one_line(s) for s in f.remediation])
         for severity in (Severity.CRITICAL, Severity.WARNING)
         for r in report.results
         for f in [*r.findings, *(r.baseline_diff or [])]
         if f.severity == severity
     ]
     items += [
-        TodoItem(f"Find out why {r.id} failed to run: {_one_line(r.error or '')}", check=r.id)
+        TodoItem(f"Find out why {r.id} failed to run: {one_line(r.error or '')}", check=r.id)
         for r in report.results
         if r.status == Status.ERROR
     ]

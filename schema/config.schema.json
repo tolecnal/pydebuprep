@@ -927,7 +927,7 @@
           "type": "boolean"
         },
         "format": {
-          "description": "Output format: text, json, yaml, html, markdown, jira, confluence",
+          "description": "Output format: text, json, yaml, html, markdown, jira, jira-legacy, jira-cloud, confluence",
           "enum": [
             "text",
             "json",
@@ -935,6 +935,8 @@
             "html",
             "markdown",
             "jira",
+            "jira-legacy",
+            "jira-cloud",
             "confluence"
           ]
         },

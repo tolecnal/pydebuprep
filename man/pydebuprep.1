@@ -144,8 +144,10 @@ for other installations.
 .BR \-f ", " \-\-format " " \fIFORMAT\fR
 Output format:
 .BR text " (default), " json ", " yaml ", " html ", " markdown ,
-.B jira
-(Jira wiki markup) or
+.B jira\-cloud
+(Markdown for pasting into Jira Cloud),
+.BR jira\-legacy " or " jira
+(Jira wiki markup for on\-prem Jira, in text mode) or
 .B confluence
 (Confluence wiki markup, for Insert > Markup > Confluence wiki).
 All formats contain the same information in the same order.
@@ -571,7 +573,7 @@ Copy a report to the clipboard to paste into a Jira issue:
 .PP
 .nf
 .RS
-sudo pydebuprep \-\-format jira \-o \- | xclip \-selection clipboard
+sudo pydebuprep \-\-format jira\-cloud \-o \- | xclip \-selection clipboard
 .RE
 .fi
 .PP

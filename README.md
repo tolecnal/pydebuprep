@@ -126,7 +126,7 @@ sudo pydebuprep report --format html --output-dir /var/tmp
 
 | Option | Effect |
 |---|---|
-| `--format text\|json\|yaml\|html\|markdown\|jira\|confluence` | Output format (default `text`). Every format has the same structure. |
+| `--format text\|json\|yaml\|html\|markdown\|jira\|jira-legacy\|jira-cloud\|confluence` | Output format (default `text`). Every format has the same structure. |
 | `--output-dir DIR` | Write to a timestamped file in `DIR` instead of stdout. |
 | `--output FILE` | Write to `FILE`; if it exists, a timestamp is added instead of overwriting. `-o -` forces standard output even when the config sets `output_dir`. |
 | `--baseline FILE` / `--no-baseline` | Compare against this snapshot instead of the newest one, or against none. |
@@ -150,7 +150,7 @@ off; an item for each check that failed to run; a reminder to run as root if che
 were skipped for that; and a final "run pydebuprep again" item. Info findings are
 left out. Markdown renders it as a task list (tickable on GitHub and GitLab), HTML as
 checkboxes, text as `[ ]`, Jira and Confluence as a table whose `(-)` icons you change
-to `(!)` or `(/)` as you go, and JSON/YAML add a `todo` array for tools. `convert --todo` adds it to a saved report.
+to `(!)` or `(/)` as you go (➖, ⚠️ and ✅ in `jira-cloud`), and JSON/YAML add a `todo` array for tools. `convert --todo` adds it to a saved report.
 
 ### Converting a saved report
 
@@ -195,16 +195,17 @@ internal CA. The report and config formats are published as JSON Schemas in
 
 ### Pasting into Jira or Confluence
 
-`--format jira` produces Jira wiki markup: paste it into an issue or comment
-(in the text editor, or the visual editor, which converts wiki markup on paste).
+`--format jira-cloud` produces Markdown for Jira Cloud, whose editor converts it when
+pasted but doesn't read wiki markup; emoji show the severity. `--format jira-legacy`, or
+`--format jira`, produces Jira wiki markup for on-prem Jira: paste it into an issue or
+comment in text mode.
 `--format confluence` produces Confluence wiki markup with status lozenges and
 info/note/warning panels; insert it with **Insert → Markup → Confluence wiki**.
-The two dialects differ, so use the one that matches where you paste. Both were
-written against the documented markup; check them in your own Jira/Confluence
-version before relying on the layout.
+The dialects differ, so use the one that matches where you paste, and check the
+result in your own Jira or Confluence version before relying on the layout.
 
 ```sh
-sudo pydebuprep --format jira -o - | xclip -selection clipboard
+sudo pydebuprep --format jira-cloud -o - | xclip -selection clipboard
 ```
 
 ## Configuration
