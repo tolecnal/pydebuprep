@@ -1,6 +1,6 @@
 # Backlog
 
-What is still open, as of 2026-11-05 (after pydebuprep 0.10.0 and portal 0.6.0). Remove items as they are done.
+What is still open, as of 2026-11-05 (after pydebuprep 0.11.0 and the portal release built on it). Remove items as they are done.
 
 ## GitHub repository settings
 
@@ -120,6 +120,9 @@ and on the Ubuntu runner VMs, so `systemctl`, `journalctl`, `systemd-analyze`,
 `resolvectl`, `docker` and `efibootmgr` are now exercised; `AUDIT_EXPECT` fails the
 audit if one of them stops running.
 
+- [ ] Paste a report with `--todo` into real Jira and Confluence (0.11.0 shipped without
+      this, both being down for maintenance): the TODO tables and icons render, and
+      Confluence's `{status:colour=...|title=...}` doesn't split its table cell at the `|`.
 - [ ] Still only on real hosts: `docker` on Debian (no runner VM), and the checks'
       behaviour on real hardware (RAID, multiple disks, physical NICs).
 
