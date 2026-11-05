@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 
 import pytest
 import yaml
 
 from conftest import make_sample_report
-from pydebuprep.model import Finding, Severity
+from pydebuprep.model import CheckResult, Finding, Report, Severity, Status
 from pydebuprep.render import EXTENSIONS, FORMATS, render
+from pydebuprep.render.text import COLORS as TEXT_COLORS
+from pydebuprep.render.text import RESET
 
 
 def expected_sequence() -> list[str]:
@@ -296,3 +299,69 @@ def test_jira_cut_as_a_last_resort() -> None:
     assert out.rstrip().endswith(
         "Cut off at Jira's size limit; the full report is in the other formats._"
     )
+
+
+def _with_worst(severity: Severity | None) -> Report:
+    """One check with findings whose worst severity is SEVERITY (None: all hidden)."""
+    findings = [Finding(Severity.INFO, "a note")]
+    if severity is None:
+        findings = []
+    elif severity is not Severity.INFO:
+        findings.append(Finding(severity, "a problem"))
+    report = make_sample_report()
+    result = CheckResult("demo", "Demo", "system", Status.FINDINGS, findings=findings)
+    return dataclasses.replace(report, results=[result])
+
+
+@pytest.mark.parametrize(
+    ("severity", "colour"),
+    [(Severity.CRITICAL, "#de350b"), (Severity.WARNING, "#ff991f"), (Severity.INFO, "#0052cc")],
+)
+def test_jira_status_colour_follows_the_worst_finding(severity: Severity, colour: str) -> None:
+    out = render(_with_worst(severity), "jira")
+    assert f"Status: {{color:{colour}}}*FINDINGS*{{color}}" in out
+
+
+def test_jira_warning_report_has_no_red() -> None:
+    assert "#de350b" not in render(_with_worst(Severity.WARNING), "jira")
+
+
+def test_jira_status_counts_baseline_changes() -> None:
+    report = _with_worst(Severity.INFO)
+    report.results[0].baseline_diff = [Finding(Severity.CRITICAL, "new since baseline")]
+    assert "Status: {color:#de350b}*FINDINGS*{color}" in render(report, "jira")
+
+
+def test_jira_status_is_neutral_when_every_finding_is_hidden() -> None:
+    assert "Status: {color:#6b778c}*FINDINGS*{color}" in render(_with_worst(None), "jira")
+
+
+@pytest.mark.parametrize(
+    ("severity", "colour"),
+    [(Severity.CRITICAL, "Red"), (Severity.WARNING, "Yellow"), (Severity.INFO, "Blue")],
+)
+def test_confluence_status_colour_follows_the_worst_finding(
+    severity: Severity, colour: str
+) -> None:
+    out = render(_with_worst(severity), "confluence")
+    assert f"{{status:colour={colour}|title=FINDINGS}}" in out
+
+
+def test_text_status_colour_follows_the_worst_finding() -> None:
+    out = render(_with_worst(Severity.WARNING), "text", color=True)
+    assert f"{TEXT_COLORS['warning']}[FINDINGS]{RESET} demo" in out
+
+
+def test_text_error_is_red_like_the_other_formats() -> None:
+    assert TEXT_COLORS["error"] == TEXT_COLORS["critical"]
+
+
+def test_html_status_colour_follows_the_worst_finding() -> None:
+    out = render(_with_worst(Severity.WARNING), "html")
+    assert '<span class="warning">[findings]</span>' in out
+
+
+def test_html_warning_is_orange() -> None:
+    out = render(_with_worst(Severity.WARNING), "html")
+    assert "--warning:#b45309" in out
+    assert "--warning:#ffa657" in out

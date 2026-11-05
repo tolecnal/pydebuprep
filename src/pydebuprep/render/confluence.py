@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pydebuprep.model import CheckResult, Finding, Report
+from pydebuprep.render._common import status_colour
 from pydebuprep.render._wiki import esc, finding_body, render_wiki
 
 STATUS_COLOURS = {
@@ -10,19 +11,18 @@ STATUS_COLOURS = {
     "warning": "Yellow",
     "info": "Blue",
     "ok": "Green",
-    "findings": "Red",
     "skipped": "Grey",
     "error": "Red",
 }
 PANELS = {"critical": "warning", "warning": "note", "info": "info"}
 
 
-def _status(word: str) -> str:
-    return f"{{status:colour={STATUS_COLOURS[word]}|title={word.upper()}}}"
+def _status(word: str, colour: str | None = None) -> str:
+    return f"{{status:colour={STATUS_COLOURS[colour or word]}|title={word.upper()}}}"
 
 
 def _check_heading(r: CheckResult) -> list[str]:
-    return [f"h3. {esc(r.id)} - {esc(r.title)} {_status(r.status.value)}"]
+    return [f"h3. {esc(r.id)} - {esc(r.title)} {_status(r.status.value, status_colour(r))}"]
 
 
 def _finding(f: Finding) -> list[str]:
@@ -37,4 +37,6 @@ def _finding(f: Finding) -> list[str]:
 
 
 def render(report: Report, *, todo: bool = False) -> str:
-    return render_wiki(report, check_heading=_check_heading, finding=_finding, todo=todo)
+    return render_wiki(
+        report, check_heading=_check_heading, finding=_finding, severity=_status, todo=todo
+    )

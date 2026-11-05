@@ -9,18 +9,19 @@ from pydebuprep.render._common import (
     config_line,
     has_baseline_section,
     host_line,
+    status_colour,
     summary_line,
     todo_items,
 )
 
+# The same meanings as the other formats: red, orange, blue, green, grey.
 COLORS = {
     "critical": "\x1b[1;31m",
-    "warning": "\x1b[1;33m",
-    "info": "\x1b[36m",
+    "warning": "\x1b[1;38;5;208m",
+    "info": "\x1b[38;5;33m",
     "ok": "\x1b[32m",
     "skipped": "\x1b[2m",
-    "error": "\x1b[1;35m",
-    "findings": "\x1b[1m",
+    "error": "\x1b[1;31m",
 }
 RESET = "\x1b[0m"
 
@@ -56,7 +57,7 @@ def render(report: Report, *, color: bool = False, todo: bool = False) -> str:
     for category, results in by_category(report):
         out += ["", category.upper(), "-" * len(category)]
         for r in results:
-            status = _paint(f"[{r.status.value.upper()}]", r.status.value, color)
+            status = _paint(f"[{r.status.value.upper()}]", status_colour(r), color)
             out.append(f"{status} {r.id} - {r.title}")
             if r.skipped_reason:
                 out.append(f"  Skipped: {r.skipped_reason}")
@@ -77,6 +78,11 @@ def render(report: Report, *, color: bool = False, todo: bool = False) -> str:
         items = todo_items(report)
         out += [NOTHING_TO_DO] if not items else []
         for item in items:
-            out.append(f"[ ] {item.label}")
+            label = (
+                f"{_paint(item.severity.upper(), item.severity, color)} {item.check}: {item.title}"
+                if item.severity
+                else item.title
+            )
+            out.append(f"[ ] {label}")
             out.extend(f"    [ ] {step}" for step in item.steps)
     return "\n".join(out) + "\n"
