@@ -1,3 +1,23 @@
+pydebuprep (0.12.0) unstable; urgency=medium
+
+  * New format jira-cloud: Markdown for pasting into Jira Cloud, whose editor
+    shows wiki markup as plain text. Emoji carry the severity and status
+    (red critical, orange warning, blue info), because a paste can't set
+    text colour. The TODO list (--todo) is a table whose rows start with a
+    minus sign icon for unresolved, to change to a warning sign or a check
+    mark by hand. It stays within the same size limit as the wiki markup.
+  * New format jira-legacy: the existing wiki markup, for on-prem Jira, pasted
+    with the comment in text mode. --format jira is another name for it, so
+    existing commands and configurations keep working. Use jira-cloud if you
+    are on Jira Cloud. A host needs this version before a portal's config can
+    set either new format; older versions reject it.
+  * The labels in the report header (Host, OS, Kernel, Machine, Generated,
+    Baseline and Config) are bold in the Jira and Confluence formats.
+  * The report format is unchanged: portal 0.3.0 and newer take these
+    reports.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Thu, 05 Nov 2026 18:24:27 +0100
+
 pydebuprep (0.11.0) unstable; urgency=medium
 
   * A check's FINDINGS status now takes the colour of its worst finding, so
