@@ -81,7 +81,7 @@ TODO
 - one item per **critical** and **warning** finding — critical first, changes since
   the baseline included — naming its check;
 - the finding's **remediation steps as sub-items**, so you can tick off partial
-  progress;
+  progress (Jira and Confluence number them in the row's Fix column);
 - an item for each check that **failed to run**, since it may hide problems;
 - a reminder to **run as root** if checks were skipped for lack of it;
 - a final **confirmation run**.
@@ -96,7 +96,7 @@ hidden by `--min-severity`. With nothing to do, the section says so.
 | text | `[ ]` items with indented `[ ]` steps |
 | markdown | task lists (`- [ ]`), which GitHub, GitLab and many wikis render as tickable checkboxes |
 | html | real checkboxes you can tick in the browser (nothing is saved; the page has no script) |
-| jira, confluence | ☐ bullets — their wiki markup has no checkbox |
+| jira, confluence | a table with one row per item and its steps in the Fix column. Wiki markup has no checkbox, so each row starts with the `(-)` icon for unresolved: change it to `(!)` for something that needs attention, or `(/)` when it's resolved |
 | json, yaml | a `todo` array of `{severity, check, title, steps}` for your own tooling |
 
 `--no-todo` leaves it out for one run when the configuration turns it on.

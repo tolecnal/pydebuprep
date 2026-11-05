@@ -12,6 +12,7 @@ from conftest import make_sample_report
 from pydebuprep.model import CheckResult, Finding, Report, Severity, Status
 from pydebuprep.render import FORMATS, render
 from pydebuprep.render._common import todo_items
+from pydebuprep.render.text import COLORS, RESET
 from pydebuprep.reportfile import load_report
 
 CONFIRM = "Run pydebuprep again to confirm everything is fixed"
@@ -107,12 +108,67 @@ def test_html_checkboxes_without_script() -> None:
     assert "<script" not in out
 
 
-@pytest.mark.parametrize("fmt", ["jira", "confluence"])
-def test_wiki_checklists(fmt: str) -> None:
+@pytest.mark.parametrize(
+    ("fmt", "critical"),
+    [
+        ("jira", "{color:#de350b}*CRITICAL*{color}"),
+        ("confluence", "{status:colour=Red|title=CRITICAL}"),
+    ],
+)
+def test_wiki_todo_is_a_table_with_status_icons(fmt: str, critical: str) -> None:
     out = render(report_with_extras(), fmt, todo=True)
-    assert "h2. TODO" in out
-    assert "* ☐ *CRITICAL* apt-sources: Repository still targets bookworm" in out
-    assert "** ☐ Edit /etc/apt/sources.list: change bookworm to trixie" in out
+    tail = out[out.index("h2. TODO") :]
+    assert "||Status||Severity||Check||Finding||Fix||\n" in tail
+    assert (
+        f"|(-)|{critical}|{{{{apt-sources}}}}|Repository still targets bookworm|"
+        "1. Edit /etc/apt/sources.list: change bookworm to trixie|\n"
+    ) in tail
+    assert f"|(-)| | |{CONFIRM}| |\n" in tail
+    assert "|(-)| |{{dkms}}|Find out why dkms failed to run: dkms timed out| |\n" in tail
+    assert "(-) unresolved, (!) needs attention, (/) resolved" in tail
+    assert "\u2610" not in out
+
+
+def test_jira_todo_warning_is_orange() -> None:
+    out = render(report_with_extras(), "jira", todo=True)
+    assert "|(-)|{color:#ff991f}*WARNING*{color}|{{apt-sources}}|" in out
+
+
+@pytest.mark.parametrize("fmt", ["jira", "confluence"])
+def test_wiki_todo_steps_share_a_cell(fmt: str) -> None:
+    report = make_sample_report()
+    report.results[0].findings[0].remediation = ["First a|b", "Second"]
+    out = render(report, fmt, todo=True)
+    assert "|1. First a\\|b \\\\ 2. Second|\n" in out
+
+
+@pytest.mark.parametrize("fmt", ["jira", "confluence"])
+def test_wiki_todo_text_cannot_fake_a_status_icon(fmt: str) -> None:
+    report = make_sample_report()
+    report.results[0].findings[0].title = "(/) done"
+    out = render(report, fmt, todo=True)
+    assert "|\\(/) done|" in out
+
+
+@pytest.mark.parametrize("fmt", ["text", "markdown", "html", "jira", "confluence"])
+def test_todo_entries_stay_on_one_line(fmt: str) -> None:
+    report = make_sample_report()
+    report.results[0].findings[0].remediation = ["first line\n  second line"]
+    report.results.append(
+        CheckResult("dkms", "DKMS", "boot", Status.ERROR, error="timed out\nafter 60s")
+    )
+    out = render(report, fmt, todo=True)
+    tail = out[out.rindex("TODO") :]
+    assert "first line second line" in tail
+    assert "timed out after 60s" in tail
+
+
+def test_text_todo_severity_uses_the_report_colours() -> None:
+    out = render(report_with_extras(), "text", todo=True, color=True)
+    tail = out[out.index("TODO") :]
+    assert f"[ ] {COLORS['critical']}CRITICAL{RESET} apt-sources:" in tail
+    assert f"[ ] {COLORS['warning']}WARNING{RESET} apt-sources:" in tail
+    assert f"[ ] {CONFIRM}\n" in tail
 
 
 @pytest.mark.parametrize("fmt", ["json", "yaml"])

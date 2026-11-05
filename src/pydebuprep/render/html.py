@@ -12,6 +12,7 @@ from pydebuprep.render._common import (
     has_baseline_section,
     host_line,
     safe_url,
+    status_colour,
     summary_line,
     todo_items,
 )
@@ -19,10 +20,10 @@ from pydebuprep.render._common import (
 STYLE = """
 ul.todo, ul.todo ul { list-style: none; padding-left: 1.2em; }
 :root { --bg:#ffffff; --fg:#1d1f21; --muted:#5f6368; --line:#d9dce1; --code:#f4f5f7;
-  --critical:#b3261e; --warning:#8a5a00; --info:#0b5cad; --ok:#1e7d32; }
+  --critical:#b3261e; --warning:#b45309; --info:#0b5cad; --ok:#1e7d32; }
 @media (prefers-color-scheme: dark) {
   :root { --bg:#16181b; --fg:#e6e7e9; --muted:#9aa0a6; --line:#33373d; --code:#202328;
-    --critical:#f2847c; --warning:#f0bf5a; --info:#7cb7f5; --ok:#7fd189; }
+    --critical:#f2847c; --warning:#ffa657; --info:#7cb7f5; --ok:#7fd189; }
 }
 body { background:var(--bg); color:var(--fg); margin:0 auto; max-width:60rem;
   padding:1.5rem 1rem; font:15px/1.5 system-ui, sans-serif; }
@@ -33,6 +34,7 @@ pre { padding:.5rem .75rem; overflow-x:auto; white-space:pre-wrap; word-break:br
 .sev { font-weight:700; text-transform:uppercase; }
 .critical { color:var(--critical); } .warning { color:var(--warning); }
 .info { color:var(--info); } .ok { color:var(--ok); }
+.error { color:var(--critical); } .skipped { color:var(--muted); }
 .finding { border-left:3px solid var(--line); padding-left:.75rem; margin:.5rem 0; }
 .finding.critical-b { border-color:var(--critical); }
 .finding.warning-b { border-color:var(--warning); }
@@ -89,7 +91,7 @@ def render(report: Report, *, todo: bool = False) -> str:
         for r in results:
             out.append(
                 f"<section><h3><code>{escape(r.id)}</code> - {escape(r.title)} "
-                f'<span class="muted">[{r.status.value}]</span></h3>'
+                f'<span class="{status_colour(r)}">[{r.status.value}]</span></h3>'
             )
             if r.skipped_reason:
                 out.append(f'<p class="muted">Skipped: {escape(r.skipped_reason)}</p>')

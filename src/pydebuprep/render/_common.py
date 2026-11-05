@@ -123,6 +123,16 @@ def baseline_state(report: Report, result: CheckResult) -> str | None:
     return None
 
 
+def status_colour(result: CheckResult) -> str:
+    """Which colour a check's status takes: "findings" follows the worst finding shown, so
+    a check with only warnings is never painted like a critical one. With every finding
+    hidden (--min-severity), it takes the neutral colour of "skipped"."""
+    if result.status is not Status.FINDINGS:
+        return str(result.status.value)
+    shown = [f.severity for f in [*result.findings, *(result.baseline_diff or [])]]
+    return str(max(shown, key=lambda s: s.rank).value if shown else Status.SKIPPED.value)
+
+
 def by_category(report: Report) -> list[tuple[str, list[CheckResult]]]:
     return [(cat, list(items)) for cat, items in groupby(report.results, key=lambda r: r.category)]
 
@@ -171,19 +181,16 @@ CONFIRM = "Run pydebuprep again to confirm everything is fixed"
 NOTHING_TO_DO = "Nothing to do."
 
 
+def _one_line(text: str) -> str:
+    return re.sub(r"\s*\n\s*", " ", text.strip())
+
+
 @dataclass
 class TodoItem:
     title: str
     severity: str | None = None
     check: str | None = None
     steps: list[str] = field(default_factory=list)
-
-    @property
-    def label(self) -> str:
-        """The item as one line of plain text."""
-        if self.severity:
-            return f"{self.severity.upper()} {self.check}: {self.title}"
-        return self.title
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -199,14 +206,14 @@ def todo_items(report: Report) -> list[TodoItem]:
     checks that failed to run, a root re-run if root checks were skipped, and a final
     confirmation run. Info findings are for awareness, not action. Empty if nothing."""
     items = [
-        TodoItem(f.title, severity.value, r.id, list(f.remediation))
+        TodoItem(_one_line(f.title), severity.value, r.id, [_one_line(s) for s in f.remediation])
         for severity in (Severity.CRITICAL, Severity.WARNING)
         for r in report.results
         for f in [*r.findings, *(r.baseline_diff or [])]
         if f.severity == severity
     ]
     items += [
-        TodoItem(f"Find out why {r.id} failed to run: {r.error}", check=r.id)
+        TodoItem(f"Find out why {r.id} failed to run: {_one_line(r.error or '')}", check=r.id)
         for r in report.results
         if r.status == Status.ERROR
     ]

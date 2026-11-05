@@ -149,8 +149,8 @@ or warning finding (critical first), with its remediation steps as sub-items to 
 off; an item for each check that failed to run; a reminder to run as root if checks
 were skipped for that; and a final "run pydebuprep again" item. Info findings are
 left out. Markdown renders it as a task list (tickable on GitHub and GitLab), HTML as
-checkboxes, text as `[ ]`, Jira and Confluence as ☐ bullets, and JSON/YAML add a
-`todo` array for tools. `convert --todo` adds it to a saved report.
+checkboxes, text as `[ ]`, Jira and Confluence as a table whose `(-)` icons you change
+to `(!)` or `(/)` as you go, and JSON/YAML add a `todo` array for tools. `convert --todo` adds it to a saved report.
 
 ### Converting a saved report
 

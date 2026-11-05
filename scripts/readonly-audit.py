@@ -6,7 +6,7 @@ every call that could change persistent state. Allowed: temporary files and
 directories under /tmp that are deleted again before the run ends, anonymous O_TMPFILE
 files, writes to /dev/null and terminals, signal 0 (an existence probe), the paths
 passed with --allow (the snapshot directory for `pydebuprep snapshot`), and the side
-effects agreed with the user (AGREED_WRITES, documented in docs/about/read-only.md under
+effects agreed with the user (AGREED_WRITES, documented in docs/about/what-it-changes.md under
 "Agreed side effects"): those only by the program they were agreed for, or a process it
 started. A failed call
 changed nothing and is ignored, except under a --strict prefix, where even an attempt

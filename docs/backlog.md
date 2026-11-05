@@ -1,6 +1,6 @@
 # Backlog
 
-What is still open, as of 2026-11-03 (after pydebuprep 0.10.0 and portal 0.6.0). Remove items as they are done.
+What is still open, as of 2026-11-05 (after pydebuprep 0.10.0 and portal 0.6.0). Remove items as they are done.
 
 ## GitHub repository settings
 
@@ -10,7 +10,8 @@ an advanced setup), and these rulesets next to the owner's `protet-main-branch`
 (no deletion or force-push of `main`):
 
 - `main: pull requests and checks`: changes go through a pull request; tests on all
-  Python versions and the Security/CodeQL jobs must pass.
+  Python versions, the Security/CodeQL jobs and, since 2026-11-05, the package audits
+  (plain and systemd containers) on Ubuntu 22.04 and 26.04 and Debian 13 must pass.
 - `release tags: admins only, immutable`: only admins create `v*` tags, and they can't
   be moved or deleted.
 
@@ -132,5 +133,12 @@ audit if one of them stops running.
 - Container images in workflows track tags (`debian:bookworm`, `ubuntu:24.04`, ...)
   rather than digests, so builds get current security updates; Dependabot cannot
   update digests inside workflow files. CI's weekly run audits against them.
+- Since 2026-11-03, to keep CI short: pull requests audit Ubuntu 22.04 and 26.04 and
+  Debian 13 (and only the Ubuntu 24.04 runner VM) and skip the package's own test run;
+  CI no longer runs on merges to `main`. A release, the weekly run and a manual run
+  audit everything, so a problem on the other releases can first show up there. Revisit
+  if that happens often.
+  The portal's CI matches: no run on merges, weekly instead, and its Release now runs
+  the lint and test jobs before building the image.
 - The Release workflow builds the `.deb` once on Debian 12 and installs that same
   file everywhere. Revisit if a dependency ever needs a per-release build.

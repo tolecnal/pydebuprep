@@ -77,6 +77,11 @@ Every pull request builds the site; merges to `main` publish it.
    `AGREED_WRITES` in `scripts/readonly-audit.py` and a row under
    [Agreed side effects](what-it-changes.md#agreed-side-effects).
 
+Pull requests audit the oldest and newest supported releases and Debian 13; if a change
+may behave differently elsewhere, run CI by hand on the branch (Actions, CI, Run
+workflow) for every supported release. The weekly run and every release cover them
+all anyway.
+
 ## Security guardrails
 
 pydebuprep runs as root and inspects directories where unprivileged users can create

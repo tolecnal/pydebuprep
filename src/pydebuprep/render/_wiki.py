@@ -12,6 +12,7 @@ from collections.abc import Callable
 from pydebuprep.model import CheckResult, Finding, Report
 from pydebuprep.render._common import (
     NOTHING_TO_DO,
+    TodoItem,
     baseline_line,
     baseline_state,
     by_category,
@@ -30,8 +31,12 @@ _EMOTICON = re.compile(r"\((?=(?:[ynix/?-]|on|off|\\[!+]|\\\*[rgby]?)\))")
 # Block markup that only works at the start of a line.
 _BLOCK_START = re.compile(r"^(?=h[1-6]\.|bq\.)")
 ZERO_WIDTH_SPACE = "\u200b"
-# Wiki markup has no checkbox; an empty ballot box shows in both products.
-BALLOT_BOX = "\u2610"
+# Wiki markup has no checkbox. Every row starts with this icon, which whoever works through
+# the list replaces, in Jira and Confluence alike.
+OPEN = "(-)"
+TODO_LEGEND = "Change a row's icon as you go: (-) unresolved, (!) needs attention, (/) resolved."
+LINE_BREAK = " \\\\ "
+EMPTY_CELL = " "
 
 
 def esc(text: str) -> str:
@@ -74,11 +79,27 @@ def summary_table(report: Report) -> list[str]:
     ]
 
 
+def todo_table(items: list[TodoItem], severity: Callable[[str], str]) -> list[str]:
+    rows = [TODO_LEGEND, "", "||Status||Severity||Check||Finding||Fix||"]
+    for item in items:
+        steps = LINE_BREAK.join(f"{n}. {esc(step)}" for n, step in enumerate(item.steps, 1))
+        cells = (
+            OPEN,
+            severity(item.severity) if item.severity else EMPTY_CELL,
+            f"{{{{{esc(item.check)}}}}}" if item.check else EMPTY_CELL,
+            esc(item.title),
+            steps or EMPTY_CELL,
+        )
+        rows.append(f"|{'|'.join(cells)}|")
+    return rows
+
+
 def render_wiki(
     report: Report,
     *,
     check_heading: Callable[[CheckResult], list[str]],
     finding: Callable[[Finding], list[str]],
+    severity: Callable[[str], str],
     todo: bool = False,
 ) -> str:
     out = [
@@ -114,13 +135,5 @@ def render_wiki(
     if todo:
         out += ["", "h2. TODO", ""]
         items = todo_items(report)
-        out += [NOTHING_TO_DO] if not items else []
-        for item in items:
-            label = (
-                f"*{item.severity.upper()}* {esc(item.check or '')}: {esc(item.title)}"
-                if item.severity
-                else esc(item.title)
-            )
-            out.append(f"* {BALLOT_BOX} {label}")
-            out.extend(f"** {BALLOT_BOX} {esc(step)}" for step in item.steps)
+        out += todo_table(items, severity) if items else [NOTHING_TO_DO]
     return "\n".join(out) + "\n"

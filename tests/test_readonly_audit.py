@@ -146,7 +146,7 @@ def test_relative_unlink_outside_tmp_is_still_a_violation(tmp_path: Path) -> Non
     assert out.count("VIOLATION") == 2
 
 
-# --- side effects agreed with the user (docs/about/read-only.md, Agreed side effects) ---
+# --- side effects agreed with the user (docs/about/what-it-changes.md, Agreed side effects) ---
 
 NGINX_T = '200 execve("/usr/sbin/nginx", ["nginx", "-t"], 0x7ffd /* 3 vars */) = 0\n'
 NGINX_WRITES = (
