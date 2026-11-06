@@ -108,11 +108,16 @@ def test_html_checkboxes_without_script() -> None:
     assert "<script" not in out
 
 
+def test_confluence_todo_cells_hold_no_macro_with_a_pipe() -> None:
+    out = render(report_with_extras(), "confluence", todo=True)
+    assert "{status" not in out[out.index("h2. TODO") :]
+
+
 @pytest.mark.parametrize(
     ("fmt", "critical"),
     [
         ("jira", "{color:#de350b}*CRITICAL*{color}"),
-        ("confluence", "{status:colour=Red|title=CRITICAL}"),
+        ("confluence", "{color:#de350b}*CRITICAL*{color}"),
     ],
 )
 def test_wiki_todo_is_a_table_with_status_icons(fmt: str, critical: str) -> None:

@@ -122,9 +122,9 @@ audit if one of them stops running.
 
 - [ ] Paste a report with `--todo` into real on-prem Jira (`jira-legacy`, for the bold
       header labels) and on-prem Confluence (`confluence-legacy`): the TODO tables and
-      icons render, and Confluence's `{status:colour=...|title=...}` doesn't split its
-      table cell at the `|`. `jira-cloud` and `confluence-cloud` are confirmed in the real
-      products.
+      icons render. The TODO table no longer uses Confluence's status macro, whose `|` can
+      end a table cell (it uses `{color}`, as Jira does). `jira-cloud` and
+      `confluence-cloud` are confirmed in the real products.
 - [ ] Still only on real hosts: `docker` on Debian (no runner VM), and the checks'
       behaviour on real hardware (RAID, multiple disks, physical NICs).
 

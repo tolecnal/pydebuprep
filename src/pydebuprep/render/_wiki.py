@@ -29,6 +29,14 @@ _EMOTICON = re.compile(r"\((?=(?:[ynix/?-]|on|off|\\[!+]|\\\*[rgby]?)\))")
 # Block markup that only works at the start of a line.
 _BLOCK_START = re.compile(r"^(?=h[1-6]\.|bq\.)")
 ZERO_WIDTH_SPACE = "\u200b"
+COLORS = {
+    "critical": "#de350b",
+    "warning": "#ff991f",
+    "info": "#0052cc",
+    "ok": "#00875a",
+    "skipped": "#6b778c",
+    "error": "#de350b",
+}
 # Wiki markup has no checkbox. Every row starts with this icon, which whoever works through
 # the list replaces, in Jira and Confluence alike.
 OPEN = "(-)"
@@ -44,6 +52,12 @@ def esc(text: str) -> str:
     text = _EMOTICON.sub(r"\\(", text)
     # These have no backslash escape; an invisible character stops the match.
     return _BLOCK_START.sub(ZERO_WIDTH_SPACE, text)
+
+
+def coloured(word: str, colour: str | None = None) -> str:
+    """WORD in capitals, bold, in the colour of its severity or status. The {color} macro
+    has no parameters to separate with a '|', so it is safe in a table cell in both products."""
+    return f"{{color:{COLORS[colour or word]}}}*{word.upper()}*{{color}}"
 
 
 def noformat(lines: list[str]) -> list[str]:
@@ -77,13 +91,13 @@ def summary_table(report: Report) -> list[str]:
     ]
 
 
-def todo_table(items: list[TodoItem], severity: Callable[[str], str]) -> list[str]:
+def todo_table(items: list[TodoItem]) -> list[str]:
     rows = [TODO_LEGEND, "", "||Status||Severity||Check||Finding||Fix||"]
     for item in items:
         steps = LINE_BREAK.join(f"{n}. {esc(step)}" for n, step in enumerate(item.steps, 1))
         cells = (
             OPEN,
-            severity(item.severity) if item.severity else EMPTY_CELL,
+            coloured(item.severity) if item.severity else EMPTY_CELL,
             f"{{{{{esc(item.check)}}}}}" if item.check else EMPTY_CELL,
             esc(item.title),
             steps or EMPTY_CELL,
@@ -101,7 +115,6 @@ def render_wiki(
     *,
     check_heading: Callable[[CheckResult], list[str]],
     finding: Callable[[Finding], list[str]],
-    severity: Callable[[str], str],
     todo: bool = False,
 ) -> str:
     out = [
@@ -134,5 +147,5 @@ def render_wiki(
     if todo:
         out += ["", "h2. TODO", ""]
         items = todo_items(report)
-        out += todo_table(items, severity) if items else [NOTHING_TO_DO]
+        out += todo_table(items) if items else [NOTHING_TO_DO]
     return "\n".join(out) + "\n"
