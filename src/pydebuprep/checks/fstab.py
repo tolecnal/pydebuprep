@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import shlex
 from typing import Any
 
 from pydebuprep.checks.base import Check, Context, count, output_lines, run_checked
@@ -123,8 +124,8 @@ class FstabCheck(Check):
                 Severity.WARNING,
                 f"{target} was mounted before the upgrade but is not now",
                 remediation=[
-                    f"Check its fstab entry and mount unit: findmnt --fstab {target}",
-                    f"sudo mount {target}",
+                    f"Check its fstab entry and mount unit: findmnt --fstab {shlex.quote(target)}",
+                    f"sudo mount {shlex.quote(target)}",
                 ],
             )
             for target in sorted(set(before) - now)

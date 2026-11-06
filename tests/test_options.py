@@ -156,7 +156,7 @@ def test_regex_options_do_not_split() -> None:
 def test_debsums_timeout_must_be_positive(value: int) -> None:
     from pydebuprep.checks.debsums import DebsumsCheck
 
-    with pytest.raises(ValueError, match="debsums: timeout_seconds must be greater than 0"):
+    with pytest.raises(ValueError, match="debsums: timeout_seconds must be between 1 and"):
         DebsumsCheck({"timeout_seconds": value})
 
 

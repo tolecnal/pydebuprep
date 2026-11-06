@@ -40,15 +40,18 @@ make coverage                          # pytest with 100% line AND branch covera
      `apt_command()` so `APT_RO_OPTS` prevents lock creation, cache regeneration, and
      `/var/log/apt/eipp.log.xz` writes.
    - Client environment variables that redirect connections or write files (`PG*`,
-     `MYSQL*`, `MARIADB*`, `APT_*`, `DOCKER_*`) are stripped in `System.run()`.
+     `MYSQL*`, `MARIADB*`, `APT_*`, `DOCKER_*`) and `PYDEBUPREP_*` (the upload token) are
+     stripped in `System.run()`; a command run as another user through `setpriv` gets only `PATH`.
 
 2. **Safe file reading as root (`_open_regular`):**
    - Unprivileged users control `/home`, `/var/www`, and `/tmp`. Opening a symlink to
      `/dev/watchdog` as root arms a hardware reboot; `/dev/zero` exhausts memory; a
      FIFO blocks forever.
    - `System.read_text`, `read_bytes`, `read_range`, and `lines` must go through
-     `_open_regular()`, which resolves symlinks, checks `stat.S_ISREG(os.lstat(real).st_mode)`
-     *before* calling `os.open(real, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)`,
+     `_open_regular()`, which resolves symlinks, refuses a link into `/proc`, `/sys` or
+     `/dev`, checks `stat.S_ISREG(os.lstat(real).st_mode)` *before* opening the path one
+     directory at a time (`_open_resolved`: each with `dir_fd` and `O_NOFOLLOW`, the file
+     with `os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC`),
      checks `os.fstat` again on the opened descriptor, and bounds reads to
      `MAX_READ_BYTES` (16 MiB).
    - `portal.read_token()` must also open with `O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC`
@@ -67,6 +70,8 @@ make coverage                          # pytest with 100% line AND branch covera
    - Every pattern a config gives (`logs.ignore`, a check's `ignore`) goes through
      `patterns_problems()`: at most 100 patterns, 200 characters each, and no repeated
      part that itself repeats without bound (catastrophic backtracking).
+   - Those rules can't catch every slow pattern, so code matching them runs inside
+     `match_budget()`, which stops it after `MATCH_SECONDS`.
 
 5. **Remote configuration restrictions (`src/pydebuprep/remote_config.py`):**
    - A config fetched via `--config https://…` is untrusted relative to root on the host.
@@ -84,10 +89,14 @@ make coverage                          # pytest with 100% line AND branch covera
    - All human-readable renderers (`text`, `html`, `markdown`, `jira`, `_cloud_markdown`, `confluence`)
      must render `clean_report(report)`, which runs `clean()` over every text field in
      `Report`, `Host`, `BaselineInfo`, `ConfigInfo`, `CheckResult`, and `Finding`.
+   - `runner.run_check()` passes every finding through `redact_finding()` so secrets quoted
+     from logs and crontabs stay out of reports.
    - Stderr warnings derived from snapshots (`baseline_warnings`) or portal replies
      (`_excerpt`, `upload_report` location) must also pass through `clean()`.
    - `Finding.references` must be validated with `safe_url()` (`http://` or `https://`
      only, no whitespace, control characters, or `<>`) both when loading saved reports
      (`reportfile.py`) and when rendering links (`html.py`, `markdown.py`, `_cloud_markdown.py`, `_wiki.py`).
-   - Always use `yaml.safe_load()` (never `yaml.load()`) and catch `RecursionError` on
-     untrusted YAML/JSON inputs.
+   - Always use `yaml.safe_load()` (never `yaml.load()`) and catch `RecursionError` and
+     `ValueError` (too-long integers) on untrusted YAML/JSON inputs.
+   - A value in a `Finding.remediation` command that someone other than root can choose,
+     such as a mount point, must go through `shlex.quote()`: people paste these as root.

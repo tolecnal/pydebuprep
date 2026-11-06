@@ -176,7 +176,8 @@ APT_LISTS_DIR = "/var/lib/apt/lists/"
 PG_SOCKET_DIR = "/var/run/postgresql"
 PSQL_FLAGS = ("psql", "-X", "-A", "-t", "-w")
 AS_POSTGRES = ("setpriv", "--reuid=postgres", "--regid=postgres", "--init-groups", "--")
-CLIENT_ENV = ("PG", "MYSQL", "MARIADB", "APT_", "DOCKER_")
+# PYDEBUPREP_: the upload token may be in PYDEBUPREP_TOKEN, and no command needs it.
+CLIENT_ENV = ("PG", "MYSQL", "MARIADB", "APT_", "DOCKER_", "PYDEBUPREP_")
 PG_USER = re.compile(r"[A-Za-z0-9_.-]+")
 CONNINFO = re.compile(
     rf"host={PG_SOCKET_DIR} port=([0-9]{{1,5}}) dbname=postgres "
@@ -190,15 +191,37 @@ DEFAULTS_FILE = "--defaults-extra-file="
 DEFAULT_TIMEOUT = 30.0
 TIME_ERROR = 5  # adjtimex(): the clock is not synchronised
 READ_FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC
+DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
 MAX_READ_BYTES = 16 << 20
+# Their files look regular, but reading can have effects (/proc/kmsg consumes the kernel
+# log): read only under their own names, never through a link someone else may have made.
+PSEUDO_FS_ROOTS = ("/proc/", "/sys/", "/dev/")
+
+
+def _open_resolved(real: str) -> int:
+    """Open a path with no symlinks in it, one directory at a time, refusing any symlink:
+    O_NOFOLLOW alone only covers the last part, so a directory on the way swapped for a
+    symlink to /dev would otherwise open /dev/watchdog."""
+    *directories, name = real.lstrip("/").split("/")
+    parent = os.open("/", DIRECTORY_FLAGS)
+    try:
+        for directory in directories:
+            below = os.open(directory, DIRECTORY_FLAGS, dir_fd=parent)
+            os.close(parent)
+            parent = below
+        return os.open(name, READ_FLAGS, dir_fd=parent)
+    finally:
+        os.close(parent)
 
 
 def _open_regular(path: str) -> BinaryIO:
     """Open a regular file (following symlinks to a regular file, never a FIFO or device)."""
     real = os.path.realpath(path)
+    if real.startswith(PSEUDO_FS_ROOTS) and not path.startswith(PSEUDO_FS_ROOTS):
+        raise OSError(f"{path}: a link into {real}")
     if not stat.S_ISREG(os.lstat(real).st_mode):
         raise OSError(f"{path}: not a regular file")
-    fd = os.open(real, READ_FLAGS)
+    fd = _open_resolved(real)
     # Checked again on what was opened: the path may have been swapped in between.
     if not stat.S_ISREG(os.fstat(fd).st_mode):
         os.close(fd)
@@ -396,6 +419,9 @@ class System:
         # Client settings for PostgreSQL and MySQL (PGHOST, PGSSLKEYLOGFILE, MYSQL_PWD, ...)
         # could redirect a probe or make a client write a file: never pass them on.
         env = {k: v for k, v in os.environ.items() if not k.startswith(CLIENT_ENV)}
+        if args[0] == AS_POSTGRES[0]:
+            # Any process of that user can read the environment of what runs as it.
+            env = {k: v for k, v in env.items() if k == "PATH"}
         env.update(LC_ALL="C", LANG="C")
         try:
             # Fixed, allowlisted argv; never a shell.

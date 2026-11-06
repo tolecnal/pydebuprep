@@ -15,6 +15,7 @@ from pydebuprep.checks.base import (
 )
 from pydebuprep.checks.journal_errors import compile_patterns, shared_patterns
 from pydebuprep.model import Finding, Severity, truncate_evidence
+from pydebuprep.patterns import match_budget
 
 DMESG_ERR = ("dmesg", "--level=err", "--notime")
 DMESG_WARN = ("dmesg", "--level=warn", "--notime")
@@ -59,7 +60,8 @@ class DmesgErrorsCheck(Check):
             if not res.ok:
                 stderr = res.stderr.strip().splitlines()
                 raise CommandFailed(stderr[0] if stderr else f"dmesg exited {res.returncode}")
-            total, evidence, ignored = _counted(res.stdout, ignore)
+            with match_budget():
+                total, evidence, ignored = _counted(res.stdout, ignore)
             if total:
                 findings.append(
                     Finding(

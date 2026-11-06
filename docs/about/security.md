@@ -27,7 +27,18 @@ packages that pass both checks.
   human-readable formats escape it and strip terminal control sequences. Saved
   reports read back by `convert` are validated field by field, and YAML is loaded
   safely.
+- Passwords, tokens and keys are redacted from everything a report quotes, by the shape
+  of what is usually secret (`password=...`, `mysql -p...`, `user:secret@host`, ...). That
+  can't recognise every secret, so treat reports as private, including on a portal.
 - Snapshots are readable only by root (directory `0700`, files `0600`).
+- Files that other users control are opened one directory at a time, refusing symlinks
+  on the way, so swapping a directory for a link can't make root open a device.
+- Regular expressions from a config are limited in number, length and shape, and
+  matching stops after a minute, so a config can't keep a CPU busy for ever.
+- The upload token is never passed on to the commands pydebuprep runs, and a command
+  running as another user, such as PostgreSQL's probe, gets almost no environment.
+- Don't give an unprivileged user `sudo` rights to `pydebuprep`. It is a tool for root:
+  `--output`, `--config` and `--baseline` name files it writes and reads as root.
 - The nginx and apache checks connect to this host's own TLS sites to compare the
   certificate served with the file configured. They connect only to loopback or to an
   address and port the kernel lists as listening here, and only to listeners owned by

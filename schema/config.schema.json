@@ -279,7 +279,7 @@
             },
             "timeout_seconds": {
               "default": 600,
-              "description": "Give up after this many seconds",
+              "description": "Give up after this many seconds (at most 7200)",
               "type": "integer"
             }
           },

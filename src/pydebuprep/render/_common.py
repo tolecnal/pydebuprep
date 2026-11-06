@@ -27,7 +27,9 @@ NO_CHANGES = "no changes"
 
 # C0 controls except tab/newline, DEL and C1 controls: journal and dmesg text is written by
 # other users and must not be able to drive the reader's terminal.
-CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+# Terminal controls, and the characters that change text direction: with those, a command
+# can read differently from what it does.
+CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]")
 
 
 def valid_utf8(text: str) -> str:
