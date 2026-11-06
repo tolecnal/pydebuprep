@@ -107,6 +107,10 @@ OPTION_TESTS: dict[tuple[str, str], str] = {
         "obsolete-packages",
         "protected_packages",
     ): "checks.test_package_insight::test_a_protected_package_that_is_gone_is_critical",
+    (
+        "upgrade-log",
+        "days",
+    ): "checks.test_upgrade_log::test_without_a_snapshot_only_the_last_days_count",
     ("systemd-failed", "ignore_units"): "checks.test_services::test_systemd_failed_ignore_units",
     ("systemd-timers", "ignore_units"): "checks.test_services::test_systemd_timers_ignore_units",
 }

@@ -101,6 +101,7 @@ nav:
           - dpkg-rc: checks/dpkg-rc.md
           - obsolete-packages: checks/obsolete-packages.md
           - package-config: checks/package-config.md
+          - upgrade-log: checks/upgrade-log.md
       - Boot:
           - boot-config: checks/boot-config.md
           - boot-space: checks/boot-space.md
