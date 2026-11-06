@@ -2,15 +2,27 @@
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Sequence
+from typing import Any
 
 from pydebuprep.checks.base import Check, CheckSkipped, Context
+from pydebuprep.findings_history import classify
 from pydebuprep.model import CheckResult, Finding, Status, sort_findings, sort_results
 from pydebuprep.redact import redact, redact_finding
 
 
 def _describe(exc: BaseException) -> str:
     return redact(f"{type(exc).__name__}: {exc}")
+
+
+def _labelled(findings: list[Finding], check: Check, ctx: Context) -> list[Finding]:
+    """FINDINGS, each saying how it compares with what the snapshot's run of CHECK found."""
+    recorded: Any = (ctx.baseline or {}).get("findings")
+    before = recorded.get(check.id) if isinstance(recorded, dict) else None
+    if not isinstance(before, list):
+        return findings
+    return [dataclasses.replace(f, since_snapshot=classify(f, before)) for f in findings]
 
 
 def run_check(check: Check, ctx: Context) -> CheckResult:
@@ -21,7 +33,8 @@ def run_check(check: Check, ctx: Context) -> CheckResult:
         result.skipped_reason = reason
         return result
     try:
-        result.findings = sort_findings([redact_finding(f) for f in check.run(ctx)])
+        found = [redact_finding(f) for f in check.run(ctx)]
+        result.findings = sort_findings(_labelled(found, check, ctx))
         diff: list[Finding] | None = None
         if ctx.baseline is not None and check.supports_baseline:
             before = ctx.baseline_for(check.id)

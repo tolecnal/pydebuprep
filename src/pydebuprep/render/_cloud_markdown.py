@@ -20,6 +20,7 @@ from pydebuprep.render._common import (
     header_lines,
     one_line,
     safe_url,
+    since_note,
     status_colour,
     todo_items,
 )
@@ -86,7 +87,7 @@ def _severity(sev: str) -> str:
 
 
 def _finding(f: Finding) -> list[str]:
-    out = [f"{_severity(f.severity.value)}: {_inline(f.title)}", ""]
+    out = [f"{_severity(f.severity.value)}: {_inline(f.title)}{since_note(f)}", ""]
     if f.detail:
         out += [*(_line(line) for line in f.detail.splitlines()), ""]
     if f.evidence:

@@ -10,6 +10,7 @@ from pydebuprep.render._common import (
     has_baseline_section,
     header_lines,
     safe_url,
+    since_note,
     summary_line,
     todo_items,
 )
@@ -30,7 +31,7 @@ def _fence(lines: list[str]) -> list[str]:
 
 
 def _finding(f: Finding) -> list[str]:
-    out = [f"- **{f.severity.value.upper()}**: {esc(f.title)}"]
+    out = [f"- **{f.severity.value.upper()}**: {esc(f.title)}{since_note(f)}"]
     if f.detail:
         out += ["", *(f"  {esc(d)}" for d in f.detail.splitlines())]
     if f.evidence:

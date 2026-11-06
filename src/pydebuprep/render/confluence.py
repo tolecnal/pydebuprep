@@ -6,7 +6,7 @@ Confluence Cloud's editor doesn't read it; see _cloud_markdown.py.
 from __future__ import annotations
 
 from pydebuprep.model import CheckResult, Finding, Report
-from pydebuprep.render._common import status_colour
+from pydebuprep.render._common import since_note, status_colour
 from pydebuprep.render._wiki import esc, finding_body, render_wiki
 
 STATUS_COLOURS = {
@@ -33,7 +33,7 @@ def _finding(f: Finding) -> list[str]:
     panel = PANELS[sev]
     return [
         f"{{{panel}}}",
-        f"{_status(sev)} *{esc(f.title)}*",
+        f"{_status(sev)} *{esc(f.title)}*{since_note(f)}",
         *finding_body(f),
         f"{{{panel}}}",
     ]

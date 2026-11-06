@@ -6,9 +6,11 @@ from pydebuprep.render._common import (
     baseline_line,
     baseline_state,
     by_category,
+    comparison_line,
     config_line,
     has_baseline_section,
     host_line,
+    since_note,
     status_colour,
     summary_line,
     todo_items,
@@ -32,7 +34,7 @@ def _paint(word: str, key: str, color: bool) -> str:
 
 def _finding(f: Finding, indent: str, color: bool) -> list[str]:
     sev = _paint(f.severity.value.upper(), f.severity.value, color)
-    lines = [f"{indent}{sev}: {f.title}"]
+    lines = [f"{indent}{sev}: {f.title}{since_note(f)}"]
     sub = indent + "    "
     if f.detail:
         lines.extend(f"{sub}{d}" for d in f.detail.splitlines())
@@ -52,7 +54,7 @@ def render(report: Report, *, color: bool = False, todo: bool = False) -> str:
     title = "pydebuprep report"
     out = [title, "=" * len(title), host_line(report), f"Generated: {report.generated_at}"]
     out += [baseline_line(report)]
-    out += [line for line in [config_line(report)] if line]
+    out += [line for line in [comparison_line(report), config_line(report)] if line]
     out += ["", f"Summary: {summary_line(report)}"]
     for category, results in by_category(report):
         out += ["", category.upper(), "-" * len(category)]
