@@ -24,7 +24,7 @@ A health report suite for Debian and Ubuntu systems after a release upgrade
 guides.
 
 `systemctl --failed` and a look at `journalctl` catch some problems. pydebuprep
-runs the rest of the post-upgrade checklist in one go, with [46 checks](#checks):
+runs the rest of the post-upgrade checklist in one go, with [47 checks](#checks):
 
 - **packages:** APT sources still pointing at the old release, third-party
   repositories the upgrader disabled, half-configured packages, unmerged
@@ -253,6 +253,7 @@ The package also installs the example as
 | `apt-lists-age` | `max_age_days` (7) |
 | `config-conflicts` | `critical_paths` (sshd_config, sshd_config.d/, sudoers, sudoers.d/), `ignore_paths` ([]): patterns for files to leave out, e.g. ones Ansible manages |
 | `debsums` | `timeout_seconds` (600) |
+| `upgrade-log` | `days` (30): without a snapshot, how many days of logs to read |
 | `boot-config` | `ignore_parameters` (BOOT_IMAGE, initrd) |
 | `obsolete-packages` | `protected_packages` ([]): packages that must stay installed |
 | `boot-space` | `warning_pct` (25.0), `critical_pct` (10.0) |
@@ -297,6 +298,7 @@ host never looks healthy just because a check couldn't look.
 | `dpkg-rc` | packages | Removed packages with leftover config |
 | `obsolete-packages` | packages | Installed packages no repository provides any more; packages from third-party repositories, by vendor; packages whose origin changed since the baseline |
 | `package-config` | packages | Alternatives that point to nothing; with a snapshot, APT pinning, foreign architectures, diversions and alternatives |
+| `upgrade-log` | packages | What APT, dpkg and the release upgrader logged since the snapshot: failed package scripts, errors, interrupted runs, removals |
 | `boot-config` | boot | An initramfs for each kernel; with a snapshot, the kernel command line and Secure Boot |
 | `boot-space` | boot | Free space and inodes on `/boot` and the EFI partition |
 | `bootloader` | boot | `grub.cfg` references the newest kernel; UEFI boot entries |

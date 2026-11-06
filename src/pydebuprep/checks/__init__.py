@@ -52,6 +52,7 @@ from pydebuprep.checks.systemd_failed import SystemdFailedCheck
 from pydebuprep.checks.systemd_timers import SystemdTimersCheck
 from pydebuprep.checks.time_sync import TimeSyncCheck
 from pydebuprep.checks.unattended_upgrades import UnattendedUpgradesCheck
+from pydebuprep.checks.upgrade_log import UpgradeLogCheck
 
 ALL_CHECKS: list[type[Check]] = [
     OsReleaseCheck,
@@ -65,6 +66,7 @@ ALL_CHECKS: list[type[Check]] = [
     ObsoletePackagesCheck,
     ConfigConflictsCheck,
     PackageConfigCheck,
+    UpgradeLogCheck,
     DebsumsCheck,
     KernelRunningCheck,
     NeedrestartCheck,

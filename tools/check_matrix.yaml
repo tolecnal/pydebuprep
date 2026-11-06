@@ -57,6 +57,13 @@ obsolete-packages:
   - {what: "Packages with an older version", severity: warning, runs: snapshot}
   - {what: "How many packages were upgraded and are new", severity: info, runs: snapshot}
   - {what: "Packages in `protected_packages` are installed", severity: critical, runs: opt-in, option: protected_packages}
+upgrade-log:
+  - {what: "APT runs that reported errors", severity: "warning / info", runs: always}
+  - {what: "APT runs that didn't finish", severity: warning, runs: always}
+  - {what: "Packages whose scripts failed, and whether they installed correctly later", severity: "warning / info", runs: always}
+  - {what: "Packages removed or purged", severity: info, runs: always}
+  - {what: "Errors from Ubuntu's release upgrader", severity: warning, runs: always}
+  - {what: "Upgrade logs that are missing, unreadable or begin too late", severity: info, runs: always}
 package-config:
   - {what: "Alternatives point to something that exists", severity: warning, runs: always}
   - {what: "APT pinning files gone", severity: warning, runs: snapshot}

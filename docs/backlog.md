@@ -131,7 +131,10 @@ audit if one of them stops running.
 ## Enhancement plan
 
 From a review of proposed improvements on 2026-11-07. Phase 1 (small file-read checks) and
-phase 2 (the upgrade-transaction audit) come first; the rest as we go.
+phase 2 (the upgrade-transaction audit) are done; the rest as we go.
+
+- [ ] Check on real hosts: `storage-health` on RAID, LUKS, ZFS and Btrfs, and `upgrade-log` on
+      a real release upgrade, Ubuntu's upgrader log included.
 
 - [ ] Phase 3: `snapshot` also runs the full checks and records fingerprints of their
       findings, so a report can tell new findings from pre-existing ones. Agreed: yes,

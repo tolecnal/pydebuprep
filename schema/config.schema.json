@@ -950,6 +950,25 @@
             "object",
             "null"
           ]
+        },
+        "upgrade-log": {
+          "additionalProperties": false,
+          "description": "What happened during the upgrade",
+          "properties": {
+            "days": {
+              "default": 30,
+              "description": "Without a snapshot, how many days of logs to read (1 to 365)",
+              "type": "integer"
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
         }
       },
       "type": [
