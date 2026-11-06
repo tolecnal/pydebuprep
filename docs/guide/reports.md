@@ -11,7 +11,7 @@ and prints a text report to the terminal. Run it as root for complete results.
 
 ```sh
 sudo pydebuprep report --checks apt-sources,dkms,systemd-failed   # only these
-sudo pydebuprep report --skip debsums                              # all but these
+sudo pydebuprep report --skip debsums                              # all but these; debsums can take many minutes
 ```
 
 Check IDs are listed in [Checks](../checks/index.md) and by

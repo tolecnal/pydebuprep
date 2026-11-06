@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -248,3 +249,41 @@ def test_broken_pipe_is_quiet(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr("sys.stdout", Closed())
     assert run(["--no-baseline"], root=False) == 1
+
+
+class Slow(Warn):
+    id = "slow"
+    requires_root = True
+    slow_note = "this takes long"
+
+
+def test_a_slow_check_is_announced_at_a_terminal(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(checks, "ALL_CHECKS", [Warn, Slow])
+    monkeypatch.setattr(sys.stderr, "isatty", lambda: True)
+    run(["report", "--no-baseline"])
+    assert "pydebuprep: this takes long" in capsys.readouterr().err
+
+
+def test_a_check_that_can_not_run_is_not_announced(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(checks, "ALL_CHECKS", [Slow])
+    monkeypatch.setattr(sys.stderr, "isatty", lambda: True)
+    run(["report", "--no-baseline"], root=False)
+    assert "this takes long" not in capsys.readouterr().err
+
+
+def test_a_slow_check_is_not_announced_in_scripts(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(checks, "ALL_CHECKS", [Slow])
+    run(["report", "--no-baseline"])
+    assert "this takes long" not in capsys.readouterr().err
+
+
+def test_debsums_says_it_is_slow() -> None:
+    from pydebuprep.checks.debsums import DebsumsCheck
+
+    assert "many minutes" in (DebsumsCheck.slow_note or "")

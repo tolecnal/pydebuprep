@@ -375,6 +375,14 @@ def _print(text: str) -> None:
             pass
 
 
+def _note_slow_checks(checks: list[Check], ctx: Context) -> None:
+    """Say at a terminal what will take long. Not in cron's mail or a script's log."""
+    if sys.stderr.isatty():
+        for check in checks:
+            if check.slow_note and check.unmet_requirement(ctx) is None:
+                print(f"pydebuprep: {check.slow_note}", file=sys.stderr)
+
+
 def cmd_report(args: argparse.Namespace, system: System) -> int:
     config, source = _load_config(args)
     fmt = args.format or config.report.format
@@ -395,6 +403,7 @@ def cmd_report(args: argparse.Namespace, system: System) -> int:
         for warning in baseline_warnings(loaded[1], system.hostname(), osinfo.codename):
             print(f"pydebuprep: warning: {warning}", file=sys.stderr)
     ctx = Context(system, osinfo, loaded[1] if loaded else None, tuple(config.log_ignore))
+    _note_slow_checks(selected, ctx)
     results = run_checks(selected, ctx)
     summary = compute_summary(results)
     try:

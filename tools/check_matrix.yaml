@@ -58,7 +58,7 @@ config-conflicts:
   - {what: "Other `.dpkg-*` and `.ucf-*` files under `/etc`", severity: warning, runs: always}
   - {what: "Directories under `/etc` it couldn't read", severity: info, runs: always}
 debsums:
-  - {what: "Package files outside `/etc` against dpkg's checksums", severity: warning, runs: always}
+  - {what: "Package files outside `/etc` against dpkg's checksums (can take many minutes)", severity: warning, runs: always}
 kernel-running:
   - {what: "The running kernel against the newest installed", severity: critical, runs: always}
   - {what: "`/run/reboot-required`", severity: critical, runs: always}

@@ -128,6 +128,23 @@ audit if one of them stops running.
 - [ ] Still only on real hosts: `docker` on Debian (no runner VM), and the checks'
       behaviour on real hardware (RAID, multiple disks, physical NICs).
 
+## Enhancement plan
+
+From a review of proposed improvements on 2026-11-07. Phase 1 (small file-read checks) and
+phase 2 (the upgrade-transaction audit) come first; the rest as we go.
+
+- [ ] Phase 3: `snapshot` also runs the full checks and records fingerprints of their
+      findings, so a report can tell new findings from pre-existing ones. Agreed: yes,
+      with a way to turn it off, and making clear that it's slow (`debsums`). A
+      classification field in reports needs the portal released first.
+- [ ] Phase 4: a listening-socket inventory; PAM and NSS from their files; `visudo -c` and
+      LVM once the read-only audit passes them.
+- [ ] Phase 5: functional probes. Agreed: a root process may contact external hosts when
+      the local config asks for it; opt-in, and never from a config fetched from a URL.
+- [ ] Phase 6: a release-transition knowledge base, shipped inside the package.
+- Parked: SMART and NVMe (raw device access, optional tools, no hardware in CI); Podman,
+  Snap and Flatpak through their clients; gateway reachability.
+
 ## Decisions to revisit
 
 - The documentation site moved from Material for MkDocs (end of life 2027-05-05) to
