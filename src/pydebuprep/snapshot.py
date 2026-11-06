@@ -101,7 +101,7 @@ def load_snapshot(path: str) -> dict[str, Any]:
         raise SnapshotError(f"cannot read snapshot {path}: {exc.strerror or exc}") from exc
     try:
         snap = json.loads(text)
-    except ValueError as exc:
+    except (ValueError, RecursionError) as exc:
         raise SnapshotError(f"snapshot {path} is not valid JSON: {exc}") from exc
     if not isinstance(snap, dict) or snap.get("schema_version") != SCHEMA_VERSION:
         raise SnapshotError(f"snapshot {path} has an unsupported schema version")

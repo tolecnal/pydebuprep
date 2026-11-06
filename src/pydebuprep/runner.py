@@ -6,10 +6,11 @@ from collections.abc import Sequence
 
 from pydebuprep.checks.base import Check, CheckSkipped, Context
 from pydebuprep.model import CheckResult, Finding, Status, sort_findings, sort_results
+from pydebuprep.redact import redact, redact_finding
 
 
 def _describe(exc: BaseException) -> str:
-    return f"{type(exc).__name__}: {exc}"
+    return redact(f"{type(exc).__name__}: {exc}")
 
 
 def run_check(check: Check, ctx: Context) -> CheckResult:
@@ -20,16 +21,16 @@ def run_check(check: Check, ctx: Context) -> CheckResult:
         result.skipped_reason = reason
         return result
     try:
-        result.findings = sort_findings(check.run(ctx))
+        result.findings = sort_findings([redact_finding(f) for f in check.run(ctx)])
         diff: list[Finding] | None = None
         if ctx.baseline is not None and check.supports_baseline:
             before = ctx.baseline_for(check.id)
             if before is not None:
-                diff = sort_findings(check.compare(ctx, before))
+                diff = sort_findings([redact_finding(f) for f in check.compare(ctx, before)])
         result.baseline_diff = diff
     except CheckSkipped as exc:
         result.status = Status.SKIPPED
-        result.skipped_reason = str(exc)
+        result.skipped_reason = redact(str(exc))
         result.findings = []
         result.baseline_diff = None
         return result

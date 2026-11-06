@@ -6,6 +6,9 @@ from pydebuprep.model import Finding, Severity, truncate_evidence
 DEBSUMS_TIMEOUT = 600.0
 
 
+MAX_TIMEOUT = 7200
+
+
 class DebsumsCheck(Check):
     id = "debsums"
     title = "Package file checksums"
@@ -13,11 +16,17 @@ class DebsumsCheck(Check):
     requires_root = True
     requires_commands = ("debsums",)
     install_hint = "sudo apt install debsums"
-    options = (Option("timeout_seconds", int(DEBSUMS_TIMEOUT), "Give up after this many seconds"),)
+    options = (
+        Option(
+            "timeout_seconds",
+            int(DEBSUMS_TIMEOUT),
+            f"Give up after this many seconds (at most {MAX_TIMEOUT})",
+        ),
+    )
 
     def validate(self) -> None:
-        if self.opt("timeout_seconds") <= 0:
-            raise ValueError("timeout_seconds must be greater than 0")
+        if not 0 < self.opt("timeout_seconds") <= MAX_TIMEOUT:
+            raise ValueError(f"timeout_seconds must be between 1 and {MAX_TIMEOUT}")
 
     def run(self, ctx: Context) -> list[Finding]:
         # debsums exits 2 when files changed and 1 when files are missing; both are findings.

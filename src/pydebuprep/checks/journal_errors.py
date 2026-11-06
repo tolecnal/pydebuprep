@@ -6,7 +6,7 @@ from collections import Counter
 
 from pydebuprep.checks.base import Check, Context, Option, count, run_checked
 from pydebuprep.model import Finding, Severity, truncate_evidence
-from pydebuprep.patterns import patterns_problems
+from pydebuprep.patterns import match_budget, patterns_problems
 
 JOURNAL = ("journalctl", "-p", "err", "-b", "--no-pager", "-o", "json")
 PERMISSION_HINTS = ("insufficient permissions", "not seeing messages from other users")
@@ -62,24 +62,25 @@ class JournalErrorsCheck(Check):
         ignored = 0
         shared = shared_patterns(ctx)
         variants: dict[tuple[str, str], set[str]] = {}
-        for line in res.stdout.splitlines():
-            try:
-                entry = json.loads(line)
-            except ValueError:
-                continue
-            if not isinstance(entry, dict):
-                continue
-            ident = entry.get("SYSLOG_IDENTIFIER") or entry.get("_COMM") or "kernel"
-            msg = " ".join(_message(entry.get("MESSAGE", "")).split())[:MAX_MESSAGE]
-            if any(p.search(msg) for p in shared) or any(
-                p.search(f"{ident}: {msg}") for p in self.patterns
-            ):
-                ignored += 1
-                continue
-            key = (str(ident), VARIABLE.sub("#", msg))
-            counts[key] += 1
-            examples.setdefault(key, msg)
-            variants.setdefault(key, set()).add(msg)
+        with match_budget():
+            for line in res.stdout.splitlines():
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(entry, dict):
+                    continue
+                ident = entry.get("SYSLOG_IDENTIFIER") or entry.get("_COMM") or "kernel"
+                msg = " ".join(_message(entry.get("MESSAGE", "")).split())[:MAX_MESSAGE]
+                if any(p.search(msg) for p in shared) or any(
+                    p.search(f"{ident}: {msg}") for p in self.patterns
+                ):
+                    ignored += 1
+                    continue
+                key = (str(ident), VARIABLE.sub("#", msg))
+                counts[key] += 1
+                examples.setdefault(key, msg)
+                variants.setdefault(key, set()).add(msg)
         findings = []
         if counts:
             total = sum(counts.values())

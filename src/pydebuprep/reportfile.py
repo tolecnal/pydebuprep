@@ -33,6 +33,8 @@ NOT_A_REPORT = (
     "--format yaml); text, HTML, Markdown, Jira and Confluence reports can't be read back"
 )
 
+TOO_MUCH = "not a pydebuprep report: nested too deeply, or holds a number too long to read"
+
 BASELINE_FIELDS = ("path", "created_at", "os_version", "hostname")
 SUMMARY_FIELDS = ("critical", "warning", "info", "ok", "skipped", "error", "exit_code")
 
@@ -53,12 +55,16 @@ def load_report(text: str) -> Report:
             raise ReportFileError(
                 f"not valid JSON: {exc.msg} (line {exc.lineno}, column {exc.colno})"
             ) from None
+        except (ValueError, RecursionError):
+            raise ReportFileError(TOO_MUCH) from None
     else:
         yaml = require_yaml()
         try:
             data = yaml.safe_load(stripped)
         except yaml.YAMLError:
             raise ReportFileError(NOT_A_REPORT) from None
+        except (ValueError, RecursionError):
+            raise ReportFileError(TOO_MUCH) from None
     if not isinstance(data, dict) or "schema_version" not in data:
         raise ReportFileError(NOT_A_REPORT)
     return report_from_dict(data)

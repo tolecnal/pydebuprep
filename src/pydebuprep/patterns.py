@@ -4,18 +4,25 @@ They are matched, as root, against every journal and kernel message, and a confi
 come from a portal, so a pattern must not be able to pin a CPU: at most MAX_PATTERNS of
 them, each at most MAX_PATTERN_LENGTH long, and none with a repeated part that itself
 repeats without bound ("(a+)+", "(\\w+\\s?)*"), the shape behind catastrophic backtracking.
+
+Those rules can't catch every slow pattern ("(a|a)*b" is as bad, and has no such shape), so
+matching also runs on a clock: see match_budget.
 """
 
 from __future__ import annotations
 
 import importlib
 import re
+import signal
 import sys
 from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 MAX_PATTERNS = 100
 MAX_PATTERN_LENGTH = 200
+# Far more than matching a whole journal against MAX_PATTERNS sensible patterns takes.
+MATCH_SECONDS = 60.0
 
 # The parser behind re.compile: re._parser since Python 3.11, sre_parse before.
 _parser: Any = importlib.import_module("re._parser" if sys.version_info >= (3, 11) else "sre_parse")
@@ -74,3 +81,25 @@ def patterns_problems(patterns: list[str]) -> list[str]:
     if len(patterns) > MAX_PATTERNS:
         return [f"at most {MAX_PATTERNS} patterns, not {len(patterns)}"]
     return [p for p in map(pattern_problem, patterns) if p is not None]
+
+
+class PatternTimeout(Exception):
+    """Matching a config's patterns took too long."""
+
+
+@contextmanager
+def match_budget(seconds: float | None = None) -> Iterator[None]:
+    """Stop the block with PatternTimeout after SECONDS. Python's regular expression engine
+    checks for signals while it backtracks, so this reaches a match in progress. Checks run
+    in the main thread, the only one signal handlers can be set in."""
+
+    def expired(_signum: int, _frame: object) -> None:
+        raise PatternTimeout("the config's log patterns took too long to match; simplify them")
+
+    previous = signal.signal(signal.SIGALRM, expired)
+    signal.setitimer(signal.ITIMER_REAL, MATCH_SECONDS if seconds is None else seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous)

@@ -117,7 +117,7 @@ def load_cached_config(directory: str, url: str) -> CachedConfig | None:
         fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
         with os.fdopen(fd, encoding="utf-8") as fh:
             data = json.load(fh)
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):
         return None
     if not isinstance(data, dict) or data.get("url") != url:
         return None

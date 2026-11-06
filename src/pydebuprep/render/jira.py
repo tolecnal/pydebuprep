@@ -16,7 +16,7 @@ HEADING = "h1. pydebuprep report\n"
 def _check_heading(r: CheckResult) -> list[str]:
     status = r.status.value
     return [
-        f"h3. {{{{{r.id}}}}} - {esc(r.title)}",
+        f"h3. {{{{{esc(r.id)}}}}} - {esc(r.title)}",
         f"Status: {coloured(status, status_colour(r))}",
     ]
 

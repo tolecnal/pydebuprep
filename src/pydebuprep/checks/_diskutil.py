@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import shlex
+
 from pydebuprep.checks.base import Check, Option
 from pydebuprep.model import Finding, Severity
 from pydebuprep.system import DiskUsage
@@ -78,8 +80,8 @@ def space_findings(
                     f"Low free inodes on {label}: {pct:.0f}% free",
                     detail=f"{usage.inodes_free} of {usage.inodes_total} inodes free.",
                     remediation=[
-                        f"Find directories with many small files: sudo du --inodes -x {label} "
-                        "| sort -n | tail",
+                        "Find directories with many small files: sudo du --inodes -x "
+                        f"{shlex.quote(label)} | sort -n | tail",
                     ],
                 )
             )
