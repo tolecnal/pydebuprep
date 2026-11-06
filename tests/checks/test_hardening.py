@@ -33,7 +33,9 @@ from pydebuprep.system import AS_POSTGRES, PG_SOCKET_DIR, PSQL_FLAGS, System
 from .helpers import make_ctx
 
 DEEP_JSON = "[" * 200_000
-EVIL_PATTERN = "(a|a)*b"
+# No repeat inside a repeat, so it passes the shape rules, yet on a long line it takes for ever.
+EVIL_PATTERN = ".*.*.*.*.*.*.*.*x"
+LONG_LINE = "a" * 400
 
 
 # --- Reading a file as root, while its owner moves things around ------------------------
@@ -108,7 +110,7 @@ def test_the_budget_stops_a_pattern_that_would_take_for_ever() -> None:
 
     started = time.monotonic()
     with pytest.raises(PatternTimeout), match_budget(0.2):
-        re.search(EVIL_PATTERN, "a" * 64)
+        re.search(EVIL_PATTERN, LONG_LINE)
     assert time.monotonic() - started < 10
 
 
@@ -126,7 +128,7 @@ def _journal_line(message: str) -> str:
 
 def test_a_slow_journal_pattern_fails_that_check_only(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(patterns, "MATCH_SECONDS", 0.2)
-    ctx = make_ctx(commands={JOURNAL: _journal_line("a" * 64)})
+    ctx = make_ctx(commands={JOURNAL: _journal_line(LONG_LINE)})
     result = run_check(JournalErrorsCheck({"ignore": [EVIL_PATTERN]}), ctx)
     assert result.status == Status.ERROR
     assert "took too long" in (result.error or "")
@@ -134,13 +136,15 @@ def test_a_slow_journal_pattern_fails_that_check_only(monkeypatch: pytest.Monkey
 
 def test_a_slow_shared_pattern_fails_that_check_only(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(patterns, "MATCH_SECONDS", 0.2)
-    ctx = replace(make_ctx(commands={JOURNAL: _journal_line("a" * 64)}), log_ignore=(EVIL_PATTERN,))
+    ctx = replace(
+        make_ctx(commands={JOURNAL: _journal_line(LONG_LINE)}), log_ignore=(EVIL_PATTERN,)
+    )
     assert run_check(JournalErrorsCheck(), ctx).status == Status.ERROR
 
 
 def test_a_slow_kernel_pattern_fails_that_check_only(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(patterns, "MATCH_SECONDS", 0.2)
-    ctx = make_ctx(commands={DMESG_ERR: "a" * 64, DMESG_WARN: ""}, root=True)
+    ctx = make_ctx(commands={DMESG_ERR: LONG_LINE, DMESG_WARN: ""}, root=True)
     result = run_check(DmesgErrorsCheck({"ignore": [EVIL_PATTERN]}), ctx)
     assert result.status == Status.ERROR
     assert "took too long" in (result.error or "")

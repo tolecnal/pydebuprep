@@ -5,8 +5,8 @@ come from a portal, so a pattern must not be able to pin a CPU: at most MAX_PATT
 them, each at most MAX_PATTERN_LENGTH long, and none with a repeated part that itself
 repeats without bound ("(a+)+", "(\\w+\\s?)*"), the shape behind catastrophic backtracking.
 
-Those rules can't catch every slow pattern ("(a|a)*b" is as bad, and has no such shape), so
-matching also runs on a clock: see match_budget.
+Those rules can't catch every slow pattern (alternatives that overlap, or many ".*" in a
+row, have no such shape), so matching also runs on a clock: see match_budget.
 """
 
 from __future__ import annotations
