@@ -14,7 +14,7 @@ pydebuprep-portal 0.3.0 and newer accept and older portals refuse. pydebuprep 0.
 adds nothing to the report, so the same portals take its reports; portal 0.5.0, built
 on it, also shows [what each report was compared with](#snapshots-in-the-portal) and
 offers 0.9.0's new checks and options in its config generator. pydebuprep 0.10.0
-through 0.13.0 change nothing in the report either, so the same portals take their reports.
+through 0.14.0 change nothing in the report either, so the same portals take their reports.
 
 ## The token
 

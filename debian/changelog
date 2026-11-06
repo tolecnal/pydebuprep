@@ -1,3 +1,31 @@
+pydebuprep (0.14.0) unstable; urgency=medium
+
+  * Security fixes; upgrade if hosts run with configs from a portal or have
+    other users. An advisory follows on GitHub.
+  * Files other users control are opened one directory at a time, refusing
+    symlinks on the way, and a link into /proc, /sys or /dev is refused.
+  * Matching a config's log patterns stops after a minute, and only that check
+    fails.
+  * PYDEBUPREP_ variables, the upload token among them, are no longer passed
+    to the commands pydebuprep runs, and a command running as another user
+    gets only PATH.
+  * Passwords, tokens and keys are redacted from what a report quotes, by the
+    shape of what is usually secret. Treat reports as private all the same.
+  * Mount points in suggested commands are quoted, and text-direction
+    characters are removed from reports.
+  * Report, snapshot and saved-config files that are nested too deeply or hold
+    numbers too long to read are refused with a clear error.
+  * debsums' timeout_seconds may be at most 7200; a config with more is now
+    rejected.
+  * confluence-legacy's TODO table colours its severity with {color}: the
+    status macro's | can end a table cell.
+  * The documentation has a check matrix: everything each check looks at, and
+    which parts always run and which are opt-in.
+  * The report format is unchanged: portal 0.3.0 and newer take these
+    reports.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Fri, 06 Nov 2026 22:28:22 +0100
+
 pydebuprep (0.13.0) unstable; urgency=medium
 
   * New format confluence-cloud: Markdown for pasting into Confluence Cloud,
