@@ -37,6 +37,13 @@ class Status(str, Enum):
     ERROR = "error"
 
 
+# How a finding compares with what the snapshot's run of the same check found.
+NEW = "new"
+WORSE = "worse"
+ALREADY = "pre-existing"
+SINCE_SNAPSHOT = (NEW, WORSE, ALREADY)
+
+
 @dataclass
 class Finding:
     severity: Severity
@@ -45,9 +52,10 @@ class Finding:
     evidence: list[str] = field(default_factory=list)
     remediation: list[str] = field(default_factory=list)
     references: list[str] = field(default_factory=list)
+    since_snapshot: str | None = None  # one of SINCE_SNAPSHOT; None when it can't be known
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "severity": self.severity.value,
             "title": self.title,
             "detail": self.detail,
@@ -55,6 +63,9 @@ class Finding:
             "remediation": list(self.remediation),
             "references": list(self.references),
         }
+        if self.since_snapshot is not None:
+            data["since_snapshot"] = self.since_snapshot
+        return data
 
 
 @dataclass

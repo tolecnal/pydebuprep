@@ -11,8 +11,10 @@ from pathlib import Path
 from typing import Any
 
 from pydebuprep.checks.base import Check, CommandFailed, Context, running_kernel
-from pydebuprep.model import BaselineInfo
+from pydebuprep.findings_history import fingerprint
+from pydebuprep.model import BaselineInfo, Status
 from pydebuprep.render._common import clean
+from pydebuprep.runner import run_check
 
 DEFAULT_SNAPSHOT_DIR = "/var/lib/pydebuprep/snapshots"
 SCHEMA_VERSION = "1"
@@ -30,7 +32,20 @@ def format_timestamp(when: datetime) -> str:
     return when.strftime("%Y%m%dT%H%M%SZ")
 
 
-def build_snapshot(checks: Sequence[Check], ctx: Context) -> dict[str, Any]:
+def _findings(checks: Sequence[Check], ctx: Context) -> dict[str, list[dict[str, Any]]]:
+    """What each check finds now. A check that was skipped or failed has no entry: what it
+    would have found isn't known, which differs from having found nothing."""
+    recorded = {}
+    for check in checks:
+        result = run_check(check, ctx)
+        if result.status in (Status.OK, Status.FINDINGS):
+            recorded[check.id] = [fingerprint(f) for f in result.findings]
+    return recorded
+
+
+def build_snapshot(
+    checks: Sequence[Check], ctx: Context, *, findings: bool = True
+) -> dict[str, Any]:
     data: dict[str, Any] = {}
     skipped: list[str] = []
     for check in checks:
@@ -53,7 +68,7 @@ def build_snapshot(checks: Sequence[Check], ctx: Context) -> dict[str, Any]:
         kernel = running_kernel(ctx)
     except CommandFailed:
         kernel = "unknown"
-    return {
+    snapshot = {
         "schema_version": SCHEMA_VERSION,
         "created_at": ctx.system.now().isoformat(timespec="seconds"),
         "hostname": ctx.system.hostname(),
@@ -62,12 +77,19 @@ def build_snapshot(checks: Sequence[Check], ctx: Context) -> dict[str, Any]:
         "checks": data,
         "skipped": skipped,
     }
+    if findings:
+        snapshot["findings"] = _findings(checks, ctx)
+    return snapshot
 
 
 def create_snapshot(
-    checks: Sequence[Check], ctx: Context, directory: str = DEFAULT_SNAPSHOT_DIR
+    checks: Sequence[Check],
+    ctx: Context,
+    directory: str = DEFAULT_SNAPSHOT_DIR,
+    *,
+    findings: bool = True,
 ) -> Path:
-    snap = build_snapshot(checks, ctx)
+    snap = build_snapshot(checks, ctx, findings=findings)
     stamp = format_timestamp(ctx.system.now())
     target_dir = Path(directory)
     try:

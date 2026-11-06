@@ -78,6 +78,13 @@
             "info"
           ]
         },
+        "since_snapshot": {
+          "enum": [
+            "new",
+            "worse",
+            "pre-existing"
+          ]
+        },
         "title": {
           "type": "string"
         }

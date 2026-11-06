@@ -108,6 +108,7 @@ _pydebuprep_snapshot() {
         '(--help -h)--help[show this help message and exit]' \
         '(--help -h)-h[show this help message and exit]' \
         '--snapshot-dir=[where to store the snapshot]:snapshot-dir:_files -/' \
+        '--no-findings[don'\''t run every check to record what it finds\: quicker, as debsums can take many minutes, but reports then can'\''t tell new findings from old ones]' \
         '*--check-option=[set a check option, overriding the config file (repeatable)]:check-option:_pydebuprep_check_options' \
         '(--config --no-config -c)--config=[read settings from FILE]:config:_files' \
         '(--config --no-config -c)-c[read settings from FILE]:config:_files' \

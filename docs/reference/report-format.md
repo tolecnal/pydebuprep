@@ -97,7 +97,10 @@ returned. Findings hidden with `--min-severity` are still counted.
 | `baseline_diff` | array or null | changes since the baseline; `null` when the check doesn't compare or there's no baseline |
 
 **Findings**: `severity` (`critical`, `warning`, `info`), `title`, `detail`, and
-the lists `evidence`, `remediation` and `references`.
+the lists `evidence`, `remediation` and `references`. A finding may also have
+`since_snapshot`: `new`, `worse` or `pre-existing`, when it was compared with a snapshot's
+[record of findings](../guide/snapshots.md#new-findings-and-old-ones). Older portals refuse
+reports with this field, so upgrade the portal before the hosts.
 
 **`config`** (only when the config came from a URL): `source` (the URL),
 `fetched_at`, and `stale` — `true` when the portal couldn't be reached and a copy

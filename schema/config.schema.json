@@ -1055,6 +1055,10 @@
           "description": "Where snapshots are written and looked up",
           "type": "string"
         },
+        "snapshot_findings": {
+          "description": "Run every check when taking a snapshot, so reports can tell new findings from old ones (slower: debsums can take many minutes)",
+          "type": "boolean"
+        },
         "todo": {
           "description": "Add a TODO checklist of what needs fixing at the end of each report",
           "type": "boolean"

@@ -287,3 +287,54 @@ def test_debsums_says_it_is_slow() -> None:
     from pydebuprep.checks.debsums import DebsumsCheck
 
     assert "many minutes" in (DebsumsCheck.slow_note or "")
+
+
+def _snapshot_of(tmp_path: Path) -> dict[str, Any]:
+    (path,) = tmp_path.glob("*.json")
+    data: dict[str, Any] = json.loads(path.read_text())
+    return data
+
+
+def test_a_snapshot_records_findings(tmp_path: Path) -> None:
+    assert run(["snapshot", "--snapshot-dir", str(tmp_path)]) == 0
+    assert [f["title"] for f in _snapshot_of(tmp_path)["findings"]["warn-check"]] == [
+        "a warning",
+        "an info note",
+    ]
+
+
+def test_no_findings_leaves_them_out(tmp_path: Path) -> None:
+    assert run(["snapshot", "--no-findings", "--snapshot-dir", str(tmp_path)]) == 0
+    assert "findings" not in _snapshot_of(tmp_path)
+
+
+def test_a_config_can_leave_them_out(tmp_path: Path) -> None:
+    config = tmp_path / "config.yaml"
+    config.write_text("report:\n  snapshot_findings: false\n")
+    snaps = tmp_path / "snaps"
+    snaps.mkdir()
+    args = ["snapshot", "--config", str(config), "--snapshot-dir", str(snaps)]
+    assert run(args) == 0
+    assert "findings" not in _snapshot_of(snaps)
+
+
+def test_no_findings_means_no_slow_note(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    monkeypatch.setattr(checks, "ALL_CHECKS", [Slow])
+    monkeypatch.setattr(sys.stderr, "isatty", lambda: True)
+    run(["snapshot", "--no-findings", "--snapshot-dir", str(tmp_path)])
+    assert "this takes long" not in capsys.readouterr().err
+    run(["snapshot", "--snapshot-dir", str(tmp_path)])
+    assert "this takes long" in capsys.readouterr().err
+
+
+def test_a_report_after_a_snapshot_labels_findings(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    run(["snapshot", "--snapshot-dir", str(tmp_path)])
+    capsys.readouterr()
+    run(["report", "--format", "json", "--snapshot-dir", str(tmp_path)])
+    found = json.loads(capsys.readouterr().out)["results"]
+    labels = {f["since_snapshot"] for r in found if r["id"] == "warn-check" for f in r["findings"]}
+    assert labels == {"pre-existing"}

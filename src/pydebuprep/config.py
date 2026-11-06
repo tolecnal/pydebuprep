@@ -40,6 +40,7 @@ class ReportSettings:
     todo: bool = False
     baseline: str = "auto"
     snapshot_dir: str = DEFAULT_SNAPSHOT_DIR
+    snapshot_findings: bool = True
 
 
 REPORT_HELP = {
@@ -51,6 +52,8 @@ REPORT_HELP = {
     "todo": "Add a TODO checklist of what needs fixing at the end of each report",
     "baseline": "Snapshot to compare against: auto (newest in snapshot_dir), none, or a file path",
     "snapshot_dir": "Where snapshots are written and looked up",
+    "snapshot_findings": "Run every check when taking a snapshot, so reports can tell new findings "
+    "from old ones (slower: debsums can take many minutes)",
 }
 
 
@@ -111,7 +114,7 @@ def _report_settings(data: Any, source: str, errors: list[str]) -> ReportSetting
                 errors.append(f"{where}: must be one of {', '.join(SEVERITIES)}")
             else:
                 settings.min_severity = value
-        elif key in ("color", "todo"):
+        elif key in ("color", "todo", "snapshot_findings"):
             if not isinstance(value, bool):
                 errors.append(f"{where}: expected true or false")
             else:

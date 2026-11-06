@@ -35,6 +35,7 @@ pydebuprep \- health report suite for Debian and Ubuntu after a release upgrade
 .br
 .B pydebuprep snapshot
 .RB [ \-\-snapshot\-dir\ \fIDIR\fR ]
+.RB [ \-\-no\-findings ]
 .RB [ \-\-check\-option\ \fICHECK.OPTION=VALUE\fR ]
 .RB [ \-\-config\ \fIFILE\fR \ |\  \-\-no\-config ]
 .br
@@ -119,8 +120,13 @@ Record a baseline before upgrading: OS release, kernel, active and enabled
 services, timers and cron jobs, APT sources, held and installed packages, mounts,
 DKMS modules, network interfaces, routes, DNS and network manager, firewall rules,
 the time service, AppArmor profiles, unattended\-upgrades, running Docker
-containers and online PostgreSQL clusters. Prints the path of the snapshot file,
-which only root can read.
+containers and online PostgreSQL clusters. It also runs every check and records
+what it finds, so a later report can label each finding new, worse or already
+there. That takes as long as a report, and
+.B debsums
+can take many minutes;
+.B \-\-no\-findings
+leaves it out. Prints the path of the snapshot file, which only root can read.
 .TP
 .B list\-checks
 List the available checks with their IDs and categories. With
@@ -177,6 +183,13 @@ Do not compare against any snapshot.
 .BI \-\-snapshot\-dir " DIR"
 Where snapshots are stored and looked up (default
 .IR /var/lib/pydebuprep/snapshots ).
+.TP
+.B \-\-no\-findings
+With
+.BR snapshot :
+don't run every check to record what it finds. Quicker, as
+.B debsums
+can take many minutes, but reports then can't tell new findings from old ones.
 .TP
 .BI \-\-checks " ID,..."
 Run only the listed checks.
@@ -304,8 +317,10 @@ holds defaults for
 .BR format ", " output_dir ", " min_severity ", " color ", " baseline
 .RB ( auto ,
 .BR none ,
-or a snapshot path) and
-.BR snapshot_dir .
+or a snapshot path),
+.B snapshot_dir
+and
+.BR snapshot_findings .
 .B logs
 has an
 .B ignore

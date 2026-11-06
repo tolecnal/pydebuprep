@@ -10,6 +10,7 @@ from pydebuprep.render._common import (
     has_baseline_section,
     header_lines,
     safe_url,
+    since_note,
     status_colour,
     summary_line,
     todo_items,
@@ -50,8 +51,8 @@ def _finding(f: Finding) -> list[str]:
     sev = f.severity.value
     out = [
         f'<div class="finding {sev}-b">',
-        f'<div><span class="sev {sev}">{sev}</span>: <span class="title">{escape(f.title)}</span>'
-        "</div>",
+        f'<div><span class="sev {sev}">{sev}</span>: '
+        f'<span class="title">{escape(f.title)}{escape(since_note(f))}</span></div>',
     ]
     if f.detail:
         out.append(f"<p>{escape(f.detail)}</p>")

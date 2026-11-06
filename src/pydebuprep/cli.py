@@ -203,6 +203,12 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="DIR",
         help=f"where to store the snapshot (default: {DEFAULT_SNAPSHOT_DIR})",
     )
+    snap.add_argument(
+        "--no-findings",
+        action="store_true",
+        help="don't run every check to record what it finds: quicker, as debsums can take many "
+        "minutes, but reports then can't tell new findings from old ones",
+    )
     _add_check_option_arg(snap)
     _add_config_args(snap)
     _add_portal_args(snap)
@@ -571,8 +577,13 @@ def cmd_snapshot(args: argparse.Namespace, system: System) -> int:
     selected = checks.get_checks(
         skip=sorted(config.disabled), settings=_check_settings(args, config)
     )
-    ctx = Context(system, detect_os(system))
-    path = create_snapshot(selected, ctx, args.snapshot_dir or config.report.snapshot_dir)
+    ctx = Context(system, detect_os(system), None, tuple(config.log_ignore))
+    findings = config.report.snapshot_findings and not args.no_findings
+    if findings:
+        _note_slow_checks(selected, ctx)
+    path = create_snapshot(
+        selected, ctx, args.snapshot_dir or config.report.snapshot_dir, findings=findings
+    )
     print(path)
     return 0
 

@@ -12,7 +12,7 @@ from typing import Any
 from pydebuprep import checks
 from pydebuprep.config import LOGS_HELP, REPORT_HELP, SEVERITIES, UPLOAD_HELP
 from pydebuprep.identity import MACHINE_ID
-from pydebuprep.model import CATEGORY_ORDER, SCHEMA_VERSION, Severity, Status
+from pydebuprep.model import CATEGORY_ORDER, SCHEMA_VERSION, SINCE_SNAPSHOT, Severity, Status
 from pydebuprep.render import FORMATS
 from pydebuprep.system import DPKG_PACKAGE_NAME
 
@@ -45,8 +45,10 @@ def report_schema() -> dict[str, Any]:
             "evidence": STRINGS,
             "remediation": STRINGS,
             "references": {"type": "array", "items": {"type": "string", "pattern": "^https?://"}},
+            "since_snapshot": {"enum": list(SINCE_SNAPSHOT)},
         }
     )
+    finding["required"].remove("since_snapshot")  # only when a snapshot's findings were compared
     findings = {"type": "array", "items": {"$ref": "#/$defs/finding"}}
     result = _object(
         {
@@ -162,6 +164,7 @@ def config_schema() -> dict[str, Any]:
         "todo": {"type": "boolean"},
         "baseline": STRING,
         "snapshot_dir": STRING,
+        "snapshot_findings": {"type": "boolean"},
     }
     upload_types: dict[str, Any] = {
         "url": {"type": ["string", "null"], "format": "uri", "pattern": "^https?://"},

@@ -16,6 +16,7 @@ from pydebuprep.deps import require_yaml
 from pydebuprep.identity import MACHINE_ID
 from pydebuprep.model import (
     SCHEMA_VERSION,
+    SINCE_SNAPSHOT,
     BaselineInfo,
     CheckResult,
     ConfigInfo,
@@ -167,7 +168,16 @@ def _finding(d: dict[str, Any], path: str) -> Finding:
         evidence=_strings(d.get("evidence", []), f"{path}.evidence"),
         remediation=_strings(d.get("remediation", []), f"{path}.remediation"),
         references=_references(d.get("references", []), f"{path}.references"),
+        since_snapshot=_since_snapshot(d.get("since_snapshot"), f"{path}.since_snapshot"),
     )
+
+
+def _since_snapshot(value: Any, path: str) -> str | None:
+    if value is None:
+        return None
+    if value not in SINCE_SNAPSHOT:
+        raise ReportFileError(f"{path}: expected one of {', '.join(SINCE_SNAPSHOT)}")
+    return str(value)
 
 
 def _field(d: dict[str, Any], key: str, path: str) -> Any:
