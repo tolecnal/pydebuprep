@@ -16,6 +16,7 @@ class DebsumsCheck(Check):
     requires_root = True
     requires_commands = ("debsums",)
     install_hint = "sudo apt install debsums"
+    slow_note = "debsums reads every packaged file, which can take many minutes (--skip debsums)"
     options = (
         Option(
             "timeout_seconds",

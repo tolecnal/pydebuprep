@@ -378,7 +378,7 @@ for each check's options.
 (packages) \fB\(**.dpkg\-dist\fR, \fB\(**.dpkg\-new\fR, \fB\(**.ucf\-dist\fR... left in \fB/etc\fR (critical for sshd/sudoers)
 .TP
 .B debsums
-(packages) Package files that no longer match their checksums (root, needs \fBdebsums\fR)
+(packages) Package files that no longer match their checksums (root, needs \fBdebsums\fR). It reads every packaged file, which can take many minutes; \fB\-\-skip debsums\fR leaves it out.
 .TP
 .B dpkg\-audit
 (packages) Packages unpacked but not configured, needing reinstalling, or waiting for triggers (separately); dpkg \-\-audit and apt\-get check

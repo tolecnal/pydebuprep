@@ -3,6 +3,11 @@
 Package files that no longer match their recorded checksums can mean an
 interrupted upgrade, a file overwritten by hand, or disk corruption.
 
+!!! warning "This check can take a long time"
+    It reads every file of every installed package: many minutes on a large system or slow
+    disks, especially on a cold cache. It gives up after `timeout_seconds` (600). Leave it
+    out with `--skip debsums`, or `enabled: false` in the configuration file.
+
 <!-- facts: debsums -->
 
 ## What it checks
@@ -24,9 +29,8 @@ debsums -c
 
 ## Limitations
 
-- It reads every packaged file, which takes minutes on large systems, especially
-  the first time (cold cache); `timeout_seconds` limits it. Turn the check off on
-  hosts where that's too slow.
+- It's slow, as the warning above says. If it gives up, the check reports an error; raise
+  `timeout_seconds` (at most 7200) or turn the check off.
 - MD5 sums detect accidents, not tampering: anyone who can replace a file can
   replace its checksum too.
 - Configuration files are skipped; see [`config-conflicts`](config-conflicts.md).

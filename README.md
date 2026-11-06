@@ -290,7 +290,7 @@ host never looks healthy just because a check couldn't look.
 | `apt-held` | packages | Held packages |
 | `apt-upgradable` | packages | Pending security updates, packages kept back, updates deferred by phasing, and other upgrades, separately |
 | `config-conflicts` | packages | `*.dpkg-dist`, `*.dpkg-new`, `*.ucf-dist`… left in `/etc` (critical for sshd/sudoers) |
-| `debsums` | packages | Package files that no longer match their checksums (root, needs `debsums`) |
+| `debsums` | packages | Package files that no longer match their checksums (root, needs `debsums`; **can take many minutes**, `--skip debsums` leaves it out) |
 | `dpkg-audit` | packages | Packages unpacked but not configured, needing reinstalling, or waiting for triggers (separately); `dpkg --audit` and `apt-get check` |
 | `dpkg-rc` | packages | Removed packages with leftover config |
 | `obsolete-packages` | packages | Installed packages no repository provides any more; packages from third-party repositories, by vendor; packages whose origin changed since the baseline |

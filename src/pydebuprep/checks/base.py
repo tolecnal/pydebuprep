@@ -106,6 +106,8 @@ class Check:
     requires_commands: tuple[str, ...] = ()
     install_hint: str | None = None
     options: tuple[Option, ...] = ()
+    # Shown before a run at a terminal, when this check will take long.
+    slow_note: str | None = None
 
     def __init__(self, settings: Mapping[str, Any] | None = None) -> None:
         known = {o.name: o for o in self.options}
