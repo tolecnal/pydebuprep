@@ -6,7 +6,8 @@ commands it runs, how it uses a snapshot, its options, and its limits.
 
 **Root** means the check needs root to read what it inspects; without it the check
 is reported as skipped. **Snapshot** means it records state when you take a
-snapshot and reports what changed since.
+snapshot and reports what changed since. The [check matrix](matrix.md) lists everything
+each check looks at, and which parts always run and which are opt-in.
 
 <!-- checks-index -->
 

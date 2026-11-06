@@ -21,6 +21,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import docs_build  # noqa: E402
 
 CHECK_IDS = sorted(cls.id for cls in checks.ALL_CHECKS)
+NOT_CHECKS = ("index", "matrix")
 
 
 def nav_pages(node: Any) -> list[str]:
@@ -39,7 +40,7 @@ def mkdocs_config() -> dict[str, Any]:
 
 
 def test_every_check_has_a_page_and_every_page_a_check() -> None:
-    pages = sorted(p.stem for p in (DOCS / "checks").glob("*.md") if p.stem != "index")
+    pages = sorted(p.stem for p in (DOCS / "checks").glob("*.md") if p.stem not in NOT_CHECKS)
     assert pages == CHECK_IDS
 
 
@@ -75,7 +76,7 @@ def test_navigation_lists_every_page() -> None:
 def test_navigation_orders_checks_like_the_report() -> None:
     nav = [p for p in nav_pages(mkdocs_config()["nav"]) if p.startswith("checks/")]
     order = [f"checks/{c.id}.md" for c in docs_build.check_classes()]
-    assert nav == ["checks/index.md", *order]
+    assert nav == ["checks/index.md", "checks/matrix.md", *order]
 
 
 def _normalize(text: str) -> str:
@@ -233,3 +234,115 @@ def test_cleanup_doc_page() -> None:
     for words in ("Dry run", "--apply", "/var/log/pydebuprep/cleanup.log", "/var/backups/pydebuprep",
                   "journalctl -t pydebuprep-cleanup", "## Guardrails", "keep_packages"):  # fmt: skip
         assert words in text, words
+
+
+def _matrix() -> dict[str, list[dict[str, Any]]]:
+    return docs_build.load_matrix()
+
+
+def _check_class(check_id: str) -> type[checks.base.Check]:
+    return next(c for c in checks.ALL_CHECKS if c.id == check_id)
+
+
+def _severities(text: str) -> set[str]:
+    return {word.strip() for word in text.split("/")} - {"none"}
+
+
+def test_matrix_lists_every_check() -> None:
+    assert sorted(_matrix()) == CHECK_IDS
+    assert all(_matrix().values())
+
+
+def test_matrix_rows_are_well_formed() -> None:
+    for check_id, rows in _matrix().items():
+        cls = _check_class(check_id)
+        options = {o.name: o for o in cls.options}
+        for row in rows:
+            where = f"{check_id}: {row['what']}"
+            assert set(row) <= {"what", "severity", "runs", "root", "option", "requires"}, where
+            assert row["runs"] in ("always", "snapshot", "default-on", "opt-in"), where
+            assert _severities(row["severity"]) <= {"critical", "warning", "info"}, where
+            assert not (row.get("root") and cls.requires_root), (
+                f"{where}: the whole check needs root"
+            )
+            has_option = row["runs"] in ("default-on", "opt-in")
+            assert ("option" in row) == has_option, where
+            if has_option:
+                default = options[row["option"]].default
+                assert bool(default) == (row["runs"] == "default-on"), where
+            if "requires" in row:
+                assert row["requires"] in options, where
+
+
+def test_matrix_names_every_on_or_off_option() -> None:
+    for cls in checks.ALL_CHECKS:
+        named = {r.get("option") for r in _matrix()[cls.id]} | {
+            r.get("requires") for r in _matrix()[cls.id]
+        }
+        for opt in cls.options:
+            if isinstance(opt.default, bool):
+                assert opt.name in named, f"{cls.id}.{opt.name} is missing from the matrix"
+
+
+def test_matrix_shows_snapshot_rows_only_for_checks_that_compare() -> None:
+    for cls in checks.ALL_CHECKS:
+        has_rows = any(r["runs"] == "snapshot" for r in _matrix()[cls.id])
+        assert has_rows == cls().supports_baseline, cls.id
+
+
+@pytest.mark.parametrize("check_id", CHECK_IDS)
+def test_matrix_severities_match_the_check_page(check_id: str) -> None:
+    text = (DOCS / "checks" / f"{check_id}.md").read_text(encoding="utf-8")
+    documented: set[str] = set()
+    for line in text.splitlines():
+        match = re.match(
+            r"\| ((?:critical|warning|info)(?: / (?:critical|warning|info))*) \|", line
+        )
+        if match:
+            documented |= _severities(match.group(1))
+    listed = {s for row in _matrix()[check_id] for s in _severities(row["severity"])}
+    assert listed == documented
+
+
+def test_matrix_page_shows_how_each_part_runs() -> None:
+    page = docs_build.expand("<!-- check-matrix -->")
+    for check_id in CHECK_IDS:
+        assert f"### [`{check_id}`]({check_id}.md)" in page
+    assert "| Readiness: `SELECT 1` | Opt-in: `probe: true` | warning / info |" in page
+    assert (
+        "| A `GET` to each URL you list | Opt-in: `probe: true` and items in `http_probes` | warning |"
+        in page
+    )
+    assert (
+        "| Readiness: `pg_isready` on each online cluster | Opt-in, as root: `probe: true` | warning / info |"
+        in page
+    )
+    assert (
+        "| Network and FUSE filesystems too | Opt-in: `include_remote: true` | critical / warning |"
+        in page
+    )
+    assert (
+        "| Units in `required_active` run, or their socket listens | Opt-in: list them in `required_active` | critical / warning |"
+        in page
+    )
+    assert (
+        "| The server's own configuration test | On by default, as root: `config_test: false` turns it off | critical / info |"
+        in page
+    )
+    assert (
+        "| `important_mounts` have at least `min_free_mib` free | On by default: `min_free_mib: 0` turns it off | critical / warning |"
+        in page
+    )
+    assert "| Ports listened on before and not now | With a snapshot, as root | critical |" in page
+    assert "| User crontabs: the programs they run exist | As root | warning |" in page
+    assert "| Enabled timers that aren't active | Always | warning |" in page
+    assert "Needs root." in page and "Needs `debsums`." in page
+
+
+def test_matrix_page_summarises_what_is_opt_in() -> None:
+    page = docs_build.expand("<!-- check-matrix -->")
+    head = page[: page.index("## Release")]
+    assert "## Opt-in at a glance" in head
+    assert "| [`docker`](docker.md) | `http_probes` | A `GET` to each URL you list |" in head
+    assert "## On by default, and can be turned off" in head
+    assert "| [`nginx`](nginx.md) | `tls_probe` |" in head

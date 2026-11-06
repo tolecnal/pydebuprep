@@ -1,0 +1,214 @@
+# What each check looks at, for docs/checks/matrix.md (tools/docs_build.py renders it;
+# tests/test_docs_site.py holds it to the check registry and the check pages).
+#
+# what:     one thing the check looks at
+# severity: the severities it can report, or "none" where it only records
+# runs:     always | snapshot | default-on | opt-in
+# root:     true when this part needs root although the check as a whole doesn't
+# option:   the check option that turns it on or off (default-on and opt-in)
+# requires: another option that must be on as well
+
+os-release:
+  - {what: "The running release is one pydebuprep supports", severity: critical, runs: always}
+  - {what: "The snapshot was taken on this host", severity: warning, runs: snapshot}
+  - {what: "The snapshot was taken on an earlier release than this one", severity: warning, runs: snapshot}
+  - {what: "Which release the host was upgraded from", severity: info, runs: snapshot}
+apt-sources:
+  - {what: "Enabled sources that name another release", severity: warning, runs: always}
+  - {what: "Third-party repositories left disabled", severity: warning, runs: always}
+  - {what: "An enabled source for the distribution's archive", severity: critical, runs: always}
+  - {what: "A source for security updates", severity: warning, runs: always}
+  - {what: "Duplicate repository entries", severity: info, runs: always}
+  - {what: "Debian suite aliases such as `stable`", severity: info, runs: always}
+  - {what: "`Signed-By` keyrings exist", severity: critical, runs: always}
+  - {what: "Keys left in the legacy `trusted.gpg`", severity: warning, runs: always}
+  - {what: "Downloaded metadata exists for each repository", severity: warning, runs: always}
+  - {what: "Downloaded metadata names the release the source asks for", severity: warning, runs: always}
+  - {what: "Downloaded `InRelease` files still verify against their keys", severity: critical, runs: always}
+  - {what: "Repositories enabled before that are now missing or disabled", severity: warning, runs: snapshot}
+apt-lists-age:
+  - {what: "Package lists have been downloaded", severity: warning, runs: always}
+  - {what: "Package lists are newer than `max_age_days`", severity: info, runs: always}
+dpkg-audit:
+  - {what: "Packages unpacked or half-configured", severity: critical, runs: always}
+  - {what: "Packages half-installed or marked for reinstalling", severity: critical, runs: always}
+  - {what: "Packages waiting for triggers", severity: warning, runs: always}
+  - {what: "`dpkg --audit`", severity: critical, runs: always}
+  - {what: "`apt-get check`: unmet dependencies, broken package database", severity: critical, runs: always}
+apt-upgradable:
+  - {what: "Pending security updates", severity: warning, runs: always}
+  - {what: "Upgrades kept back", severity: warning, runs: always}
+  - {what: "Updates deferred by phasing", severity: info, runs: always}
+  - {what: "Other upgradable packages", severity: info, runs: always}
+apt-held:
+  - {what: "Packages on hold", severity: warning, runs: always}
+  - {what: "Packages newly held", severity: warning, runs: snapshot}
+  - {what: "Packages no longer held", severity: info, runs: snapshot}
+apt-autoremove:
+  - {what: "What `apt autoremove` would remove (simulated)", severity: info, runs: always}
+dpkg-rc:
+  - {what: "Removed packages that still have configuration files", severity: info, runs: always}
+obsolete-packages:
+  - {what: "Installed packages no enabled repository has", severity: warning, runs: always}
+  - {what: "Packages from third-party repositories", severity: info, runs: always}
+  - {what: "Packages removed since the snapshot", severity: info, runs: snapshot}
+  - {what: "Packages whose origin changed", severity: warning, runs: snapshot}
+config-conflicts:
+  - {what: "Leftovers of `critical_paths` files, such as `sshd_config`", severity: critical, runs: always}
+  - {what: "Other `.dpkg-*` and `.ucf-*` files under `/etc`", severity: warning, runs: always}
+  - {what: "Directories under `/etc` it couldn't read", severity: info, runs: always}
+debsums:
+  - {what: "Package files outside `/etc` against dpkg's checksums", severity: warning, runs: always}
+kernel-running:
+  - {what: "The running kernel against the newest installed", severity: critical, runs: always}
+  - {what: "`/run/reboot-required`", severity: critical, runs: always}
+  - {what: "Still on the kernel from before the upgrade", severity: warning, runs: snapshot}
+  - {what: "The kernel changed", severity: info, runs: snapshot}
+dkms:
+  - {what: "Each module is built for the running kernel", severity: critical, runs: always}
+  - {what: "Modules no longer registered", severity: warning, runs: snapshot}
+bootloader:
+  - {what: "`grub.cfg` references the newest kernel", severity: "warning / info", runs: always}
+  - {what: "UEFI: the firmware reports which entry booted, and it still exists", severity: "warning / info", runs: always}
+  - {what: "No GRUB configuration found", severity: info, runs: always}
+boot-space:
+  - {what: "Free space on `/boot` and `/boot/efi`", severity: "critical / warning", runs: always}
+  - {what: "Free inodes on `/boot` and `/boot/efi`", severity: "critical / warning", runs: always}
+systemd-failed:
+  - {what: "Units in the `failed` state", severity: critical, runs: always}
+  - {what: "Services that were active or enabled and aren't now", severity: warning, runs: snapshot}
+systemd-critical-services:
+  - {what: "ssh, cron and journald exist, run and are enabled", severity: "critical / warning", runs: default-on, option: builtin}
+  - {what: "Units in `required_active` run, or their socket listens", severity: "critical / warning", runs: opt-in, option: required_active}
+  - {what: "Units in `required_enabled` are enabled", severity: "critical / warning", runs: opt-in, option: required_enabled}
+  - {what: "Units that existed before and are gone or masked", severity: "critical / warning", runs: snapshot}
+  - {what: "Ports critical units listened on before", severity: warning, runs: snapshot, root: true}
+systemd-timers:
+  - {what: "Enabled timers that aren't active", severity: warning, runs: always}
+  - {what: "Timers that were active and aren't now", severity: warning, runs: snapshot}
+journal-errors:
+  - {what: "Messages at priority `err` or worse since boot", severity: warning, runs: always}
+  - {what: "Whether the journal could be read completely", severity: info, runs: always}
+dmesg-errors:
+  - {what: "Kernel errors since boot", severity: warning, runs: always}
+  - {what: "Kernel warnings since boot", severity: info, runs: always}
+boot-time:
+  - {what: "Total boot time and slowest units", severity: info, runs: always}
+  - {what: "The chain of units the boot waited on", severity: info, runs: always}
+  - {what: "Boot hasn't finished yet", severity: info, runs: always}
+needrestart:
+  - {what: "Services using outdated libraries", severity: warning, runs: always}
+  - {what: "A pending kernel upgrade", severity: warning, runs: always}
+time-sync:
+  - {what: "A time synchronisation service is running", severity: warning, runs: always}
+  - {what: "The kernel considers the clock synchronised", severity: warning, runs: always}
+  - {what: "The time service changed", severity: info, runs: snapshot}
+cron:
+  - {what: "System crontabs: the programs they run exist", severity: warning, runs: always}
+  - {what: "User crontabs: the programs they run exist", severity: warning, runs: always, root: true}
+  - {what: "A cron daemon runs when there are jobs", severity: warning, runs: always}
+  - {what: "Jobs removed by the upgrade", severity: info, runs: snapshot}
+fstab:
+  - {what: "`findmnt --verify`: errors", severity: critical, runs: always}
+  - {what: "`findmnt --verify`: warnings", severity: warning, runs: always}
+  - {what: "Entries that can't be verified without root", severity: info, runs: always}
+  - {what: "Filesystems mounted before and not now", severity: warning, runs: snapshot}
+disk-space:
+  - {what: "Free space on local filesystems", severity: "critical / warning", runs: always}
+  - {what: "Free inodes on local filesystems", severity: "critical / warning", runs: always}
+  - {what: "`important_mounts` have at least `min_free_mib` free", severity: "critical / warning", runs: default-on, option: min_free_mib}
+  - {what: "Network and FUSE filesystems too", severity: "critical / warning", runs: opt-in, option: include_remote}
+network:
+  - {what: "A default route exists", severity: warning, runs: always}
+  - {what: "A DNS server is configured", severity: warning, runs: always}
+  - {what: "Interfaces that were up and aren't", severity: warning, runs: snapshot}
+  - {what: "Addresses that are gone", severity: warning, runs: snapshot}
+  - {what: "A changed default route", severity: warning, runs: snapshot}
+  - {what: "A changed network manager", severity: warning, runs: snapshot}
+  - {what: "Changed DNS servers", severity: info, runs: snapshot}
+firewall:
+  - {what: "ufw is enabled and its rules are loaded", severity: warning, runs: always}
+  - {what: "`nftables.service` is enabled and rules are loaded", severity: warning, runs: always}
+  - {what: "Any rules are loaded at all", severity: info, runs: always}
+  - {what: "Rules that were loaded before and aren't now", severity: critical, runs: snapshot}
+  - {what: "A changed firewall frontend", severity: info, runs: snapshot}
+apparmor:
+  - {what: "AppArmor is enabled", severity: warning, runs: always}
+  - {what: "Denials this boot", severity: warning, runs: always}
+  - {what: "Profiles in complain mode", severity: info, runs: always}
+  - {what: "Profiles that were enforced and aren't now", severity: warning, runs: snapshot}
+unattended-upgrades:
+  - {what: "It is enabled, when installed", severity: warning, runs: always}
+  - {what: "Its allowed origins don't name an old release", severity: warning, runs: always}
+  - {what: "It was installed or enabled before and isn't now", severity: warning, runs: snapshot}
+ssh-server:
+  - {what: "`sshd -t`: errors", severity: critical, runs: always}
+  - {what: "`sshd -t`: warnings", severity: warning, runs: always}
+  - {what: "DSA keys in `authorized_keys`", severity: warning, runs: always}
+postgresql:
+  - {what: "Clusters on an older major version, or left behind after migrating", severity: warning, runs: always}
+  - {what: "Clusters that should start automatically and are down", severity: warning, runs: always}
+  - {what: "Clusters online before and not now", severity: warning, runs: snapshot}
+  - {what: "Readiness: `pg_isready` on each online cluster", severity: "warning / info", runs: opt-in, option: probe, root: true}
+  - {what: "Readiness: `SELECT 1` on each online cluster", severity: "warning / info", runs: opt-in, option: probe, root: true}
+mariadb:
+  - {what: "The data directory matches the server's version (MariaDB only)", severity: warning, runs: always}
+  - {what: "Readiness: `mariadb-admin ping`", severity: "warning / info", runs: opt-in, option: probe}
+  - {what: "Readiness: `SELECT 1`", severity: "warning / info", runs: opt-in, option: probe}
+postfix:
+  - {what: "`postconf -n` can read the configuration", severity: critical, runs: always}
+  - {what: "Warnings `postconf -n` prints", severity: warning, runs: always}
+bind:
+  - {what: "`named-checkconf`", severity: critical, runs: always}
+docker:
+  - {what: "Containers failing their health check", severity: warning, runs: always}
+  - {what: "Containers that keep restarting", severity: warning, runs: always}
+  - {what: "Containers still starting their health check", severity: info, runs: always}
+  - {what: "Containers that were running and aren't now", severity: warning, runs: snapshot}
+  - {what: "A TCP connection to each published port", severity: warning, runs: opt-in, option: probe}
+  - {what: "A `GET` to each URL you list", severity: warning, runs: opt-in, option: http_probes, requires: probe}
+nginx:
+  - {what: "Included files exist", severity: critical, runs: always}
+  - {what: "Loaded modules exist", severity: critical, runs: always}
+  - {what: "`unix:` sockets exist", severity: warning, runs: always}
+  - {what: "Certificates can be read, and aren't expired or expiring", severity: "critical / warning / info", runs: always}
+  - {what: "Keys and signatures OpenSSL accepts", severity: critical, runs: always}
+  - {what: "DH parameters of at least 2048 bits", severity: critical, runs: always}
+  - {what: "TLSv1.2 or TLSv1.3 is enabled", severity: critical, runs: always}
+  - {what: "Certificates cover their server names", severity: warning, runs: always}
+  - {what: "Each TLS site serves the certificate its configuration names", severity: "warning / info", runs: default-on, option: tls_probe}
+  - {what: "The server's own configuration test", severity: "critical / info", runs: default-on, option: config_test, root: true}
+  - {what: "Modules loaded before and not now", severity: "warning / info", runs: snapshot}
+  - {what: "Configuration files read before and not now", severity: warning, runs: snapshot}
+  - {what: "Ports listened on before and not now", severity: critical, runs: snapshot, root: true}
+apache:
+  - {what: "Included files exist", severity: critical, runs: always}
+  - {what: "Loaded modules exist", severity: critical, runs: always}
+  - {what: "`unix:` sockets exist", severity: warning, runs: always}
+  - {what: "Files in `sites-enabled` or `conf-enabled` not ending in `.conf`", severity: warning, runs: always}
+  - {what: "Certificates can be read, and aren't expired or expiring", severity: "critical / warning / info", runs: always}
+  - {what: "Keys and signatures OpenSSL accepts", severity: critical, runs: always}
+  - {what: "DH parameters of at least 2048 bits", severity: critical, runs: always}
+  - {what: "TLSv1.2 or TLSv1.3 is enabled", severity: critical, runs: always}
+  - {what: "Certificates cover their server names", severity: warning, runs: always}
+  - {what: "Each TLS site serves the certificate its configuration names", severity: "warning / info", runs: default-on, option: tls_probe}
+  - {what: "The server's own configuration test", severity: "critical / info", runs: default-on, option: config_test, root: true}
+  - {what: "Modules loaded before and not now", severity: "warning / info", runs: snapshot}
+  - {what: "Configuration files read before and not now", severity: warning, runs: snapshot}
+  - {what: "Ports listened on before and not now", severity: critical, runs: snapshot, root: true}
+php:
+  - {what: "Extensions enabled before and not now", severity: warning, runs: snapshot}
+  - {what: "SAPIs no longer installed for any PHP version", severity: warning, runs: snapshot}
+certbot:
+  - {what: "certbot is installed", severity: warning, runs: always}
+  - {what: "certbot's Python exists", severity: critical, runs: always}
+  - {what: "The renewals' plugins are installed", severity: "critical / info", runs: always}
+  - {what: "Certificates can be read, and aren't expired or expiring", severity: "critical / warning / info", runs: always}
+libvirt:
+  - {what: "Machines set to start at boot are running", severity: warning, runs: always}
+  - {what: "Emulators and disks exist", severity: "critical / warning", runs: always}
+python-venvs:
+  - {what: "Each virtualenv's Python exists", severity: warning, runs: always}
+  - {what: "Each virtualenv's Python isn't older than the system's", severity: info, runs: always}
+  - {what: "Compiled modules find their native libraries", severity: warning, runs: always}
+  - {what: "Scripts in `bin/` start an interpreter that exists", severity: warning, runs: always}

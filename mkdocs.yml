@@ -86,6 +86,7 @@ nav:
       - Reference: configuration/reference.md
   - Checks:
       - checks/index.md
+      - Check matrix: checks/matrix.md
       - Release:
           - apt-lists-age: checks/apt-lists-age.md
           - apt-sources: checks/apt-sources.md

@@ -1,5 +1,6 @@
 """Confluence wiki markup for on-prem Confluence (Insert > Markup > Confluence wiki), using
-status and panel macros. Confluence Cloud's editor doesn't read it; see _cloud_markdown.py.
+status and panel macros (not in the TODO table: the status macro's '|' can end a table cell).
+Confluence Cloud's editor doesn't read it; see _cloud_markdown.py.
 """
 
 from __future__ import annotations
@@ -39,6 +40,4 @@ def _finding(f: Finding) -> list[str]:
 
 
 def render(report: Report, *, todo: bool = False) -> str:
-    return render_wiki(
-        report, check_heading=_check_heading, finding=_finding, severity=_status, todo=todo
-    )
+    return render_wiki(report, check_heading=_check_heading, finding=_finding, todo=todo)

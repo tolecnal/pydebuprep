@@ -41,9 +41,10 @@ from pydebuprep.config import (  # noqa: E402
 from pydebuprep.model import CATEGORY_ORDER  # noqa: E402
 
 MARKER = re.compile(
-    r"<!-- (facts|options|checks-index|config-reference|example-config|cli-reference)"
+    r"<!-- (facts|options|checks-index|check-matrix|config-reference|example-config|cli-reference)"
     r"(?:: ([a-z0-9-]+))? -->"
 )
+MATRIX = ROOT / "tools" / "check_matrix.yaml"
 CATEGORY_TITLES = {
     "release": "Release",
     "packages": "Packages",
@@ -176,6 +177,90 @@ def checks_index() -> str:
     return "\n".join(out)
 
 
+def load_matrix() -> dict[str, list[dict[str, Any]]]:
+    """What each check looks at, from tools/check_matrix.yaml."""
+    data: dict[str, list[dict[str, Any]]] = yaml.safe_load(MATRIX.read_text(encoding="utf-8"))
+    return data
+
+
+def _turned_on(cls: type[Check], row: dict[str, Any]) -> str:
+    """How to switch on an opt-in part."""
+    name = row["option"]
+    if "requires" in row:
+        return f"`{row['requires']}: true` and items in `{name}`"
+    default = next(o.default for o in cls.options if o.name == name)
+    return f"list them in `{name}`" if isinstance(default, list) else f"`{name}: true`"
+
+
+def _turned_off(cls: type[Check], row: dict[str, Any]) -> str:
+    """How to switch off a part that is on by default."""
+    name = row["option"]
+    default = next(o.default for o in cls.options if o.name == name)
+    return f"`{name}: false`" if isinstance(default, bool) else f"`{name}: 0`"
+
+
+def _runs(cls: type[Check], row: dict[str, Any]) -> str:
+    root = bool(row.get("root"))
+    if row["runs"] == "opt-in":
+        return f"Opt-in{', as root' if root else ''}: {_turned_on(cls, row)}"
+    if row["runs"] == "default-on":
+        return f"On by default{', as root' if root else ''}: {_turned_off(cls, row)} turns it off"
+    if row["runs"] == "snapshot":
+        return "With a snapshot, as root" if root else "With a snapshot"
+    return "As root" if root else "Always"
+
+
+def _needs(cls: type[Check]) -> str:
+    needs = ["Needs root."] if cls.requires_root else []
+    if cls.requires_commands:
+        programs = ", ".join(f"`{c}`" for c in cls.requires_commands)
+        needs.append(f"Needs {programs}.")
+    return " ".join(needs)
+
+
+def _option_summary(title: str, intro: str, kind: str, matrix: dict[str, Any]) -> list[str]:
+    out = [f"## {title}", "", intro, "", "| Check | Option | What it adds |", "|---|---|---|"]
+    for cls in check_classes():
+        for row in matrix[cls.id]:
+            if row["runs"] == kind:
+                link = f"[`{cls.id}`]({cls.id}.md)"
+                out.append(f"| {link} | `{row['option']}` | {_cell(row['what'])} |")
+    return [*out, ""]
+
+
+def check_matrix() -> str:
+    """Summaries of the optional parts, then one table per check, by category."""
+    matrix = load_matrix()
+    out = [
+        *_option_summary(
+            "Opt-in at a glance", "These run only when you turn them on.", "opt-in", matrix
+        ),
+        *_option_summary(
+            "On by default, and can be turned off",
+            "These are the parts of a check that have their own off switch.",
+            "default-on",
+            matrix,
+        ),
+    ]
+    for category in CATEGORY_ORDER:
+        out += [f"## {CATEGORY_TITLES[category]}", ""]
+        for cls in (c for c in check_classes() if c.category == category):
+            needs = _needs(cls)
+            out += [
+                f"### [`{cls.id}`]({cls.id}.md)",
+                "",
+                *([needs, ""] if needs else []),
+                "| What it looks at | Runs | Severity |",
+                "|---|---|---|",
+            ]
+            out += [
+                f"| {_cell(row['what'])} | {_runs(cls, row)} | {row['severity']} |"
+                for row in matrix[cls.id]
+            ]
+            out.append("")
+    return "\n".join(out)
+
+
 def config_reference() -> str:
     """Every key of the configuration file: the report and logs sections, then checks."""
     defaults = ReportSettings()
@@ -291,6 +376,8 @@ def render_marker(kind: str, arg: str | None) -> str:
         return facts(arg) if kind == "facts" else options(arg)
     if kind == "checks-index":
         return checks_index()
+    if kind == "check-matrix":
+        return check_matrix()
     if kind == "config-reference":
         return config_reference()
     if kind == "example-config":
