@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from pydebuprep.checks.apt_upgradable import SIMULATE_UPGRADE, AptUpgradableCheck
-from pydebuprep.model import Severity
+from pydebuprep.model import Finding, Severity
 
 from .helpers import make_ctx
 
@@ -181,7 +181,7 @@ def test_origin_changes_since_the_snapshot() -> None:
     # Upgrade: containerd.io now from Debian, terraform's repository gone.
     after = obsolete(installed=INSTALLED.replace("containerd.io\t1.7", "containerd.io\t1.6"))
     fs = check.compare(after, before)
-    assert [(f.severity, f.title, f.evidence) for f in fs] == [
+    assert [(f.severity, f.title, f.evidence) for f in fs if "origin" in f.title] == [
         (Severity.WARNING, "1 package comes from a different origin than before the upgrade",
          ["containerd.io: Docker (download.docker.com) → Debian"]),
     ]  # fmt: skip
@@ -242,3 +242,102 @@ def test_package_indexes_are_streamed() -> None:
     ctx = obsolete()
     ObsoletePackagesCheck().run(ctx)
     assert not any("_Packages" in p for p in ctx.system.whole_reads)  # type: ignore[attr-defined]
+
+
+# --- obsolete-packages: what changed ----------------------------------------------------
+
+EXTENDED = "/var/lib/apt/extended_states"
+STATES_FILE = (
+    "Package: libfoo\nArchitecture: amd64\nAuto-Installed: 1\n\n"
+    "Package: bar\nArchitecture: amd64\nAuto-Installed: 0\n\n"
+    "Package: lib2\nAuto-Installed: 1\n"
+)
+
+
+def _versions(**versions: str) -> str:
+    return "".join(f"{name}\t{version}\n" for name, version in versions.items())
+
+
+def _compare_changes(before: dict[str, object], now: str, files: dict[str, str] | None = None,
+                     check: ObsoletePackagesCheck | None = None) -> list[Finding]:  # fmt: skip
+    ctx = make_ctx(commands={PKG_VERSIONS_ARGV: now}, files=files or {})
+    return (check or ObsoletePackagesCheck()).compare(ctx, before)
+
+
+def test_baseline_records_manual_packages() -> None:
+    ctx = make_ctx(
+        commands={PKG_VERSIONS_ARGV: _versions(libfoo="1", bar="1", baz="1")},
+        files={EXTENDED: STATES_FILE},
+    )
+    assert ObsoletePackagesCheck().collect_baseline(ctx)["manual"] == ["bar", "baz"]
+
+
+def test_baseline_without_apt_states_records_no_manual_packages() -> None:
+    ctx = make_ctx(commands={PKG_VERSIONS_ARGV: _versions(bar="1")})
+    assert "manual" not in ObsoletePackagesCheck().collect_baseline(ctx)
+
+
+def test_version_changes_are_summed_up_not_listed() -> None:
+    fs = _compare_changes(
+        {"versions": {"a": "1", "b": "2", "c": "1"}},
+        _versions(a="2", b="2", c="2", d="1", e="1"),
+    )
+    assert [(f.severity, f.title) for f in fs] == [
+        (Severity.INFO, "Since the snapshot: 2 packages upgraded, 2 new")
+    ]
+    assert fs[0].evidence == ["New: d, e"]
+
+
+def test_a_downgrade_is_a_warning() -> None:
+    fs = _compare_changes({"versions": {"a": "2"}}, _versions(a="1"))
+    assert [(f.severity, f.title, f.evidence) for f in fs] == [
+        (Severity.WARNING, "1 package has an older version than before the upgrade", ["a: 2 to 1"])
+    ]
+
+
+def test_a_removed_manual_package_is_a_warning() -> None:
+    fs = _compare_changes({"versions": {"a": "1", "b": "1", "c": "1"}, "manual": ["a", "c"]},
+                          _versions(c="1"))  # fmt: skip
+    assert [(f.severity, f.title, f.evidence) for f in fs] == [
+        (Severity.WARNING, "1 package installed by hand was removed", ["a 1"]),
+        (Severity.INFO, "1 package removed since baseline", ["b 1"]),
+    ]
+
+
+def test_a_manual_package_now_automatic_is_a_warning() -> None:
+    fs = _compare_changes(
+        {"versions": {"libfoo": "1", "bar": "1"}, "manual": ["libfoo", "bar"]},
+        _versions(libfoo="1", bar="1"),
+        {EXTENDED: STATES_FILE},
+    )
+    assert [(f.severity, f.title, f.evidence) for f in fs] == [
+        (Severity.WARNING, "1 package installed by hand is now marked automatic", ["libfoo"])
+    ]
+
+
+def test_no_apt_states_now_says_nothing_about_marks() -> None:
+    assert _compare_changes({"versions": {"a": "1"}, "manual": ["a"]}, _versions(a="1")) == []
+
+
+def test_a_protected_package_that_is_gone_is_critical() -> None:
+    check = ObsoletePackagesCheck({"protected_packages": ["openssh-server", "bash"]})
+    fs = check._protected(make_ctx(commands={PKG_VERSIONS_ARGV: _versions(bash="5")}))
+    assert [(f.severity, f.title, f.evidence) for f in fs] == [
+        (Severity.CRITICAL, "1 protected package isn't installed", ["openssh-server"])
+    ]
+
+
+def test_no_protected_packages_asks_nothing() -> None:
+    assert ObsoletePackagesCheck()._protected(make_ctx()) == []
+
+
+def test_protected_packages_that_are_installed_are_silent() -> None:
+    check = ObsoletePackagesCheck({"protected_packages": ["bash"]})
+    assert check._protected(make_ctx(commands={PKG_VERSIONS_ARGV: _versions(bash="5")})) == []
+
+
+def test_a_manual_package_still_manual_is_silent() -> None:
+    fs = _compare_changes(
+        {"versions": {"bar": "1"}, "manual": ["bar"]}, _versions(bar="1"), {EXTENDED: STATES_FILE}
+    )
+    assert fs == []

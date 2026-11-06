@@ -100,7 +100,9 @@ nav:
           - dpkg-audit: checks/dpkg-audit.md
           - dpkg-rc: checks/dpkg-rc.md
           - obsolete-packages: checks/obsolete-packages.md
+          - package-config: checks/package-config.md
       - Boot:
+          - boot-config: checks/boot-config.md
           - boot-space: checks/boot-space.md
           - bootloader: checks/bootloader.md
           - dkms: checks/dkms.md
@@ -111,6 +113,7 @@ nav:
           - dmesg-errors: checks/dmesg-errors.md
           - journal-errors: checks/journal-errors.md
           - needrestart: checks/needrestart.md
+          - oom-events: checks/oom-events.md
           - systemd-critical-services: checks/systemd-critical-services.md
           - systemd-failed: checks/systemd-failed.md
           - systemd-timers: checks/systemd-timers.md
@@ -137,6 +140,7 @@ nav:
       - Storage:
           - disk-space: checks/disk-space.md
           - fstab: checks/fstab.md
+          - storage-health: checks/storage-health.md
   - Reference:
       - reference/index.md
       - Command line: reference/cli.md

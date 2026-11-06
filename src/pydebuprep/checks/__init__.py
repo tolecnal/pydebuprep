@@ -14,6 +14,7 @@ from pydebuprep.checks.apt_sources import AptSourcesCheck
 from pydebuprep.checks.apt_upgradable import AptUpgradableCheck
 from pydebuprep.checks.base import Check
 from pydebuprep.checks.bind import BindCheck
+from pydebuprep.checks.boot_config import BootConfigCheck
 from pydebuprep.checks.boot_space import BootSpaceCheck
 from pydebuprep.checks.boot_time import BootTimeCheck
 from pydebuprep.checks.bootloader import BootloaderCheck
@@ -37,12 +38,15 @@ from pydebuprep.checks.needrestart import NeedrestartCheck
 from pydebuprep.checks.network import NetworkCheck
 from pydebuprep.checks.nginx import NginxCheck
 from pydebuprep.checks.obsolete_packages import ObsoletePackagesCheck
+from pydebuprep.checks.oom_events import OomEventsCheck
 from pydebuprep.checks.os_release import OsReleaseCheck
+from pydebuprep.checks.package_config import PackageConfigCheck
 from pydebuprep.checks.php import PhpCheck
 from pydebuprep.checks.postfix import PostfixCheck
 from pydebuprep.checks.postgresql import PostgresqlCheck
 from pydebuprep.checks.python_venvs import PythonVenvsCheck
 from pydebuprep.checks.ssh_server import SshServerCheck
+from pydebuprep.checks.storage_health import StorageHealthCheck
 from pydebuprep.checks.systemd_critical import SystemdCriticalCheck
 from pydebuprep.checks.systemd_failed import SystemdFailedCheck
 from pydebuprep.checks.systemd_timers import SystemdTimersCheck
@@ -60,20 +64,24 @@ ALL_CHECKS: list[type[Check]] = [
     DpkgRcCheck,
     ObsoletePackagesCheck,
     ConfigConflictsCheck,
+    PackageConfigCheck,
     DebsumsCheck,
     KernelRunningCheck,
     NeedrestartCheck,
     DkmsCheck,
     BootloaderCheck,
     BootSpaceCheck,
+    BootConfigCheck,
     SystemdFailedCheck,
     SystemdCriticalCheck,
     SystemdTimersCheck,
     JournalErrorsCheck,
     DmesgErrorsCheck,
+    OomEventsCheck,
     BootTimeCheck,
     FstabCheck,
     DiskSpaceCheck,
+    StorageHealthCheck,
     TimeSyncCheck,
     CronCheck,
     NetworkCheck,

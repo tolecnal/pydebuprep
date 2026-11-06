@@ -5,7 +5,8 @@ from urllib.parse import unquote
 
 from pydebuprep.checks._apt_metadata import LISTS_DIR, parse_release
 from pydebuprep.checks.apt_upgradable import package_lines
-from pydebuprep.checks.base import Check, Context, count, run_checked
+from pydebuprep.checks.base import Check, Context, Option, count, run_checked
+from pydebuprep.checks.kernel_running import compare_versions
 from pydebuprep.model import Finding, Severity, truncate_evidence
 from pydebuprep.system import apt_command
 
@@ -13,6 +14,7 @@ PKG_VERSIONS_ARGV = ("dpkg-query", "-W", "-f=${Package}\t${Version}\n")
 # Hosts that serve the distributions' own archives (mirrors too: deb.debian.org, ...).
 DISTRO_HOSTS = ("debian.org", "ubuntu.com", "canonical.com")
 NAMES_SHOWN = 10
+EXTENDED_STATES = "/var/lib/apt/extended_states"
 
 
 def installed_versions(ctx: Context) -> dict[str, str]:
@@ -77,14 +79,86 @@ def package_origins(ctx: Context, installed: dict[str, str]) -> dict[str, str]:
     }
 
 
+def _automatic(ctx: Context) -> set[str] | None:
+    """Packages APT installed as dependencies; None if its record can't be read."""
+    text = ctx.system.read_text(EXTENDED_STATES)
+    if text is None:
+        return None
+    automatic = set()
+    name = ""
+    for line in text.splitlines():
+        if line.startswith("Package:"):
+            name = line[8:].strip()
+        elif line.replace(" ", "") == "Auto-Installed:1":
+            automatic.add(name)
+    return automatic
+
+
+def _version_changes(before: dict[str, str], now: dict[str, str]) -> list[Finding]:
+    """A sum of what changed: thousands of new versions are the point of an upgrade. Only an
+    older version is unusual enough to name."""
+    kept = [name for name in before if name in now and before[name] != now[name]]
+    older = sorted(name for name in kept if compare_versions(now[name], before[name]) < 0)
+    upgraded = len(kept) - len(older)
+    new = sorted(name for name in now if name not in before)
+    findings = []
+    if older:
+        findings.append(
+            Finding(
+                Severity.WARNING,
+                f"{count(len(older), 'package has', 'packages have')} an older version "
+                "than before the upgrade",
+                detail="Unusual in an upgrade: a pin, or a package from another repository.",
+                evidence=truncate_evidence([f"{n}: {before[n]} to {now[n]}" for n in older]),
+                remediation=["Check each with: apt policy PACKAGE"],
+            )
+        )
+    parts = [count(upgraded, "package") + " upgraded"] if upgraded else []
+    parts += [f"{len(new)} new"] if new else []
+    if parts:
+        more = f", … ({len(new)})" if len(new) > NAMES_SHOWN else ""
+        findings.append(
+            Finding(
+                Severity.INFO,
+                f"Since the snapshot: {', '.join(parts)}",
+                evidence=[f"New: {', '.join(new[:NAMES_SHOWN])}{more}"] if new else [],
+            )
+        )
+    return findings
+
+
 class ObsoletePackagesCheck(Check):
     id = "obsolete-packages"
     title = "Packages not available from any repository"
     category = "packages"
     requires_commands = ("apt", "dpkg-query")
+    options = (
+        Option(
+            "protected_packages",
+            [],
+            "Packages that must stay installed: critical if one isn't",
+        ),
+    )
 
     def run(self, ctx: Context) -> list[Finding]:
-        return self._local(ctx) + self._third_party(ctx)
+        return self._protected(ctx) + self._local(ctx) + self._third_party(ctx)
+
+    def _protected(self, ctx: Context) -> list[Finding]:
+        if not self.opt("protected_packages"):
+            return []
+        now = installed_versions(ctx)
+        gone = sorted(name for name in self.opt("protected_packages") if name not in now)
+        if not gone:
+            return []
+        return [
+            Finding(
+                Severity.CRITICAL,
+                f"{count(len(gone), 'protected package', 'protected packages')} "
+                f"{'isn' if len(gone) == 1 else 'aren'}'t installed",
+                evidence=gone,
+                remediation=[f"sudo apt install {' '.join(gone)}"],
+            )
+        ]
 
     @staticmethod
     def _third_party(ctx: Context) -> list[Finding]:
@@ -145,7 +219,14 @@ class ObsoletePackagesCheck(Check):
 
     def collect_baseline(self, ctx: Context) -> Any:
         versions = installed_versions(ctx)
-        return {"versions": versions, "origins": package_origins(ctx, versions)}
+        baseline: dict[str, Any] = {
+            "versions": versions,
+            "origins": package_origins(ctx, versions),
+        }
+        automatic = _automatic(ctx)
+        if automatic is not None:
+            baseline["manual"] = sorted(set(versions) - automatic)
+        return baseline
 
     def compare(self, ctx: Context, before: Any) -> list[Finding]:
         # Snapshots from before 0.4 hold the versions only.
@@ -154,7 +235,21 @@ class ObsoletePackagesCheck(Check):
         origins_before = before.get("origins", {}) if new_format else {}
         now = installed_versions(ctx)
         findings = []
+        manual_before = set(before.get("manual", [])) if new_format else set()
         removed = sorted(name for name in versions if name not in now)
+        by_hand = [name for name in removed if name in manual_before]
+        if by_hand:
+            findings.append(
+                Finding(
+                    Severity.WARNING,
+                    f"{count(len(by_hand), 'package')} installed by hand "
+                    f"{'was' if len(by_hand) == 1 else 'were'} removed",
+                    detail="The upgrade removed something you asked for: check it isn't needed.",
+                    evidence=truncate_evidence([f"{n} {versions[n]}" for n in by_hand]),
+                    remediation=["Reinstall anything still needed: sudo apt install PACKAGE"],
+                )
+            )
+        removed = [name for name in removed if name not in manual_before]
         if removed:
             findings.append(
                 Finding(
@@ -165,6 +260,21 @@ class ObsoletePackagesCheck(Check):
                     remediation=["Reinstall anything still needed: sudo apt install PACKAGE"],
                 )
             )
+        findings += _version_changes(versions, now)
+        automatic = _automatic(ctx)
+        if automatic is not None:
+            marked = sorted(name for name in manual_before & automatic if name in now)
+            if marked:
+                findings.append(
+                    Finding(
+                        Severity.WARNING,
+                        f"{count(len(marked), 'package')} installed by hand "
+                        f"{'is' if len(marked) == 1 else 'are'} now marked automatic",
+                        detail="`apt autoremove` can remove it once nothing depends on it.",
+                        evidence=truncate_evidence(marked),
+                        remediation=["sudo apt-mark manual PACKAGE"],
+                    )
+                )
         if origins_before:
             origins_now = package_origins(ctx, now)
             moved = sorted(

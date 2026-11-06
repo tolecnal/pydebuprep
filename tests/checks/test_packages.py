@@ -126,7 +126,7 @@ def test_compare_removed_packages() -> None:
     }
     # Snapshots from before 0.4 hold the versions only.
     fs = ObsoletePackagesCheck().compare(ctx, {"bash": "5.1", "python3.11": "3.11.2", "zsh": "5.9"})
-    assert titles(fs) == ["1 package removed since baseline"]
+    assert titles(fs)[0] == "1 package removed since baseline"
     assert fs[0].evidence == ["python3.11 3.11.2"]
 
 

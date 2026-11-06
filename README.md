@@ -24,7 +24,7 @@ A health report suite for Debian and Ubuntu systems after a release upgrade
 guides.
 
 `systemctl --failed` and a look at `journalctl` catch some problems. pydebuprep
-runs the rest of the post-upgrade checklist in one go, with [42 checks](#checks):
+runs the rest of the post-upgrade checklist in one go, with [46 checks](#checks):
 
 - **packages:** APT sources still pointing at the old release, third-party
   repositories the upgrader disabled, half-configured packages, unmerged
@@ -253,6 +253,8 @@ The package also installs the example as
 | `apt-lists-age` | `max_age_days` (7) |
 | `config-conflicts` | `critical_paths` (sshd_config, sshd_config.d/, sudoers, sudoers.d/), `ignore_paths` ([]): patterns for files to leave out, e.g. ones Ansible manages |
 | `debsums` | `timeout_seconds` (600) |
+| `boot-config` | `ignore_parameters` (BOOT_IMAGE, initrd) |
+| `obsolete-packages` | `protected_packages` ([]): packages that must stay installed |
 | `boot-space` | `warning_pct` (25.0), `critical_pct` (10.0) |
 | `dmesg-errors`, `journal-errors` | `ignore` ([]): regular expressions for messages to leave out (see also `logs: ignore:`) |
 | `systemd-failed`, `systemd-timers` | `ignore_units` ([]): unit name patterns to leave out |
@@ -294,6 +296,8 @@ host never looks healthy just because a check couldn't look.
 | `dpkg-audit` | packages | Packages unpacked but not configured, needing reinstalling, or waiting for triggers (separately); `dpkg --audit` and `apt-get check` |
 | `dpkg-rc` | packages | Removed packages with leftover config |
 | `obsolete-packages` | packages | Installed packages no repository provides any more; packages from third-party repositories, by vendor; packages whose origin changed since the baseline |
+| `package-config` | packages | Alternatives that point to nothing; with a snapshot, APT pinning, foreign architectures, diversions and alternatives |
+| `boot-config` | boot | An initramfs for each kernel; with a snapshot, the kernel command line and Secure Boot |
 | `boot-space` | boot | Free space and inodes on `/boot` and the EFI partition |
 | `bootloader` | boot | `grub.cfg` references the newest kernel; UEFI boot entries |
 | `dkms` | boot | DKMS modules built for the running kernel |
@@ -303,6 +307,7 @@ host never looks healthy just because a check couldn't look.
 | `dmesg-errors` | services | Kernel errors and warnings (root) |
 | `journal-errors` | services | Errors in the journal since boot, grouped |
 | `needrestart` | services | Services still using old libraries (root, needs `needrestart`) |
+| `oom-events` | services | Processes killed for lack of memory this boot (root) |
 | `systemd-critical-services` | services | Critical units (built-in ssh, cron and journald where installed, plus configured ones) not running (failed ones are left to `systemd-failed`), masked, missing, disabled, or running without a required unit; units masked or missing since the baseline; listeners lost since the baseline (root) |
 | `systemd-failed` | services | Failed units; services active or enabled before the upgrade that aren't now |
 | `systemd-timers` | services | Enabled timers that aren't active |
@@ -325,6 +330,7 @@ host never looks healthy just because a check couldn't look.
 | `unattended-upgrades` | security | Installed but disabled, or still naming the old release in its allowed origins |
 | `disk-space` | storage | Free space and inodes on local filesystems (network mounts optional); a minimum free-space floor for `/` and `/var` |
 | `fstab` | storage | `findmnt --verify`; mounts that went missing since the baseline |
+| `storage-health` | storage | Software RAID, encrypted devices, swap, ZFS and Btrfs |
 
 ## Cleaning up after an upgrade
 

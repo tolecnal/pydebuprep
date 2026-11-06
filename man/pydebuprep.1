@@ -389,6 +389,12 @@ for each check's options.
 .B obsolete\-packages
 (packages) Installed packages no repository provides any more; packages from third\-party repositories, by vendor; packages whose origin changed since the baseline
 .TP
+.B package\-config
+(packages) Alternatives that point to nothing; with a snapshot, APT pinning, foreign architectures, diversions and alternatives
+.TP
+.B boot\-config
+(boot) An initramfs for each kernel; with a snapshot, the kernel command line and Secure Boot
+.TP
 .B boot\-space
 (boot) Free space and inodes on \fB/boot\fR and the EFI partition
 .TP
@@ -415,6 +421,9 @@ for each check's options.
 .TP
 .B needrestart
 (services) Services still using old libraries (root, needs \fBneedrestart\fR)
+.TP
+.B oom\-events
+(services) Processes killed for lack of memory this boot (root)
 .TP
 .B systemd\-critical\-services
 (services) Critical units (built\-in ssh, cron and journald where installed, plus configured ones) not running (failed ones are left to \fBsystemd\-failed\fR), masked, missing, disabled, or running without a required unit; units masked or missing since the baseline; listeners lost since the baseline (root)
@@ -481,6 +490,9 @@ for each check's options.
 .TP
 .B fstab
 (storage) \fBfindmnt \-\-verify\fR; mounts that went missing since the baseline
+.TP
+.B storage\-health
+(storage) Software RAID, encrypted devices, swap, ZFS and Btrfs
 .SH FILES
 .TP
 .I /etc/pydebuprep.conf

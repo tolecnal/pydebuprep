@@ -117,6 +117,7 @@ ALLOWED_COMMANDS: set[tuple[str, ...]] = {
     ("nft", "-j", "list", "ruleset"),
     ("iptables-legacy-save",),
     ("journalctl", "-b", "-k", "--no-pager", "-o", "cat", '--grep=apparmor="DENIED"'),
+    ("journalctl", "-b", "-k", "--no-pager", "-o", "cat", "--grep=ut of memory: Killed process"),
     ("apt-config", "dump"),
     ("sshd", "-t"),
     ("pg_lsclusters", "--no-header"),
@@ -588,6 +589,9 @@ class System:
             return os.readlink(path)
         except OSError:
             return None
+
+    def realpath(self, path: str) -> str:
+        return os.path.realpath(path)
 
     def glob(self, pattern: str) -> list[str]:
         return sorted(_glob.glob(pattern))

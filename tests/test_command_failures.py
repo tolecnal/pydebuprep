@@ -58,5 +58,12 @@ def test_snapshot_skips_checks_whose_commands_fail() -> None:
     system = BrokenSystem("timeout")
     snap = build_snapshot(checks.get_checks(), Context(system, detect_os(system)))
     # These read only files, so failing commands can't stop them.
-    assert set(snap["checks"]) <= {"os-release", "apt-sources", "cron"}
+    assert set(snap["checks"]) <= {
+        "os-release",
+        "apt-sources",
+        "cron",
+        "boot-config",
+        "package-config",
+        "storage-health",
+    }
     assert snap["kernel"] == "unknown"

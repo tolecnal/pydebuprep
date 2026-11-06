@@ -440,3 +440,9 @@ def test_var_tmp_scratch_paths_are_scratch() -> None:
     assert _in_scratch("/var/tmp/pydebuprep-abc123/key.gpg")
     assert _in_scratch("/tmp/pydebuprep-abc123/key.gpg")
     assert not _in_scratch("/var/tmp/other/key.gpg") and not _in_scratch("/home/u/pydebuprep-x/k")
+
+
+def test_realpath_follows_links(tmp_path: Path) -> None:
+    (tmp_path / "file").write_text("x")
+    (tmp_path / "link").symlink_to("file")
+    assert System().realpath(str(tmp_path / "link")) == str((tmp_path / "file").resolve())
