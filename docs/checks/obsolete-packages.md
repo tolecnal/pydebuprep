@@ -15,8 +15,11 @@ or installed from a repository that was disabled.
   version the distribution's archive has counts as the distribution's; the others are
   grouped by vendor, named by their repository's `Origin` and host
   (`Docker (download.docker.com)`).
-- With a snapshot: packages that were removed, and packages whose origin changed — a
-  vendor's package replaced by the distribution's, or the reverse.
+- Any `protected_packages` you list are installed.
+- With a snapshot: packages that were removed, packages whose origin changed — a
+  vendor's package replaced by the distribution's, or the reverse — and a sum of what
+  else changed. A version change alone isn't a finding: thousands are the point of an
+  upgrade, so only an older version is named.
 
 ## Findings
 
@@ -25,11 +28,17 @@ or installed from a repository that was disabled.
 | warning | *N* installed packages are not available from any configured repository | Inspect each with `apt policy PACKAGE`; replace it with the new release's equivalent, or remove it. |
 | info | *N* packages come from third-party repositories | They get updates only from their vendors: keep those repositories enabled and pointing at this release. |
 | warning | *N* packages come from a different origin than before the upgrade | Check each with `apt policy PACKAGE`; pin the origin you want in `/etc/apt/preferences.d/` if needed. |
+| critical | *N* protected packages aren't installed | `sudo apt install PACKAGE`. |
 | info | *N* packages removed since baseline | Check nothing you rely on is gone; reinstall with `sudo apt install PACKAGE`. |
+| warning | *N* packages installed by hand were removed | The upgrade removed something you asked for; reinstall it if it's still needed. |
+| warning | *N* packages installed by hand are now marked automatic | `apt autoremove` can remove them: `sudo apt-mark manual PACKAGE`. |
+| warning | *N* packages have an older version than before the upgrade | Unusual: a pin, or another repository. `apt policy PACKAGE`. |
+| info | Since the snapshot: *N* packages upgraded, *M* new | For the record. |
 
 ## Compared with a snapshot
 
-The snapshot records every installed package, its version, and where it came from.
+The snapshot records every installed package, its version, where it came from, and which
+were installed by hand (`/var/lib/apt/extended_states`).
 Snapshots taken by versions before 0.4 have no origins; with those, only removed
 packages are compared.
 

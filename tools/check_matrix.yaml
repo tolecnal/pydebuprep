@@ -53,6 +53,20 @@ obsolete-packages:
   - {what: "Packages from third-party repositories", severity: info, runs: always}
   - {what: "Packages removed since the snapshot", severity: info, runs: snapshot}
   - {what: "Packages whose origin changed", severity: warning, runs: snapshot}
+  - {what: "Packages installed by hand that were removed, or are now marked automatic", severity: warning, runs: snapshot}
+  - {what: "Packages with an older version", severity: warning, runs: snapshot}
+  - {what: "How many packages were upgraded and are new", severity: info, runs: snapshot}
+  - {what: "Packages in `protected_packages` are installed", severity: critical, runs: opt-in, option: protected_packages}
+package-config:
+  - {what: "Alternatives point to something that exists", severity: warning, runs: always}
+  - {what: "APT pinning files gone", severity: warning, runs: snapshot}
+  - {what: "APT pinning files new or changed", severity: info, runs: snapshot}
+  - {what: "Package architectures no longer enabled", severity: warning, runs: snapshot}
+  - {what: "Package architectures newly enabled", severity: info, runs: snapshot}
+  - {what: "Local diversions gone", severity: warning, runs: snapshot}
+  - {what: "Diversions with a new owner", severity: info, runs: snapshot}
+  - {what: "Alternatives chosen by hand that are different now", severity: warning, runs: snapshot}
+  - {what: "Automatic alternatives that point elsewhere", severity: info, runs: snapshot}
 config-conflicts:
   - {what: "Leftovers of `critical_paths` files, such as `sshd_config`", severity: critical, runs: always}
   - {what: "Other `.dpkg-*` and `.ucf-*` files under `/etc`", severity: warning, runs: always}
@@ -71,6 +85,11 @@ bootloader:
   - {what: "`grub.cfg` references the newest kernel", severity: "warning / info", runs: always}
   - {what: "UEFI: the firmware reports which entry booted, and it still exists", severity: "warning / info", runs: always}
   - {what: "No GRUB configuration found", severity: info, runs: always}
+boot-config:
+  - {what: "Each kernel has an initramfs", severity: warning, runs: always}
+  - {what: "Kernel parameters removed or changed", severity: warning, runs: snapshot}
+  - {what: "New kernel parameters", severity: info, runs: snapshot}
+  - {what: "A changed Secure Boot state", severity: "warning / info", runs: snapshot}
 boot-space:
   - {what: "Free space on `/boot` and `/boot/efi`", severity: "critical / warning", runs: always}
   - {what: "Free inodes on `/boot` and `/boot/efi`", severity: "critical / warning", runs: always}
@@ -96,6 +115,8 @@ boot-time:
   - {what: "Total boot time and slowest units", severity: info, runs: always}
   - {what: "The chain of units the boot waited on", severity: info, runs: always}
   - {what: "Boot hasn't finished yet", severity: info, runs: always}
+oom-events:
+  - {what: "Processes killed for lack of memory this boot", severity: warning, runs: always}
 needrestart:
   - {what: "Services using outdated libraries", severity: warning, runs: always}
   - {what: "A pending kernel upgrade", severity: warning, runs: always}
@@ -113,6 +134,14 @@ fstab:
   - {what: "`findmnt --verify`: warnings", severity: warning, runs: always}
   - {what: "Entries that can't be verified without root", severity: info, runs: always}
   - {what: "Filesystems mounted before and not now", severity: warning, runs: snapshot}
+storage-health:
+  - {what: "Software RAID: inactive, degraded, rebuilding or resynchronising arrays", severity: "critical / warning / info", runs: always}
+  - {what: "Encrypted devices in `/etc/crypttab` are open", severity: warning, runs: always}
+  - {what: "Swap in `/etc/fstab` is active", severity: warning, runs: always}
+  - {what: "ZFS pools are `ONLINE`", severity: critical, runs: always}
+  - {what: "Btrfs: missing devices and recorded errors", severity: "critical / warning", runs: always}
+  - {what: "RAID arrays and ZFS pools from before that are gone", severity: critical, runs: snapshot}
+  - {what: "Encrypted devices and swap from before that aren't active", severity: warning, runs: snapshot}
 disk-space:
   - {what: "Free space on local filesystems", severity: "critical / warning", runs: always}
   - {what: "Free inodes on local filesystems", severity: "critical / warning", runs: always}

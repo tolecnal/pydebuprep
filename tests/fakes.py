@@ -128,6 +128,9 @@ class FakeSystem(System):
     def readlink(self, path: str) -> str | None:
         return self.links.get(path)
 
+    def realpath(self, path: str) -> str:
+        return self._target(path)
+
     def tcp_connect(self, host: str, port: int, timeout: float) -> str | None:
         return None if (host, port) in self.ports else "Connection refused"
 

@@ -44,8 +44,8 @@ they are.
   derivatives, many checks work, but results may be incomplete and the
   [`os-release`](../checks/os-release.md) check reports it as unsupported.
 - Some areas aren't covered (yet): Podman and LXD (their clients write on first use),
-  snaps and Flatpaks, kernel command-line changes, RAID and SMART health. libvirt is
-  checked from its files, without its client.
+  snaps and Flatpaks, LVM, SMART and NVMe health. libvirt is checked from its files,
+  without its client.
 - Several checks need **root**; without it they're skipped.
 - In **containers** without systemd, checks that need systemd are skipped; a
   container also shares the host's kernel, clock and firewall, so those checks say

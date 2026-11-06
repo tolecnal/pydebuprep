@@ -25,14 +25,20 @@ def _unescape(text: str) -> str:
     return ESCAPE.sub(lambda m: chr(int(m.group(1), 16)), text)
 
 
-def swap_sources(ctx: Context) -> set[str]:
-    """Sources of swap entries in /etc/fstab (devices or swap files)."""
-    sources = set()
+def swap_entries(ctx: Context) -> list[tuple[str, str]]:
+    """Swap entries in /etc/fstab: their source (a device or swap file) and options."""
+    entries = []
     for line in (ctx.system.read_text("/etc/fstab") or "").splitlines():
         fields = line.split("#", 1)[0].split()
         if len(fields) >= 3 and fields[2] == "swap":
-            sources.add(_unescape(fields[0].replace("\\040", " ")))
-    return sources
+            options = fields[3] if len(fields) > 3 else ""
+            entries.append((_unescape(fields[0].replace("\\040", " ")), options))
+    return entries
+
+
+def swap_sources(ctx: Context) -> set[str]:
+    """Sources of swap entries in /etc/fstab (devices or swap files)."""
+    return {source for source, _ in swap_entries(ctx)}
 
 
 def _mounted(ctx: Context) -> list[str]:

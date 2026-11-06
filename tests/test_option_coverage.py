@@ -99,6 +99,14 @@ OPTION_TESTS: dict[tuple[str, str], str] = {
         "systemd-critical-services",
         "ignore_units",
     ): "checks.test_systemd_critical::test_builtin_false_and_ignore_units",
+    (
+        "boot-config",
+        "ignore_parameters",
+    ): "checks.test_boot_config::test_parameters_can_be_left_out",
+    (
+        "obsolete-packages",
+        "protected_packages",
+    ): "checks.test_package_insight::test_a_protected_package_that_is_gone_is_critical",
     ("systemd-failed", "ignore_units"): "checks.test_services::test_systemd_failed_ignore_units",
     ("systemd-timers", "ignore_units"): "checks.test_services::test_systemd_timers_ignore_units",
 }

@@ -144,6 +144,31 @@
             "null"
           ]
         },
+        "boot-config": {
+          "additionalProperties": false,
+          "description": "Initramfs, kernel command line and Secure Boot",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "ignore_parameters": {
+              "default": [
+                "BOOT_IMAGE",
+                "initrd"
+              ],
+              "description": "Kernel parameters left out of the comparison, by name (shell-style patterns)",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
         "boot-space": {
           "additionalProperties": false,
           "description": "Free space on /boot and the EFI partition",
@@ -630,6 +655,28 @@
             "enabled": {
               "default": true,
               "type": "boolean"
+            },
+            "protected_packages": {
+              "default": [],
+              "description": "Packages that must stay installed: critical if one isn't",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "oom-events": {
+          "additionalProperties": false,
+          "description": "Processes killed for lack of memory",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
             }
           },
           "type": [
@@ -640,6 +687,20 @@
         "os-release": {
           "additionalProperties": false,
           "description": "Operating system release",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "package-config": {
+          "additionalProperties": false,
+          "description": "APT pinning, architectures, diversions and alternatives",
           "properties": {
             "enabled": {
               "default": true,
@@ -750,6 +811,20 @@
         "ssh-server": {
           "additionalProperties": false,
           "description": "SSH server configuration",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "storage-health": {
+          "additionalProperties": false,
+          "description": "RAID, encrypted devices, swap, ZFS and Btrfs",
           "properties": {
             "enabled": {
               "default": true,
