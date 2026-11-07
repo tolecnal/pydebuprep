@@ -1,3 +1,16 @@
+pydebuprep (0.15.2) unstable; urgency=medium
+
+  * upgrade-log now reads the APT logs Ubuntu's release upgrader keeps in
+    /var/log/dist-upgrade. It was missing the failures and removals of
+    do-release-upgrade, which don't go to /var/log/apt. Upgrades with plain
+    apt, as on Debian, were read correctly.
+  * obsolete-packages no longer counts removed libraries (lib*) as installed by
+    hand: a base system's libraries aren't marked automatic either, and upgrades
+    rename them. The finding now says "marked as installed by hand".
+  * The report format is unchanged: portal 0.11.0 takes these reports.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Sat, 07 Nov 2026 03:02:37 +0100
+
 pydebuprep (0.15.1) unstable; urgency=medium
 
   * The first release of what was meant to be 0.15.0: that tag exists, but a

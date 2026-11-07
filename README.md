@@ -77,7 +77,7 @@ sudo apt install ./pydebuprep_*_all.deb
 Without the GitHub CLI, download a specific version and skip the attestation check:
 
 ```sh
-VERSION=0.15.1
+VERSION=0.15.2
 wget https://github.com/tolecnal/pydebuprep/releases/download/v$VERSION/pydebuprep_${VERSION}_all.deb \
      https://github.com/tolecnal/pydebuprep/releases/download/v$VERSION/SHA256SUMS
 sha256sum -c SHA256SUMS && sudo apt install ./pydebuprep_${VERSION}_all.deb
@@ -466,7 +466,7 @@ push a matching tag from `main` (release tags are protected: only maintainers ca
 them):
 
 ```sh
-git tag -a v0.15.1 -m "pydebuprep 0.15.1" && git push origin v0.15.1
+git tag -a v0.15.2 -m "pydebuprep 0.15.2" && git push origin v0.15.2
 ```
 
 The **Release** workflow builds the `.deb` once and lints it with lintian. It then
@@ -479,7 +479,7 @@ To check a download:
 
 ```sh
 sha256sum -c SHA256SUMS
-gh attestation verify pydebuprep_0.15.1_all.deb --repo tolecnal/pydebuprep
+gh attestation verify pydebuprep_0.15.2_all.deb --repo tolecnal/pydebuprep
 ```
 
 Running the workflow by hand (workflow_dispatch) builds and verifies the package

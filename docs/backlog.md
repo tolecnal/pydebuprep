@@ -1,6 +1,6 @@
 # Backlog
 
-What is still open, as of 2026-11-07 (after pydebuprep 0.15.1 and the portal release built on it). Remove items as they are done.
+What is still open, as of 2026-11-07 (after pydebuprep 0.15.2 and the portal release built on it). Remove items as they are done.
 
 ## GitHub repository settings
 
@@ -139,7 +139,8 @@ From a review of proposed improvements on 2026-11-07. Phase 1 (small file-read c
 phase 2 (the upgrade-transaction audit) are done, and so is phase 3; the rest as we go.
 
 - [ ] Check on real hosts: `storage-health` on RAID, LUKS, ZFS and Btrfs. `upgrade-log` was
-      checked on real upgrades, Debian 12 to 13 and Ubuntu 22.04 to 24.04, in containers.
+      checked on real upgrades in containers: Ubuntu 22.04 to 24.04, and Debian 12 to 13 both
+      clean and with a package's script failing partway, then repaired.
 
 - [x] Phase 3: `snapshot` runs every check and records what it finds, and reports label each
       finding new, worse or pre-existing. Severity and exit codes don't change.
