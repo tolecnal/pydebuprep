@@ -1,3 +1,35 @@
+pydebuprep (0.15.0) unstable; urgency=medium
+
+  * Reports compared with a snapshot label each finding: new since the
+    snapshot, worse than at the snapshot, or already there at the snapshot, in
+    every format, with a count in the header. Severity and exit codes don't
+    change.
+  * snapshot now runs every check to record what it finds, so it takes as long
+    as a report (debsums can take many minutes) and has the same agreed side
+    effects. --no-findings or snapshot_findings: false leaves it out.
+  * UPGRADE THE PORTAL FIRST: reports can now carry the new field
+    since_snapshot, which portals before 0.11.0 refuse. Reports without a
+    snapshot taken by this version don't carry it.
+  * New check upgrade-log: what APT, dpkg and Ubuntu's release upgrader logged
+    since the snapshot, or in the last 30 days: failed package scripts, errors,
+    interrupted runs, removals, and logs that can't say.
+  * New check boot-config: an initramfs for each kernel; with a snapshot, the
+    kernel command line and Secure Boot.
+  * New check package-config: alternatives that point to nothing; with a
+    snapshot, APT pinning, foreign architectures, diversions and alternatives.
+  * New check storage-health: software RAID, encrypted devices, swap, ZFS and
+    Btrfs, read from /proc, /sys and /etc.
+  * New check oom-events: processes killed for lack of memory this boot.
+  * obsolete-packages sums up version changes since the snapshot, and warns of
+    older versions and of packages installed by hand that were removed or are
+    now marked automatic. A new option, protected_packages, makes it critical
+    if a package you list isn't installed.
+  * It's now clear in the documentation, and at a terminal before it runs, that
+    debsums can take many minutes. The limitations page says what is tested and
+    what a pass proves.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Sat, 07 Nov 2026 01:01:55 +0100
+
 pydebuprep (0.14.0) unstable; urgency=medium
 
   * Security fixes; upgrade if hosts run with configs from a portal or have
