@@ -224,9 +224,8 @@ def test_a_bad_label_is_refused() -> None:
 
 
 def test_the_schema_allows_exactly_these_labels() -> None:
-    from jsonschema import Draft202012Validator
-
-    validator = Draft202012Validator(report_schema())
+    jsonschema = pytest.importorskip("jsonschema")  # not there when the package is built
+    validator = jsonschema.Draft202012Validator(report_schema())
     data = json.loads(render(labelled_report(), "json"))
     assert list(validator.iter_errors(data)) == []
     data["results"][0]["findings"][0]["since_snapshot"] = "other"

@@ -15,7 +15,7 @@ adds nothing to the report, so the same portals take its reports; portal 0.5.0, 
 on it, also shows [what each report was compared with](#snapshots-in-the-portal) and
 offers 0.9.0's new checks and options in its config generator. pydebuprep 0.10.0
 through 0.14.0 change nothing in the report either, so the same portals take their reports.
-From 0.15.0 a report compared with a snapshot taken by 0.15.0 or later has a new field,
+From 0.15.1 a report compared with a snapshot taken by 0.15.1 or later has a new field,
 `since_snapshot`, which needs portal 0.11.0 or later: upgrade the portal first.
 
 ## The token

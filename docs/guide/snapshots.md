@@ -48,7 +48,7 @@ A report compared with a snapshot labels each finding:
 
 The report's header counts them. A label changes neither a finding's severity nor the exit
 code: an old problem is still a problem. A finding has no label when the snapshot can't say:
-it was taken with `--no-findings` or by a version before 0.15, or the check was skipped or
+it was taken with `--no-findings` or by a version before 0.15.1, or the check was skipped or
 failed then.
 
 Findings are compared by their text, ignoring numbers, so `1 package is held back` and `3

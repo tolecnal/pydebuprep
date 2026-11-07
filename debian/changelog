@@ -1,5 +1,7 @@
-pydebuprep (0.15.0) unstable; urgency=medium
+pydebuprep (0.15.1) unstable; urgency=medium
 
+  * The first release of what was meant to be 0.15.0: that tag exists, but a
+    test stopped its package from building, so nothing was published.
   * Reports compared with a snapshot label each finding: new since the
     snapshot, worse than at the snapshot, or already there at the snapshot, in
     every format, with a count in the header. Severity and exit codes don't
