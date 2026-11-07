@@ -53,7 +53,7 @@ obsolete-packages:
   - {what: "Packages from third-party repositories", severity: info, runs: always}
   - {what: "Packages removed since the snapshot", severity: info, runs: snapshot}
   - {what: "Packages whose origin changed", severity: warning, runs: snapshot}
-  - {what: "Packages installed by hand that were removed, or are now marked automatic", severity: warning, runs: snapshot}
+  - {what: "Packages marked as installed by hand that were removed, or are now marked automatic", severity: warning, runs: snapshot}
   - {what: "Packages with an older version", severity: warning, runs: snapshot}
   - {what: "How many packages were upgraded and are new", severity: info, runs: snapshot}
   - {what: "Packages in `protected_packages` are installed", severity: critical, runs: opt-in, option: protected_packages}

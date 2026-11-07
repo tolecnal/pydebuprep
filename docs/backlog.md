@@ -138,8 +138,8 @@ audit if one of them stops running.
 From a review of proposed improvements on 2026-11-07. Phase 1 (small file-read checks) and
 phase 2 (the upgrade-transaction audit) are done, and so is phase 3; the rest as we go.
 
-- [ ] Check on real hosts: `storage-health` on RAID, LUKS, ZFS and Btrfs, and `upgrade-log` on
-      a real release upgrade, Ubuntu's upgrader log included.
+- [ ] Check on real hosts: `storage-health` on RAID, LUKS, ZFS and Btrfs. `upgrade-log` was
+      checked on real upgrades, Debian 12 to 13 and Ubuntu 22.04 to 24.04, in containers.
 
 - [x] Phase 3: `snapshot` runs every check and records what it finds, and reports label each
       finding new, worse or pre-existing. Severity and exit codes don't change.

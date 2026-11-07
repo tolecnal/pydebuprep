@@ -261,3 +261,49 @@ def test_rotated_dpkg_logs_count_by_time_not_by_file_order() -> None:
     assert summary(UpgradeLogCheck().run(ctx)) == [
         (Severity.INFO, "1 package failed, then installed correctly later")
     ]
+
+
+# --- do-release-upgrade keeps APT's logs in its own directory -----------------------------
+
+UPGRADER_HISTORY = "/var/log/dist-upgrade/history.log"
+UPGRADER_TERM = "/var/log/dist-upgrade/apt-term.log"
+# As a real upgrade from Ubuntu 22.04 to 24.04 wrote them: no Commandline.
+REAL_UPGRADER_RUN = """
+Start-Date: 2026-10-20  20:46:43
+Remove: libgdbm-compat4:amd64 (1.23-1), libext2fs2:amd64 (1.46.5-2ubuntu1.2)
+End-Date: 2026-10-20  20:48:11
+
+Start-Date: 2026-10-20  20:48:15
+Purge: python3.10:amd64 (3.10.12-1~22.04.18)
+Error: Sub-process /usr/bin/dpkg returned an error code (1)
+End-Date: 2026-10-20  20:48:29
+"""
+
+
+def test_the_release_upgraders_own_logs_are_read() -> None:
+    ctx = make_ctx(files={**QUIET, UPGRADER_HISTORY: REAL_UPGRADER_RUN, UPGRADER_TERM: FAILED_TERM})
+    fs = UpgradeLogCheck().run(ctx)
+    assert summary(fs) == [
+        (Severity.WARNING, "1 APT run reported errors"),
+        (Severity.INFO, "3 packages were removed or purged"),
+        (Severity.WARNING, "1 package failed during installation or upgrade"),
+    ]
+    assert fs[0].evidence == [
+        "2026-10-20 20:48:15: (no command line): "
+        "Sub-process /usr/bin/dpkg returned an error code (1)"
+    ]
+    assert fs[1].evidence == ["libext2fs2", "libgdbm-compat4", "python3.10"]
+
+
+def test_logs_of_earlier_release_upgrades_are_read_too() -> None:
+    old = "/var/log/dist-upgrade/20261020-2000"
+    ctx = make_ctx(
+        files={**QUIET, f"{old}/history.log": REAL_UPGRADER_RUN, f"{old}/apt-term.log": FAILED_TERM}
+    )
+    assert len(UpgradeLogCheck().run(ctx)) == 3
+
+
+def test_a_release_upgrade_that_never_finished_is_reported() -> None:
+    unfinished = "\nStart-Date: 2026-10-20  20:46:43\nInstall: a:amd64 (1)\n"
+    (f,) = UpgradeLogCheck().run(make_ctx(files={**QUIET, UPGRADER_HISTORY: unfinished}))
+    assert f.evidence == ["2026-10-20 20:46:43: (no command line)"]

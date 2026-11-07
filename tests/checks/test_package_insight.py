@@ -299,7 +299,7 @@ def test_a_removed_manual_package_is_a_warning() -> None:
     fs = _compare_changes({"versions": {"a": "1", "b": "1", "c": "1"}, "manual": ["a", "c"]},
                           _versions(c="1"))  # fmt: skip
     assert [(f.severity, f.title, f.evidence) for f in fs] == [
-        (Severity.WARNING, "1 package installed by hand was removed", ["a 1"]),
+        (Severity.WARNING, "1 package marked as installed by hand was removed", ["a 1"]),
         (Severity.INFO, "1 package removed since baseline", ["b 1"]),
     ]
 
@@ -311,7 +311,11 @@ def test_a_manual_package_now_automatic_is_a_warning() -> None:
         {EXTENDED: STATES_FILE},
     )
     assert [(f.severity, f.title, f.evidence) for f in fs] == [
-        (Severity.WARNING, "1 package installed by hand is now marked automatic", ["libfoo"])
+        (
+            Severity.WARNING,
+            "1 package marked as installed by hand is now marked automatic",
+            ["libfoo"],
+        )
     ]
 
 
@@ -341,3 +345,14 @@ def test_a_manual_package_still_manual_is_silent() -> None:
         {"versions": {"bar": "1"}, "manual": ["bar"]}, _versions(bar="1"), {EXTENDED: STATES_FILE}
     )
     assert fs == []
+
+
+def test_a_removed_library_is_not_called_installed_by_hand() -> None:
+    """A base system's libraries aren't marked automatic either, and upgrades rename them."""
+    fs = _compare_changes(
+        {"versions": {"libssl3": "3", "tool": "1"}, "manual": ["libssl3", "tool"]}, _versions()
+    )
+    assert [(f.severity, f.title, f.evidence) for f in fs] == [
+        (Severity.WARNING, "1 package marked as installed by hand was removed", ["tool 1"]),
+        (Severity.INFO, "1 package removed since baseline", ["libssl3 3"]),
+    ]

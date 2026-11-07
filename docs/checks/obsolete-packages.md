@@ -30,8 +30,8 @@ or installed from a repository that was disabled.
 | warning | *N* packages come from a different origin than before the upgrade | Check each with `apt policy PACKAGE`; pin the origin you want in `/etc/apt/preferences.d/` if needed. |
 | critical | *N* protected packages aren't installed | `sudo apt install PACKAGE`. |
 | info | *N* packages removed since baseline | Check nothing you rely on is gone; reinstall with `sudo apt install PACKAGE`. |
-| warning | *N* packages installed by hand were removed | The upgrade removed something you asked for; reinstall it if it's still needed. |
-| warning | *N* packages installed by hand are now marked automatic | `apt autoremove` can remove them: `sudo apt-mark manual PACKAGE`. |
+| warning | *N* packages marked as installed by hand were removed | Someone may have asked for them, or they came with the base system; reinstall what's still needed. Libraries (`lib*`) aren't counted: upgrades rename them. |
+| warning | *N* packages marked as installed by hand are now marked automatic | `apt autoremove` can remove them: `sudo apt-mark manual PACKAGE`. |
 | warning | *N* packages have an older version than before the upgrade | Unusual: a pin, or another repository. `apt policy PACKAGE`. |
 | info | Since the snapshot: *N* packages upgraded, *M* new | For the record. |
 

@@ -237,19 +237,21 @@ class ObsoletePackagesCheck(Check):
         findings = []
         manual_before = set(before.get("manual", [])) if new_format else set()
         removed = sorted(name for name in versions if name not in now)
-        by_hand = [name for name in removed if name in manual_before]
+        # A base system's libraries aren't marked automatic either, and upgrades rename them.
+        by_hand = [n for n in removed if n in manual_before and not n.startswith("lib")]
         if by_hand:
             findings.append(
                 Finding(
                     Severity.WARNING,
-                    f"{count(len(by_hand), 'package')} installed by hand "
+                    f"{count(len(by_hand), 'package')} marked as installed by hand "
                     f"{'was' if len(by_hand) == 1 else 'were'} removed",
-                    detail="The upgrade removed something you asked for: check it isn't needed.",
+                    detail="APT doesn't mark it as a dependency, so someone may have asked for it, "
+                    "or it came with the base system: check it isn't needed.",
                     evidence=truncate_evidence([f"{n} {versions[n]}" for n in by_hand]),
                     remediation=["Reinstall anything still needed: sudo apt install PACKAGE"],
                 )
             )
-        removed = [name for name in removed if name not in manual_before]
+        removed = [name for name in removed if name not in by_hand]
         if removed:
             findings.append(
                 Finding(
@@ -268,7 +270,7 @@ class ObsoletePackagesCheck(Check):
                 findings.append(
                     Finding(
                         Severity.WARNING,
-                        f"{count(len(marked), 'package')} installed by hand "
+                        f"{count(len(marked), 'package')} marked as installed by hand "
                         f"{'is' if len(marked) == 1 else 'are'} now marked automatic",
                         detail="`apt autoremove` can remove it once nothing depends on it.",
                         evidence=truncate_evidence(marked),
