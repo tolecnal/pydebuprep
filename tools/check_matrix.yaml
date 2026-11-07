@@ -148,7 +148,7 @@ storage-health:
   - {what: "ZFS pools are `ONLINE`", severity: critical, runs: always}
   - {what: "Btrfs: missing devices and recorded errors", severity: "critical / warning", runs: always}
   - {what: "RAID arrays and ZFS pools from before that are gone", severity: critical, runs: snapshot}
-  - {what: "Encrypted devices and swap from before that aren't active", severity: warning, runs: snapshot}
+  - {what: "LVM volumes, encrypted devices and swap from before that aren't active", severity: warning, runs: snapshot}
 disk-space:
   - {what: "Free space on local filesystems", severity: "critical / warning", runs: always}
   - {what: "Free inodes on local filesystems", severity: "critical / warning", runs: always}
@@ -162,12 +162,23 @@ network:
   - {what: "A changed default route", severity: warning, runs: snapshot}
   - {what: "A changed network manager", severity: warning, runs: snapshot}
   - {what: "Changed DNS servers", severity: info, runs: snapshot}
+listeners:
+  - {what: "TCP and UDP listeners that are gone", severity: warning, runs: snapshot}
+  - {what: "Ports now reachable from other hosts", severity: warning, runs: snapshot}
+  - {what: "New listeners other hosts can reach", severity: warning, runs: snapshot}
+  - {what: "Ports on other addresses, new local listeners, and Unix sockets gone", severity: info, runs: snapshot}
+  - {what: "Listeners with another process behind them", severity: info, runs: snapshot}
 firewall:
   - {what: "ufw is enabled and its rules are loaded", severity: warning, runs: always}
   - {what: "`nftables.service` is enabled and rules are loaded", severity: warning, runs: always}
   - {what: "Any rules are loaded at all", severity: info, runs: always}
   - {what: "Rules that were loaded before and aren't now", severity: critical, runs: snapshot}
   - {what: "A changed firewall frontend", severity: info, runs: snapshot}
+auth-config:
+  - {what: "`visudo -c`: sudoers are valid", severity: critical, runs: always, root: true}
+  - {what: "PAM modules exist", severity: "critical / warning", runs: always}
+  - {what: "Name service modules exist", severity: warning, runs: always}
+  - {what: "Modules lost from PAM's login paths and the name service", severity: warning, runs: snapshot}
 apparmor:
   - {what: "AppArmor is enabled", severity: warning, runs: always}
   - {what: "Denials this boot", severity: warning, runs: always}

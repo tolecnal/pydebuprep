@@ -1,4 +1,4 @@
-"""storage-health: RAID, encrypted devices, swap, ZFS and Btrfs, from /proc and /sys."""
+"""storage-health: RAID, LVM, encrypted devices, swap, ZFS and Btrfs, from /proc and /sys."""
 
 from __future__ import annotations
 
@@ -169,6 +169,7 @@ def test_baseline_and_nothing_changed() -> None:
         "encrypted": ["cryptroot"],
         "swaps": ["/swapfile"],
         "pools": ["tank"],
+        "volumes": [],
     }
     assert check.compare(ctx, before) == []
 
@@ -185,3 +186,26 @@ def test_what_is_gone_since_the_snapshot() -> None:
 
 def test_a_snapshot_without_these_is_silent() -> None:
     assert StorageHealthCheck().compare(make_ctx(), {}) == []
+
+
+def _logical_volumes() -> dict[str, str]:
+    return {
+        "/sys/block/dm-0/dm/name": "vg-root\n",
+        "/sys/block/dm-0/dm/uuid": "LVM-abcdef\n",
+        "/sys/block/dm-1/dm/name": "vg-root-real\n",
+        "/sys/block/dm-1/dm/uuid": "LVM-abcdef-real\n",
+        "/sys/block/dm-2/dm/name": "crypt\n",
+        "/sys/block/dm-2/dm/uuid": "CRYPT-LUKS2-x\n",
+    }
+
+
+def test_baseline_records_logical_volumes_but_not_their_internals() -> None:
+    before = StorageHealthCheck().collect_baseline(make_ctx(files=_logical_volumes()))
+    assert before["volumes"] == ["vg-root"]
+
+
+def test_a_logical_volume_that_is_gone_is_a_warning() -> None:
+    fs = StorageHealthCheck().compare(make_ctx(), {"volumes": ["vg-root"]})
+    assert summary(fs) == [
+        (Severity.WARNING, "1 LVM volume from before the upgrade isn't active", ["vg-root"])
+    ]

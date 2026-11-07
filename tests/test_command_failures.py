@@ -65,5 +65,7 @@ def test_snapshot_skips_checks_whose_commands_fail() -> None:
         "boot-config",
         "package-config",
         "storage-health",
+        "auth-config",
+        "listeners",
     }
     assert snap["kernel"] == "unknown"

@@ -133,9 +133,11 @@ nav:
           - python-venvs: checks/python-venvs.md
       - Network:
           - firewall: checks/firewall.md
+          - listeners: checks/listeners.md
           - network: checks/network.md
       - Security:
           - apparmor: checks/apparmor.md
+          - auth-config: checks/auth-config.md
           - ssh-server: checks/ssh-server.md
           - unattended-upgrades: checks/unattended-upgrades.md
       - Storage:

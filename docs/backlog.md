@@ -146,8 +146,9 @@ phase 2 (the upgrade-transaction audit) are done, and so is phase 3; the rest as
       finding new, worse or pre-existing. Severity and exit codes don't change.
 - [ ] Before hosts upload reports with these labels, release a portal built on the same
       pydebuprep version: older portals refuse `since_snapshot`.
-- [ ] Phase 4: a listening-socket inventory; PAM and NSS from their files; `visudo -c` and
-      LVM once the read-only audit passes them.
+- [x] Phase 4: `listeners`, `auth-config` (with `visudo -c`), and active LVM volumes in
+      `storage-health`. LVM's commands were measured and rejected: plain ones write lock
+      files, and with `--readonly` they still try to rewrite `/run/lvm/hints`.
 - [ ] Phase 5: functional probes. Agreed: a root process may contact external hosts when
       the local config asks for it; opt-in, and never from a config fetched from a URL.
 - [ ] Phase 6: a release-transition knowledge base, shipped inside the package.

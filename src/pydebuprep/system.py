@@ -120,6 +120,7 @@ ALLOWED_COMMANDS: set[tuple[str, ...]] = {
     ("journalctl", "-b", "-k", "--no-pager", "-o", "cat", "--grep=ut of memory: Killed process"),
     ("apt-config", "dump"),
     ("sshd", "-t"),
+    ("visudo", "-c"),  # only parses; measured with strace to write nothing, not even a lock
     ("pg_lsclusters", "--no-header"),
     ("mariadbd", "--version"),
     ("postconf", "-n"),
