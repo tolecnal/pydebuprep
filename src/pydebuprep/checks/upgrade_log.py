@@ -7,6 +7,7 @@ import re
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from itertools import chain
 
 from pydebuprep.checks.base import Check, Context, Option, count
 from pydebuprep.model import Finding, Severity, truncate_evidence
@@ -14,7 +15,9 @@ from pydebuprep.model import Finding, Severity, truncate_evidence
 HISTORY = "/var/log/apt/history.log"
 TERM = "/var/log/apt/term.log"
 DPKG = "/var/log/dpkg.log"
-UPGRADER_LOGS = ("/var/log/dist-upgrade/main.log", "/var/log/dist-upgrade/*/main.log")
+# do-release-upgrade sends APT's logs here, not to /var/log/apt. A second upgrade moves the
+# first one's files into a directory named by its date.
+UPGRADER_DIRS = ("/var/log/dist-upgrade", "/var/log/dist-upgrade/*")
 MAX_DAYS = 365
 STAMP_LENGTH = len("2026-10-20 20:00:00")
 # Logs keep local time. Lexical order of these strings is time order.
@@ -35,7 +38,7 @@ def _stamp(text: str) -> str:
 @dataclass
 class _Run:
     start: str
-    command: str = ""
+    command: str = "(no command line)"  # the release upgrader's runs record none
     errors: list[str] = field(default_factory=list)
     finished: bool = False
 
@@ -96,6 +99,15 @@ def _lines(ctx: Context, path: str) -> Iterator[str]:
         yield from ctx.system.lines(file)
 
 
+def _upgrader_files(ctx: Context, name: str) -> list[str]:
+    return [path for folder in UPGRADER_DIRS for path in ctx.system.glob(f"{folder}/{name}")]
+
+
+def _upgrader_lines(ctx: Context, name: str) -> Iterator[str]:
+    for path in _upgrader_files(ctx, name):
+        yield from ctx.system.lines(path)
+
+
 def _dpkg_log(ctx: Context, start: str) -> tuple[dict[str, tuple[str, str]], str | None]:
     """Each package's last (time, status) since START, and the log's first time."""
     last: dict[str, tuple[str, str]] = {}
@@ -118,7 +130,7 @@ def _history(ctx: Context, start: str) -> Iterator[tuple[_Run, list[str]]]:
     """Each APT run since START, with the packages it removed."""
     run: _Run | None = None
     removed: list[str] = []
-    for line in _lines(ctx, HISTORY):
+    for line in chain(_lines(ctx, HISTORY), _upgrader_lines(ctx, "history.log")):
         key, _, value = line.strip().partition(": ")
         if key == "Start-Date":
             if run is not None:
@@ -186,7 +198,7 @@ def _term_failures(ctx: Context, start: str) -> dict[tuple[str, str], tuple[str,
     failures: dict[tuple[str, str], tuple[str, str]] = {}
     stamp = ""
     pending: tuple[str, str] | None = None
-    for line in _lines(ctx, TERM):
+    for line in chain(_lines(ctx, TERM), _upgrader_lines(ctx, "apt-term.log")):
         text = line.strip()
         if pending is not None:
             failures[pending] = (stamp, text)
@@ -244,12 +256,10 @@ def _failure_findings(open_failures: list[str], fixed: list[str]) -> list[Findin
 
 def _upgrader_errors(ctx: Context, start: str) -> list[Finding]:
     errors = []
-    for pattern in UPGRADER_LOGS:
-        for path in ctx.system.glob(pattern):
-            for line in ctx.system.lines(path):
-                match = UPGRADER_ERROR.match(line)
-                if match and match.group(1) >= start:
-                    errors.append(match.group(2).strip())
+    for line in _upgrader_lines(ctx, "main.log"):
+        match = UPGRADER_ERROR.match(line)
+        if match and match.group(1) >= start:
+            errors.append(match.group(2).strip())
     if not errors:
         return []
     return [

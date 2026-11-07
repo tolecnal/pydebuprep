@@ -14,6 +14,8 @@ It reads, rotated and compressed copies included:
 - `/var/log/apt/term.log`: packages whose scripts failed (`dpkg: error processing package`).
   With `/var/log/dpkg.log` it tells a failure that was put right later from one that wasn't;
 - `/var/log/dist-upgrade/main.log`: errors from Ubuntu's release upgrader, where it ran.
+  That upgrader keeps APT's logs there too (`history.log`, `apt-term.log`), not in
+  `/var/log/apt`, and they're read the same way, those of earlier upgrades included.
 
 With a snapshot it reads from the moment the snapshot was taken, so older problems aren't
 blamed on the upgrade. Without one it reads the last `days` days (30).
