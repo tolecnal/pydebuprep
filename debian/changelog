@@ -1,3 +1,18 @@
+pydebuprep (0.16.0) unstable; urgency=medium
+
+  * New check listeners (root): with a snapshot, TCP, UDP and Unix listeners
+    that are gone, ports now reachable from other hosts, new listeners, and
+    another process behind a listener. Read from /proc.
+  * New check auth-config: sudoers with visudo -c (root), and whether the
+    modules PAM and the name service use exist; with a snapshot, modules lost.
+    Nothing logs in, and no directory server is contacted.
+  * storage-health also compares active LVM volumes with the snapshot, read from
+    /sys. LVM's commands aren't used: even with --readonly they try to rewrite
+    /run/lvm/hints.
+  * The report format is unchanged: portal 0.11.0 takes these reports.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Sat, 07 Nov 2026 04:08:09 +0100
+
 pydebuprep (0.15.2) unstable; urgency=medium
 
   * upgrade-log now reads the APT logs Ubuntu's release upgrader keeps in
