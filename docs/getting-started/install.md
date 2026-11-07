@@ -16,6 +16,11 @@ gh attestation verify pydebuprep_*_all.deb -R tolecnal/pydebuprep
 sudo apt install ./pydebuprep_*_all.deb
 ```
 
+!!! note "Versions: 0.14.0 is followed by 0.15.1"
+    There is no pydebuprep 0.15.0: its tag `v0.15.0` exists, but a test stopped its package
+    from building, so nothing was published, and tags can't be moved. 0.15.1 holds what it
+    was meant to.
+
 `gh attestation verify` proves the package was built by this repository's release
 workflow from a release tag, and not modified since. See
 [Security and releases](../about/security.md).

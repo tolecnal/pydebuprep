@@ -455,6 +455,9 @@ make docs         # strict build into site/
 
 ## Releases
 
+There is no pydebuprep 0.15.0: its tag `v0.15.0` exists, but a test stopped its package from
+building, so nothing was published, and tags can't be moved. 0.15.1 holds what it was meant to.
+
 Bump the version in `debian/changelog` (`dch -v X.Y.Z`) and in
 `src/pydebuprep/__init__.py` together. Before merging that, run the **CI** workflow by
 hand on its branch (`gh workflow run CI --ref BRANCH`): pull requests skip the package's own
