@@ -54,6 +54,11 @@ first agreed side effects) released on 2026-11-02, published with `SHA256SUMS` a
 verified provenance attestation. Its report format is unchanged, so portal 0.3.0 and
 newer take its reports.
 
+`v0.15.0` (2026-11-07) has a tag but no release: `tests/test_since_snapshot.py` needed
+`jsonschema`, which package builds don't have, and pull requests skip that test run. Tags
+can't be moved, so `v0.15.1` followed, with the same content and the fix. The manual CI run
+in the README's release steps exists because of this.
+
 - [ ] Before the next release: bump `debian/changelog` (`dch -v X.Y.Z`) and
       `__version__` together. The Release workflow refuses a tag that doesn't
       match both.
