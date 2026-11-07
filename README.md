@@ -24,7 +24,7 @@ A health report suite for Debian and Ubuntu systems after a release upgrade
 guides.
 
 `systemctl --failed` and a look at `journalctl` catch some problems. pydebuprep
-runs the rest of the post-upgrade checklist in one go, with [47 checks](#checks):
+runs the rest of the post-upgrade checklist in one go, with [49 checks](#checks):
 
 - **packages:** APT sources still pointing at the old release, third-party
   repositories the upgrader disabled, half-configured packages, unmerged
@@ -253,6 +253,7 @@ The package also installs the example as
 | `apt-lists-age` | `max_age_days` (7) |
 | `config-conflicts` | `critical_paths` (sshd_config, sshd_config.d/, sudoers, sudoers.d/), `ignore_paths` ([]): patterns for files to leave out, e.g. ones Ansible manages |
 | `debsums` | `timeout_seconds` (600) |
+| `listeners` | `ignore_listeners`: listeners to leave out (shell-style patterns) |
 | `upgrade-log` | `days` (30): without a snapshot, how many days of logs to read |
 | `boot-config` | `ignore_parameters` (BOOT_IMAGE, initrd) |
 | `obsolete-packages` | `protected_packages` ([]): packages that must stay installed |
@@ -326,13 +327,15 @@ host never looks healthy just because a check couldn't look.
 | `postgresql` | applications | Clusters still on an older major version than the newest installed server, or left behind after migrating; clusters that should start but are down; clusters online before but not now; opt-in probe that each online cluster accepts connections and answers a query |
 | `python-venvs` | applications | Virtualenvs whose Python no longer exists, or built for an older Python; compiled modules needing libraries that are missing (read from their ELF headers, never `ldd`); scripts whose interpreter doesn't exist |
 | `firewall` | network | ufw or nftables enabled but no rules loaded; rules lost since the baseline (root; only queries already-loaded kernel modules) |
+| `listeners` | network | With a snapshot: listeners that are gone, can now be reached from other hosts, are new or have another process behind them (root) |
 | `network` | network | Default route and DNS servers; interfaces, addresses, routes, DNS and the network manager (ifupdown, netplan, NetworkManager, systemd-networkd) compared with the baseline |
 | `apparmor` | security | AppArmor enabled, profiles in complain mode, denials this boot, profiles no longer enforced (root) |
+| `auth-config` | security | sudoers (`visudo -c`, root), and PAM and name service modules that exist; with a snapshot, modules lost |
 | `ssh-server` | security | `sshd -t` errors and warnings (an invalid config locks you out on restart); DSA keys in `authorized_keys` (root) |
 | `unattended-upgrades` | security | Installed but disabled, or still naming the old release in its allowed origins |
 | `disk-space` | storage | Free space and inodes on local filesystems (network mounts optional); a minimum free-space floor for `/` and `/var` |
 | `fstab` | storage | `findmnt --verify`; mounts that went missing since the baseline |
-| `storage-health` | storage | Software RAID, encrypted devices, swap, ZFS and Btrfs |
+| `storage-health` | storage | Software RAID, LVM, encrypted devices, swap, ZFS and Btrfs |
 
 ## Cleaning up after an upgrade
 

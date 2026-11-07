@@ -1,4 +1,4 @@
-# storage-health — RAID, encrypted devices, swap, ZFS and Btrfs
+# storage-health — RAID, LVM, encrypted devices, swap, ZFS and Btrfs
 
 Free space and mounts say little about whether the storage underneath is healthy. A
 degraded RAID array still mounts, and another failure can lose its data.
@@ -33,10 +33,12 @@ to be installed and no device is opened.
 | warning | *N* encrypted devices from before the upgrade aren't open | As above. |
 | warning | *N* swap areas from before the upgrade aren't active | As above. |
 | critical | *N* ZFS pools from before the upgrade are gone | `sudo zpool import`. |
+| warning | *N* LVM volumes from before the upgrade aren't active | `sudo lvs`; `sudo vgchange -ay`. A missing physical volume is a common cause. |
 
 ## Compared with a snapshot
 
-The snapshot records the RAID arrays, open encrypted devices, active swap and ZFS pools.
+The snapshot records the RAID arrays, active LVM volumes, open encrypted devices, active swap
+and ZFS pools.
 A problem that was already there before the upgrade is reported the same way.
 
 ## Commands it runs
@@ -46,7 +48,10 @@ None; it reads the files above.
 ## Limitations
 
 - It sees what the kernel reports, not what the disks would say: SMART and NVMe health
-  aren't covered, and neither is LVM.
+  aren't covered.
+- For LVM it sees only which volumes are active, from `/sys`. It can't report a missing physical
+  volume while its volumes still run, or a thin pool filling up: LVM's own commands try to
+  rewrite `/run/lvm/hints`, even with `--readonly`, so they aren't used.
 - Hardware RAID controllers are invisible to it.
 - The ZFS and Btrfs parts depend on files recent kernels provide; on others they say nothing.
 

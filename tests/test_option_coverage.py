@@ -18,6 +18,7 @@ from pydebuprep import checks
 ROOT = Path(__file__).resolve().parent.parent
 
 OPTION_TESTS: dict[tuple[str, str], str] = {
+    ("listeners", "ignore_listeners"): "checks.test_listeners::test_listeners_can_be_left_out",
     ("postgresql", "probe"): "checks.test_probes::test_pg_probe_off_by_default_runs_nothing",
     ("postgresql", "credentials_file"): "checks.test_probes::test_pg_credentials_file",
     ("certbot", "cert_warning_days"): "checks.test_certbot::test_live_certificate_expiring",

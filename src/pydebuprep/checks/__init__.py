@@ -12,6 +12,7 @@ from pydebuprep.checks.apt_held import AptHeldCheck
 from pydebuprep.checks.apt_lists_age import AptListsAgeCheck
 from pydebuprep.checks.apt_sources import AptSourcesCheck
 from pydebuprep.checks.apt_upgradable import AptUpgradableCheck
+from pydebuprep.checks.auth_config import AuthConfigCheck
 from pydebuprep.checks.base import Check
 from pydebuprep.checks.bind import BindCheck
 from pydebuprep.checks.boot_config import BootConfigCheck
@@ -33,6 +34,7 @@ from pydebuprep.checks.fstab import FstabCheck
 from pydebuprep.checks.journal_errors import JournalErrorsCheck
 from pydebuprep.checks.kernel_running import KernelRunningCheck
 from pydebuprep.checks.libvirt import LibvirtCheck
+from pydebuprep.checks.listeners import ListenersCheck
 from pydebuprep.checks.mariadb import MariaDbCheck
 from pydebuprep.checks.needrestart import NeedrestartCheck
 from pydebuprep.checks.network import NetworkCheck
@@ -87,10 +89,12 @@ ALL_CHECKS: list[type[Check]] = [
     TimeSyncCheck,
     CronCheck,
     NetworkCheck,
+    ListenersCheck,
     FirewallCheck,
     AppArmorCheck,
     UnattendedUpgradesCheck,
     SshServerCheck,
+    AuthConfigCheck,
     PostgresqlCheck,
     MariaDbCheck,
     PostfixCheck,

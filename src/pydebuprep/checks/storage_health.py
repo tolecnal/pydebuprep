@@ -1,4 +1,4 @@
-"""Whether the storage under the filesystems is healthy: software RAID, encrypted devices,
+"""Whether the storage under the filesystems is healthy: software RAID, LVM, encrypted devices,
 swap, ZFS and Btrfs. All read from /proc, /sys and /etc, so no tool has to be installed and
 no device is opened."""
 
@@ -48,6 +48,18 @@ def _open_encrypted(ctx: Context) -> list[str]:
     return sorted(names)
 
 
+def _active_volumes(ctx: Context) -> list[str]:
+    """Active LVM logical volumes. An internal device, such as a snapshot's -real or -cow, has
+    a suffix after the volume's UUID. Read here because LVM's commands aren't read-only:
+    even with --readonly they try to rewrite /run/lvm/hints."""
+    names = []
+    for path in ctx.system.glob("/sys/block/dm-*/dm/name"):
+        uuid = (ctx.system.read_text(posixpath.join(posixpath.dirname(path), "uuid")) or "").strip()
+        if uuid.startswith("LVM-") and "-" not in uuid[4:]:
+            names.append((ctx.system.read_text(path) or "").strip())
+    return sorted(names)
+
+
 def _crypttab(ctx: Context) -> list[str]:
     """Names in /etc/crypttab that should be open: those not marked noauto."""
     names = []
@@ -87,7 +99,7 @@ def _named(names: list[str], singular: str, plural: str, rest: str) -> str:
 
 class StorageHealthCheck(Check):
     id = "storage-health"
-    title = "RAID, encrypted devices, swap, ZFS and Btrfs"
+    title = "RAID, LVM, encrypted devices, swap, ZFS and Btrfs"
     category = "storage"
 
     def run(self, ctx: Context) -> list[Finding]:
@@ -246,6 +258,7 @@ class StorageHealthCheck(Check):
             "encrypted": _open_encrypted(ctx),
             "swaps": _active_swaps(ctx) or [],
             "pools": sorted(_pools(ctx)),
+            "volumes": _active_volumes(ctx),
         }
 
     def compare(self, ctx: Context, before: Any) -> list[Finding]:
@@ -256,6 +269,7 @@ class StorageHealthCheck(Check):
              "aren't", "open"),
             ("swaps", Severity.WARNING, "swap area", "swap areas", "isn't", "aren't", "active"),
             ("pools", Severity.CRITICAL, "ZFS pool", "ZFS pools", "is", "are", "gone"),
+            ("volumes", Severity.WARNING, "LVM volume", "LVM volumes", "isn't", "aren't", "active"),
         )  # fmt: skip
         findings = []
         for key, severity, one, many, verb, verbs, state in rules:

@@ -130,6 +130,20 @@
             "null"
           ]
         },
+        "auth-config": {
+          "additionalProperties": false,
+          "description": "sudoers, PAM and the name service",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
         "bind": {
           "additionalProperties": false,
           "description": "BIND configuration",
@@ -543,6 +557,33 @@
             "null"
           ]
         },
+        "listeners": {
+          "additionalProperties": false,
+          "description": "What listens on this host",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "ignore_listeners": {
+              "default": [
+                "unix:/run/user/*",
+                "unix:/run/systemd/*",
+                "unix:/tmp/*",
+                "unix:/var/tmp/*"
+              ],
+              "description": "Listeners to leave out, such as tcp/*:8080 or unix:/run/app* (shell-style patterns)",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
         "mariadb": {
           "additionalProperties": false,
           "description": "MariaDB and MySQL",
@@ -824,7 +865,7 @@
         },
         "storage-health": {
           "additionalProperties": false,
-          "description": "RAID, encrypted devices, swap, ZFS and Btrfs",
+          "description": "RAID, LVM, encrypted devices, swap, ZFS and Btrfs",
           "properties": {
             "enabled": {
               "default": true,
