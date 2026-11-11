@@ -35,6 +35,7 @@ pydebuprep \- health report suite for Debian and Ubuntu after a release upgrade
 .br
 .B pydebuprep snapshot
 .RB [ \-\-snapshot\-dir\ \fIDIR\fR ]
+.RB [ \-\-progress | \-\-no\-progress ]
 .RB [ \-\-no\-findings ]
 .RB [ \-\-check\-option\ \fICHECK.OPTION=VALUE\fR ]
 .RB [ \-\-config\ \fIFILE\fR \ |\  \-\-no\-config ]
@@ -183,6 +184,19 @@ Do not compare against any snapshot.
 .BI \-\-snapshot\-dir " DIR"
 Where snapshots are stored and looked up (default
 .IR /var/lib/pydebuprep/snapshots ).
+.TP
+.BR \-\-progress ", " \-\-no\-progress
+With
+.B report
+and
+.BR snapshot :
+which check is running is shown on standard error, as one line that is rewritten and then
+cleared, when that is a terminal.
+.B \-\-no\-progress
+turns it off;
+.B \-\-progress
+shows it elsewhere too, as a line for each check. The report on standard output is never
+touched.
 .TP
 .B \-\-no\-findings
 With
