@@ -9,6 +9,7 @@ from typing import Any
 from pydebuprep.checks.base import Check, CheckSkipped, Context
 from pydebuprep.findings_history import classify
 from pydebuprep.model import CheckResult, Finding, Status, sort_findings, sort_results
+from pydebuprep.progress import Progress, tracked
 from pydebuprep.redact import redact, redact_finding
 
 
@@ -58,5 +59,7 @@ def run_check(check: Check, ctx: Context) -> CheckResult:
     return result
 
 
-def run_checks(checks: Sequence[Check], ctx: Context) -> list[CheckResult]:
-    return sort_results([run_check(c, ctx) for c in checks])
+def run_checks(
+    checks: Sequence[Check], ctx: Context, progress: Progress | None = None
+) -> list[CheckResult]:
+    return sort_results([run_check(c, ctx) for c in tracked(checks, progress)])

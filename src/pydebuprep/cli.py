@@ -35,6 +35,7 @@ from pydebuprep.model import (
 )
 from pydebuprep.osinfo import detect_os
 from pydebuprep.portal import CA_FILE_ENV, Connection, PortalError, read_token, upload_report
+from pydebuprep.progress import choose as choose_progress
 from pydebuprep.remote_config import is_url, load_remote_config
 from pydebuprep.render import EXTENSIONS, FORMATS, render
 from pydebuprep.reportfile import ReportFileError, load_report
@@ -123,6 +124,25 @@ def _add_portal_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_progress_args(parser: argparse.ArgumentParser) -> None:
+    shown = parser.add_mutually_exclusive_group()
+    shown.add_argument(
+        "--progress",
+        dest="progress",
+        action="store_const",
+        const=True,
+        help="say on stderr which check is running, also when stderr isn't a terminal "
+        "(at a terminal that's shown anyway)",
+    )
+    shown.add_argument(
+        "--no-progress",
+        dest="progress",
+        action="store_const",
+        const=False,
+        help="don't show which check is running",
+    )
+
+
 def _add_output_args(parser: argparse.ArgumentParser) -> None:
     out = parser.add_mutually_exclusive_group()
     out.add_argument(
@@ -171,6 +191,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="hide findings below this severity (default: info; exit code still counts them)",
     )
     report.add_argument("--no-color", action="store_true", help="never colorize text output")
+    _add_progress_args(report)
     report.add_argument(
         "--todo",
         action=argparse.BooleanOptionalAction,
@@ -203,6 +224,7 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="DIR",
         help=f"where to store the snapshot (default: {DEFAULT_SNAPSHOT_DIR})",
     )
+    _add_progress_args(snap)
     snap.add_argument(
         "--no-findings",
         action="store_true",
@@ -410,7 +432,7 @@ def cmd_report(args: argparse.Namespace, system: System) -> int:
             print(f"pydebuprep: warning: {warning}", file=sys.stderr)
     ctx = Context(system, osinfo, loaded[1] if loaded else None, tuple(config.log_ignore))
     _note_slow_checks(selected, ctx)
-    results = run_checks(selected, ctx)
+    results = run_checks(selected, ctx, choose_progress(args.progress, sys.stderr))
     summary = compute_summary(results)
     try:
         kernel = running_kernel(ctx)
@@ -582,7 +604,11 @@ def cmd_snapshot(args: argparse.Namespace, system: System) -> int:
     if findings:
         _note_slow_checks(selected, ctx)
     path = create_snapshot(
-        selected, ctx, args.snapshot_dir or config.report.snapshot_dir, findings=findings
+        selected,
+        ctx,
+        args.snapshot_dir or config.report.snapshot_dir,
+        findings=findings,
+        progress=choose_progress(args.progress, sys.stderr),
     )
     print(path)
     return 0

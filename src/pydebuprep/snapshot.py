@@ -13,6 +13,7 @@ from typing import Any
 from pydebuprep.checks.base import Check, CommandFailed, Context, running_kernel
 from pydebuprep.findings_history import fingerprint
 from pydebuprep.model import BaselineInfo, Status
+from pydebuprep.progress import Progress, tracked
 from pydebuprep.render._common import clean
 from pydebuprep.runner import run_check
 
@@ -32,11 +33,13 @@ def format_timestamp(when: datetime) -> str:
     return when.strftime("%Y%m%dT%H%M%SZ")
 
 
-def _findings(checks: Sequence[Check], ctx: Context) -> dict[str, list[dict[str, Any]]]:
+def _findings(
+    checks: Sequence[Check], ctx: Context, progress: Progress | None
+) -> dict[str, list[dict[str, Any]]]:
     """What each check finds now. A check that was skipped or failed has no entry: what it
     would have found isn't known, which differs from having found nothing."""
     recorded = {}
-    for check in checks:
+    for check in tracked(checks, progress):
         result = run_check(check, ctx)
         if result.status in (Status.OK, Status.FINDINGS):
             recorded[check.id] = [fingerprint(f) for f in result.findings]
@@ -44,7 +47,11 @@ def _findings(checks: Sequence[Check], ctx: Context) -> dict[str, list[dict[str,
 
 
 def build_snapshot(
-    checks: Sequence[Check], ctx: Context, *, findings: bool = True
+    checks: Sequence[Check],
+    ctx: Context,
+    *,
+    findings: bool = True,
+    progress: Progress | None = None,
 ) -> dict[str, Any]:
     data: dict[str, Any] = {}
     skipped: list[str] = []
@@ -78,7 +85,7 @@ def build_snapshot(
         "skipped": skipped,
     }
     if findings:
-        snapshot["findings"] = _findings(checks, ctx)
+        snapshot["findings"] = _findings(checks, ctx, progress)
     return snapshot
 
 
@@ -88,8 +95,9 @@ def create_snapshot(
     directory: str = DEFAULT_SNAPSHOT_DIR,
     *,
     findings: bool = True,
+    progress: Progress | None = None,
 ) -> Path:
-    snap = build_snapshot(checks, ctx, findings=findings)
+    snap = build_snapshot(checks, ctx, findings=findings, progress=progress)
     stamp = format_timestamp(ctx.system.now())
     target_dir = Path(directory)
     try:

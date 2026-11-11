@@ -114,9 +114,9 @@ _pydebuprep() {
 
     local opts words_for_cmd="" file_arg=""
     case ${cmd:-report} in
-        report) opts="--allow-http --baseline --ca-file --check-option --checks --config --format --help --min-severity --no-baseline --no-color --no-config --no-todo --output --output-dir --skip --snapshot-dir --todo --token-file -c -f -h -o" ;;
+        report) opts="--allow-http --baseline --ca-file --check-option --checks --config --format --help --min-severity --no-baseline --no-color --no-config --no-progress --no-todo --output --output-dir --progress --skip --snapshot-dir --todo --token-file -c -f -h -o" ;;
         convert) opts="--format --help --no-color --no-todo --output --output-dir --todo -f -h -o" ;;
-        snapshot) opts="--allow-http --ca-file --check-option --config --help --no-config --no-findings --snapshot-dir --token-file -c -h" ;;
+        snapshot) opts="--allow-http --ca-file --check-option --config --help --no-config --no-findings --no-progress --progress --snapshot-dir --token-file -c -h" ;;
         list-checks) opts="--help --verbose -h -v" ;;
         configtest) opts="--allow-http --ca-file --config --help --no-config --token-file -c -h" ;;
         upload) opts="--allow-http --ca-file --config --help --no-config --token-file -c -h" ;;

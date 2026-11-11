@@ -134,6 +134,7 @@ sudo pydebuprep report --format html --output-dir /var/tmp
 | `--checks ID,...` / `--skip ID,...` | Run only, or leave out, specific checks. |
 | `--min-severity warning\|critical` | Hide lower-severity findings (the exit code still counts them). |
 | `--no-color` | Plain text output (also when not a TTY or `NO_COLOR` is set). |
+| `--progress`, `--no-progress` | Which check is running is shown on stderr at a terminal. `--no-progress` turns that off; `--progress` shows it elsewhere too, a line per check. |
 | `--todo` / `--no-todo` | Add a TODO checklist at the end of the report (see below); `todo: true` in the config makes it the default. |
 | `--check-option CHECK.OPTION=VALUE` | Set a check option; repeat it to add items to a list option. See `pydebuprep list-checks --verbose`. |
 | `--config FILE` / `--no-config` | Use another config file, or none. |

@@ -59,6 +59,21 @@ Overrides the configuration file for this run. Each check's page lists its optio
 `pydebuprep list-checks --verbose` lists them all. For list options, repeat
 `--check-option` to give several items.
 
+## Progress
+
+A run can take a while: [`debsums`](../checks/debsums.md) alone can take many minutes. At a
+terminal, pydebuprep says which check is running, on one line that it rewrites and clears
+when done:
+
+```text
+[12/49] [##--------] debsums: Package file checksums
+```
+
+It goes to standard error, so a report on standard output, piped or redirected, is never
+touched. Nothing is shown when standard error isn't a terminal, as in cron or a script.
+`--no-progress` turns it off; `--progress` shows it there too, as a plain line for each check.
+`snapshot` shows it the same way.
+
 ## Colour
 
 Text output is coloured when writing to a terminal. `--no-color`, the `NO_COLOR`
