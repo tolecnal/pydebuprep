@@ -41,7 +41,8 @@ from pydebuprep.config import (  # noqa: E402
 from pydebuprep.model import CATEGORY_ORDER  # noqa: E402
 
 MARKER = re.compile(
-    r"<!-- (facts|options|checks-index|check-matrix|config-reference|example-config|cli-reference)"
+    r"<!-- (facts|options|checks-index|check-matrix|check-count|config-reference|example-config"
+    r"|cli-reference)"
     r"(?:: ([a-z0-9-]+))? -->"
 )
 MATRIX = ROOT / "tools" / "check_matrix.yaml"
@@ -378,6 +379,8 @@ def render_marker(kind: str, arg: str | None) -> str:
         return checks_index()
     if kind == "check-matrix":
         return check_matrix()
+    if kind == "check-count":
+        return str(len(checks.ALL_CHECKS))
     if kind == "config-reference":
         return config_reference()
     if kind == "example-config":

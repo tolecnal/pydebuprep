@@ -8,7 +8,7 @@ from pydebuprep.checks.apt_upgradable import package_lines
 from pydebuprep.checks.base import Check, Context, Option, count, run_checked
 from pydebuprep.checks.kernel_running import compare_versions
 from pydebuprep.model import Finding, Severity, truncate_evidence
-from pydebuprep.system import apt_command
+from pydebuprep.system import DPKG_PACKAGE_NAME, apt_command
 
 PKG_VERSIONS_ARGV = ("dpkg-query", "-W", "-f=${Package}\t${Version}\n")
 # Hosts that serve the distributions' own archives (mirrors too: deb.debian.org, ...).
@@ -139,6 +139,12 @@ class ObsoletePackagesCheck(Check):
             "Packages that must stay installed: critical if one isn't",
         ),
     )
+
+    def validate(self) -> None:
+        # They go into a command the report suggests running as root.
+        bad = [n for n in self.opt("protected_packages") if not DPKG_PACKAGE_NAME.fullmatch(n)]
+        if bad:
+            raise ValueError(f"protected_packages: not package names: {', '.join(map(repr, bad))}")
 
     def run(self, ctx: Context) -> list[Finding]:
         return self._protected(ctx) + self._local(ctx) + self._third_party(ctx)

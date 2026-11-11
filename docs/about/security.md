@@ -29,7 +29,8 @@ packages that pass both checks.
   safely.
 - Passwords, tokens and keys are redacted from everything a report quotes, by the shape
   of what is usually secret (`password=...`, `mysql -p...`, `user:secret@host`, ...). That
-  can't recognise every secret, so treat reports as private, including on a portal.
+  can't recognise every secret, so treat reports as private, including on a portal. A quoted
+  line longer than 2000 characters loses its tail.
 - Snapshots are readable only by root (directory `0700`, files `0600`).
 - Files that other users control are opened one directory at a time, refusing symlinks
   on the way, so swapping a directory for a link can't make root open a device.

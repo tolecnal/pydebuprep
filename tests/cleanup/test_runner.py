@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import fcntl
 import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import ClassVar
 
@@ -140,24 +141,24 @@ def test_preflight_reasons(tmp_path: Path) -> None:
     [reason] = preflight(FakeSystem(root=True), broken, dpkg_lock=str(lock))
     assert reason.startswith("dpkg --audit reports problems: The following packages")
     lock.write_text("")
-    fd = os.open(lock, os.O_RDWR)
-    pid = os.fork()
-    if pid == 0:  # another process holds dpkg's lock, as apt does
-        fcntl.lockf(fd, fcntl.LOCK_EX)
-        os.write(os.open(tmp_path / "held", os.O_WRONLY | os.O_CREAT), b"1")
-        import time
-
-        time.sleep(5)
-        os._exit(0)
-    try:
-        while not (tmp_path / "held").exists():
-            pass
-        [reason] = preflight(FakeSystem(root=True), FakeRunner(), dpkg_lock=str(lock))
-        assert reason == "apt or dpkg is running (its lock is held); try again when it's done"
-    finally:
-        os.kill(pid, 9)
-        os.waitpid(pid, 0)
-        os.close(fd)
+    # Another process holds dpkg's lock, as apt does. A process of its own, not a fork: the
+    # test runner's workers have threads, which a fork doesn't carry over safely.
+    holder = (
+        "import fcntl, os, sys, time\n"
+        "fd = os.open(sys.argv[1], os.O_RDWR)\n"
+        "fcntl.lockf(fd, fcntl.LOCK_EX)\n"
+        "print('held', flush=True)\n"
+        "time.sleep(30)\n"
+    )
+    with subprocess.Popen(
+        [sys.executable, "-c", holder, str(lock)], stdout=subprocess.PIPE, text=True
+    ) as other:
+        try:
+            assert other.stdout is not None and other.stdout.readline() == "held\n"
+            [reason] = preflight(FakeSystem(root=True), FakeRunner(), dpkg_lock=str(lock))
+            assert reason == "apt or dpkg is running (its lock is held); try again when it's done"
+        finally:
+            other.kill()
 
 
 SIMULATION = """\

@@ -37,11 +37,17 @@ def _network_listeners(system: System) -> dict[str, str]:
 
 
 def _unix_listeners(system: System) -> dict[str, str]:
-    """Socket inode -> "unix:PATH", for sockets with a path that accept connections."""
+    """Socket inode -> "unix:PATH", for sockets with a path that accept connections.
+
+    The kernel prints a path as it is, so any user can write a line of their own here with a
+    newline in a socket's name. Only a path that is a socket on this host counts: a forged
+    line can then name nothing its author couldn't have made a real socket at."""
     found = {}
     for line in (system.read_text("/proc/net/unix") or "").splitlines()[1:]:
         fields = line.split()
-        if len(fields) >= 8 and fields[3] == ACCEPTING and fields[7].startswith("/"):
+        if len(fields) != 8 or fields[3] != ACCEPTING or not fields[7].startswith("/"):
+            continue
+        if system.is_socket(fields[7]):
             found[fields[6]] = f"{UNIX_PREFIX}{fields[7]}"
     return found
 

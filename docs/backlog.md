@@ -155,6 +155,14 @@ phase 2 (the upgrade-transaction audit) are done, and so is phase 3; the rest as
 - Parked: SMART and NVMe (raw device access, optional tools, no hardware in CI); Podman,
   Snap and Flatpak through their clients; gateway reachability.
 
+## Reviews
+
+Security review on 2026-11-11, of what was added since 0.14.0. Fixed: redaction took time
+growing with the square of a line's length, so a user's long crontab line could stall a run
+as root; `protected_packages` went unchecked into a suggested command; and a socket path with
+a newline could forge a listener. The test suite was reviewed too: it now runs in parallel,
+and coverage is measured on one Python version in CI. The 100% rule stays.
+
 ## Decisions to revisit
 
 - The documentation site moved from Material for MkDocs (end of life 2027-05-05) to
