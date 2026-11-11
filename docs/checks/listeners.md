@@ -35,6 +35,8 @@ None; it reads `/proc/net/*` and each process's open files in `/proc`.
 
 - Random local ports are left out, as they change at every restart: UDP ones anywhere, TCP
   ones on loopback. So are some Unix sockets (`ignore_listeners`).
+- A Unix socket counts only if its path is a socket this host's root can see: one inside a
+  service's private `/tmp` or a chroot is left out, and so is one with a space in its path.
 - A new listener isn't necessarily a problem, and a firewall may block one that looks
   reachable: "reachable" means it isn't bound to loopback only.
 - A service that moved from a port to a Unix socket shows as one gone and one new.

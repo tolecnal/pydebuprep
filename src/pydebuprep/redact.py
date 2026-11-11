@@ -12,6 +12,10 @@ import re
 from pydebuprep.model import Finding
 
 REDACTED = "<redacted>"
+# Longer lines lose their tail before the patterns run: they come from files any user can
+# write, such as a crontab, and some patterns take time that grows with the square of a line's
+# length. A tail left in unread could hold a secret, so it's left out.
+MAX_LINE = 2000
 _WORD = r"(?:pass(?:word|wd|phrase)?|pwd|secret|token|api[_-]?key|access[_-]?key|private[_-]?key)"
 _RULES = (
     # pdp_<id>_<secret>: the portal's upload tokens
@@ -23,7 +27,12 @@ _RULES = (
     # --password secret, --auth-token=secret
     (re.compile(rf"(?i)(--[\w-]*{_WORD}[\w-]*[= ]+)\S+"), rf"\1{REDACTED}"),
     # password=secret, DB_PASSWORD: secret, "api_key": "secret"
-    (re.compile(rf"(?i)([\w-]*{_WORD}[\w-]*[\"']?\s*[=:]\s*[\"']?)[^\s\"'&;,]+"), rf"\1{REDACTED}"),
+    # (the name is matched from its start, so a long word is looked at once, not from each
+    # of its letters)
+    (
+        re.compile(rf"(?i)(?<![\w-])([\w-]*{_WORD}[\w-]*[\"']?\s*[=:]\s*[\"']?)[^\s\"'&;,]+"),
+        rf"\1{REDACTED}",
+    ),
     # mysql -psecret: the password follows -p with no space
     (
         re.compile(
@@ -35,9 +44,12 @@ _RULES = (
 
 
 def redact(text: str) -> str:
+    left_out = len(text) - MAX_LINE
+    if left_out > 0:
+        text = text[:MAX_LINE]
     for pattern, replacement in _RULES:
         text = pattern.sub(replacement, text)
-    return text
+    return f"{text} … ({left_out} more characters left out)" if left_out > 0 else text
 
 
 def redact_finding(finding: Finding) -> Finding:

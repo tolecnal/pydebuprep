@@ -446,3 +446,18 @@ def test_realpath_follows_links(tmp_path: Path) -> None:
     (tmp_path / "file").write_text("x")
     (tmp_path / "link").symlink_to("file")
     assert System().realpath(str(tmp_path / "link")) == str((tmp_path / "file").resolve())
+
+
+def test_is_socket(tmp_path: Path) -> None:
+    import socket
+
+    path = tmp_path / "s.sock"
+    with socket.socket(socket.AF_UNIX) as sock:
+        sock.bind(str(path))
+        (tmp_path / "link").symlink_to(path)
+        (tmp_path / "file").write_text("x")
+        assert System().is_socket(str(path))
+        assert not System().is_socket(str(tmp_path / "link"))
+        assert not System().is_socket(str(tmp_path / "file"))
+        assert not System().is_socket(str(tmp_path / "missing"))
+        assert not System().is_socket("/tmp/a\0b")

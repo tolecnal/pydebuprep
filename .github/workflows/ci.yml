@@ -38,7 +38,12 @@ jobs:
         run: |
           python -m pip install -r requirements-dev.txt
           python -m pip install --no-deps -e .
-      - run: make lint coverage PYTHON=python
+      # Coverage is measured once, on the oldest Python: measuring it more than doubles a
+      # run, and the other versions run the same tests.
+      - if: matrix.python == '3.10'
+        run: make lint coverage PYTHON=python
+      - if: matrix.python != '3.10'
+        run: make lint test PYTHON=python
 
   web-configs:
     name: nginx and Apache checks on real configurations (${{ matrix.image }})

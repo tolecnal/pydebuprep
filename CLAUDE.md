@@ -18,6 +18,9 @@ make lint                              # ruff check, ruff format --check, mypy
 make coverage                          # pytest with 100% line AND branch coverage required
 ```
 
+Tests run on every core (`pytest-xdist`); `make coverage JOBS=0` runs them in one process.
+They must also pass without the plugin, as the package build runs them: don't rely on it.
+
 - **100% line and branch coverage (`fail_under = 100`) is mandatory.** Write real
   tests for every new branch; do not add `# pragma: no cover` to bypass coverage.
 - **Do not silence linters (`# noqa`, `# type: ignore`, `# nosec`)** unless strictly
@@ -90,7 +93,9 @@ make coverage                          # pytest with 100% line AND branch covera
      must render `clean_report(report)`, which runs `clean()` over every text field in
      `Report`, `Host`, `BaselineInfo`, `ConfigInfo`, `CheckResult`, and `Finding`.
    - `runner.run_check()` passes every finding through `redact_finding()` so secrets quoted
-     from logs and crontabs stay out of reports.
+     from logs and crontabs stay out of reports. `redact()` drops what is past `MAX_LINE`
+     before its patterns run: any user can write a long line, and a pattern's time must not
+     grow with it.
    - Stderr warnings derived from snapshots (`baseline_warnings`) or portal replies
      (`_excerpt`, `upload_report` location) must also pass through `clean()`.
    - `Finding.references` must be validated with `safe_url()` (`http://` or `https://`
@@ -100,3 +105,7 @@ make coverage                          # pytest with 100% line AND branch covera
      `ValueError` (too-long integers) on untrusted YAML/JSON inputs.
    - A value in a `Finding.remediation` command that someone other than root can choose,
      such as a mount point, must go through `shlex.quote()`: people paste these as root.
+     An option whose values go into one, such as `protected_packages`, is checked in
+     `Check.validate()`: a config fetched from a URL can set it.
+   - `/proc/net/unix` prints socket paths raw, so a user can forge lines in it with a newline
+     in a path: only count a path that `System.is_socket()` confirms.

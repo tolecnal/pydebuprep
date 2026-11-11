@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import re
 import sys
 from pathlib import Path
@@ -236,6 +237,7 @@ def test_cleanup_doc_page() -> None:
         assert words in text, words
 
 
+@functools.cache
 def _matrix() -> dict[str, list[dict[str, Any]]]:
     return docs_build.load_matrix()
 
@@ -346,3 +348,11 @@ def test_matrix_page_summarises_what_is_opt_in() -> None:
     assert "| [`docker`](docker.md) | `http_probes` | A `GET` to each URL you list |" in head
     assert "## On by default, and can be turned off" in head
     assert "| [`nginx`](nginx.md) | `tls_probe` |" in head
+
+
+def test_the_number_of_checks_comes_from_the_registry() -> None:
+    assert docs_build.expand("runs <!-- check-count --> checks") == (
+        f"runs {len(checks.ALL_CHECKS)} checks"
+    )
+    for page in ("index.md", "checks/index.md"):
+        assert "<!-- check-count --> checks" in (DOCS / page).read_text(encoding="utf-8"), page

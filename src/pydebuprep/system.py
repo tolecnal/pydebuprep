@@ -585,6 +585,13 @@ class System:
         except OSError:
             return False
 
+    def is_socket(self, path: str) -> bool:
+        """A Unix socket itself, not a symlink to one."""
+        try:
+            return stat.S_ISSOCK(os.lstat(path).st_mode)
+        except (OSError, ValueError):  # ValueError: a NUL in a name read from /proc
+            return False
+
     def readlink(self, path: str) -> str | None:
         try:
             return os.readlink(path)

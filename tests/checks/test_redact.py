@@ -103,3 +103,50 @@ def test_a_skip_reason_is_redacted_too() -> None:
             raise CheckSkipped("password=hunter2")
 
     assert "hunter2" not in (run_check(Skipping(), make_ctx()).skipped_reason or "")
+
+
+# --- redaction can't be made slow -------------------------------------------------------
+
+LONG = 1_000_000
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "a" * LONG,
+        "-" * LONG,
+        "--" + "a-" * (LONG // 2),
+        "mysql " * (LONG // 6),
+        "://" + "a" * LONG,
+        "password " * (LONG // 9),
+        "token" * (LONG // 5),
+    ],
+    ids=["word", "dashes", "dashed words", "mysql", "url", "password words", "token run"],
+)
+def test_a_long_line_is_redacted_quickly(text: str) -> None:
+    """A user's crontab line reaches this as root: it must not take minutes."""
+    import time
+
+    started = time.monotonic()
+    out = redact(text)
+    assert time.monotonic() - started < 5
+    assert len(out) < 5000 and out.endswith("characters left out)")
+
+
+def test_a_long_line_keeps_its_start_and_loses_its_tail() -> None:
+    from pydebuprep.redact import MAX_LINE
+
+    out = redact("job: password=hunter2 " + "x" * MAX_LINE + " token=tail-secret")
+    assert out.startswith(f"job: password={REDACTED} xxx")
+    assert "tail-secret" not in out
+
+
+def test_a_line_at_the_limit_is_left_whole() -> None:
+    from pydebuprep.redact import MAX_LINE
+
+    assert redact("x" * MAX_LINE) == "x" * MAX_LINE
+
+
+def test_words_that_only_contain_a_secret_word_still_count() -> None:
+    assert redact("MY_DB_PASSWORD=hunter2") == f"MY_DB_PASSWORD={REDACTED}"
+    assert redact("x --db-password hunter2") == f"x --db-password {REDACTED}"

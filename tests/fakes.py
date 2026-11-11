@@ -128,6 +128,9 @@ class FakeSystem(System):
     def readlink(self, path: str) -> str | None:
         return self.links.get(path)
 
+    def is_socket(self, path: str) -> bool:
+        return path in self.files
+
     def realpath(self, path: str) -> str:
         return self._target(path)
 

@@ -38,6 +38,9 @@ def system(
         "/proc/net/unix": UNIX_HEAD + unix,
         EPHEMERAL: "32768\t60999\n",
     }
+    for line in unix.splitlines():  # every path named is a socket that exists
+        if len(line.split()) >= 8:
+            files[line.split()[7]] = ""
     links = {}
     for inode, (pid, name) in (owners or {}).items():
         files[f"/proc/{pid}/comm"] = f"{name}\n"
@@ -196,3 +199,16 @@ def test_another_address_on_a_known_port_is_not_a_new_listener() -> None:
     tcp = tcp_line(LOOPBACK, 80, 11) + tcp_line(ANYWHERE, 80, 12)
     fs = compare({"tcp/127.0.0.1:80": ""}, tcp=tcp)
     assert [f.title for f in fs] == ["1 port is now reachable from other hosts"]
+
+
+def test_a_forged_line_in_the_socket_list_is_not_a_listener() -> None:
+    """A socket's path is printed as it is, so one with a newline in it writes a line of its
+    own. What that line names isn't a socket, or isn't there."""
+    forged = (
+        "0000: 00000002 00000000 00010000 0001 01 21 /home/u/x\n"
+        "0: 00000002 00000000 00010000 0001 01 21 /run/fake.sock\n"
+    )
+    parts = system(unix=forged, owners={21: (101, "evil")})
+    del parts["files"]["/run/fake.sock"]
+    found = ListenersCheck({"ignore_listeners": []}).collect_baseline(make_ctx(**parts))
+    assert found == {"unix:/home/u/x": "evil"}  # the real socket, under its real name

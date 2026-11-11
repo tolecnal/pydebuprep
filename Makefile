@@ -7,12 +7,15 @@ lint:
 	$(PYTHON) -m ruff format --check src tests scripts tools
 	$(PYTHON) -m mypy
 
+# Tests run on every core (pytest-xdist). JOBS=0 runs them in one process, for debugging.
+JOBS ?= auto
+
 test:
-	$(PYTHON) -m pytest -q
+	$(PYTHON) -m pytest -q -n $(JOBS)
 
 # Branch coverage; fails below fail_under in pyproject.toml.
 coverage:
-	$(PYTHON) -m pytest -q --cov --cov-report=term-missing
+	$(PYTHON) -m pytest -q -n $(JOBS) --cov --cov-report=term-missing
 
 # Files generated from the code; tests fail if they are out of date.
 generated:

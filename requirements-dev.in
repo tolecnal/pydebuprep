@@ -3,6 +3,7 @@
 PyYAML
 pytest
 pytest-cov
+pytest-xdist
 ruff
 mypy
 types-PyYAML
