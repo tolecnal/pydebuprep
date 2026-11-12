@@ -10,7 +10,7 @@ Only the latest release gets security fixes. Upgrade to it before reporting, if 
 
 | Version | Supported |
 |---|---|
-| 0.16.x (latest) | Yes |
+| 0.17.x (latest) | Yes |
 | Older | No |
 
 ## Reporting a vulnerability
@@ -87,9 +87,9 @@ changes on each supported release, and published with checksums and a signed
 build-provenance attestation:
 
 ```sh
-gh release download v0.16.0 -R tolecnal/pydebuprep
+gh release download v0.17.0 -R tolecnal/pydebuprep
 sha256sum -c SHA256SUMS
-gh attestation verify pydebuprep_0.16.0_all.deb -R tolecnal/pydebuprep
+gh attestation verify pydebuprep_0.17.0_all.deb -R tolecnal/pydebuprep
 ```
 
 Install only packages that pass both checks.
