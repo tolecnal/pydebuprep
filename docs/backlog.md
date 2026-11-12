@@ -1,6 +1,6 @@
 # Backlog
 
-What is still open, as of 2026-11-07 (after pydebuprep 0.16.0 and the portal release built on it). Remove items as they are done.
+What is still open, as of 2026-11-11 (after pydebuprep 0.17.0 and the portal release built on it). Remove items as they are done.
 
 ## GitHub repository settings
 

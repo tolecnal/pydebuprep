@@ -1,3 +1,25 @@
+pydebuprep (0.17.0) unstable; urgency=medium
+
+  * report and snapshot show which check is running, on standard error: at a
+    terminal, one line with a count and a bar that is rewritten and then
+    cleared. Nothing is shown in cron or scripts. --no-progress turns it off;
+    --progress shows it without a terminal too, as a line for each check. The
+    report on standard output is never touched.
+  * Security: a quoted line longer than 2000 characters now loses its tail
+    before secrets are looked for. That search took time growing with the
+    square of a line's length, so a user's long crontab line could stall a
+    run as root for hours. Affects 0.14.0 to 0.16.0.
+  * Security: protected_packages takes package names only. Its values went
+    unchecked into a suggested sudo command, and a config fetched from a
+    portal can set it. Affects 0.15.1 to 0.16.0.
+  * Security: listeners counts a Unix socket only if its path is a socket on
+    this host. A socket path with a newline in it could forge a listener.
+    Sockets root can't see by path, as in a service's private /tmp, are now
+    left out. Affects 0.16.0.
+  * The report format is unchanged: portal 0.11.0 and newer take these reports.
+
+ -- Jostein Elvaker Haande <jehaande@gmail.com>  Wed, 11 Nov 2026 23:41:45 +0100
+
 pydebuprep (0.16.0) unstable; urgency=medium
 
   * New check listeners (root): with a snapshot, TCP, UDP and Unix listeners

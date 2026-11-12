@@ -1,3 +1,3 @@
 """Read-only post-upgrade health report for Debian and Ubuntu systems."""
 
-__version__ = "0.16.0"
+__version__ = "0.17.0"
