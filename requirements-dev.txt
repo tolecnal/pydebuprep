@@ -63,11 +63,11 @@ rpds-py==0.30.0
     # via
     #   jsonschema
     #   referencing
-ruff==0.17.3
+ruff==0.17.4
     # via -r requirements-dev.in
 stevedore==5.8.0
     # via bandit
-types-pyyaml==6.0.12.20261103
+types-pyyaml==6.0.12.20261111
     # via -r requirements-dev.in
 typing-extensions==4.16.0
     # via mypy

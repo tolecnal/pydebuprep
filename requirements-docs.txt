@@ -2,8 +2,6 @@
 #    uv pip compile --python-version 3.12 requirements-docs.in -o requirements-docs.txt
 click==8.5.0
     # via zensical
-deepmerge==4.0.0
-    # via zensical
 jinja2==3.1.6
     # via zensical
 markdown==3.11.2
@@ -24,7 +22,7 @@ pyyaml==6.0.3
     #   zensical
 tomli==2.5.0
     # via zensical
-zensical==0.0.74
+zensical==0.1.1
     # via -r requirements-docs.in
-zensical-ui==0.0.41
+zensical-ui==0.0.42
     # via zensical
